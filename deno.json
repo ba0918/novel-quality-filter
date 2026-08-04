@@ -5,6 +5,7 @@
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
     "test": "deno test --allow-all",
+    "setup-hooks": "deno run --allow-run --allow-read scripts/setup-hooks.ts",
     "spike:lindera": "deno run --allow-all spike/lindera_spike.ts",
     "spike:realdata": "deno run --allow-all spike/realdata_spike.ts"
   },

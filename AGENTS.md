@@ -20,12 +20,41 @@ V3）。 「AI 検出」ではなく「低品質駄文の検出」。品質が�
 
 `deno task check` で lint + fmt + test を一括実行する。コミット前に通すこと。
 
-## プロジェクト構造
+## アーキテクチャ
+
+レイヤードアーキテクチャを採用（ba-markdown-viewer と同方式）。
 
 ```
-src/           # アプリケーションコード
-spike/         # 技術検証用スパイク（Git 管理するが本番コードではない）
-dist/          # ビルド出力（Git 管理外）
+src/
+├── domain/          # 純粋なドメインロジック（ブラウザ API 非依存）
+│   ├── scoring/     #   スコア計算、重み付け、正規化
+│   ├── analyzer/    #   文長SD、段落分析、区切り検出、TTR、修飾語密度
+│   └── tokenizer/   #   lindera-wasm のラッパー（初期化・キャッシュ管理）
+├── services/        # ドメインオブジェクトのオーケストレーション
+├── messaging/       # レイヤー間通信（Chrome 拡張メッセージング）
+├── background/      # Service Worker（バックグラウンドスコアリング）
+├── content/         # カクヨム/なろう用 content script + DOM 注入
+├── settings/        # Popup UI（閾値、ブロックリスト管理）
+├── ui-components/   # スコアバッジ、ブロックボタン等
+└── shared/          # 型定義、ストレージラッパー、定数
+```
+
+### レイヤー間通信ルール
+
+**レイヤー間のやり取りは必ず messaging を経由する。直接 import による越境禁止。**
+
+- content / background / settings は互いを直接 import しない
+- レイヤーをまたぐ通信は全て `messaging/` 層の型付きメッセージを通す
+- domain / shared は全レイヤーから import 可（内側への依存のみ許可）
+
+```
+content ──messaging──▶ background ◀──messaging── settings
+              │               │
+              ▼               ▼
+           domain          domain
+              │               │
+              ▼               ▼
+           shared           shared
 ```
 
 ## コーディング規約

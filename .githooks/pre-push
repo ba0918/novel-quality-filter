@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+echo "Pre-push checks running..."
+
+echo "Running full quality gate..."
+if ! deno task check; then
+  echo "Quality gate failed."
+  exit 1
+fi
+
+echo "Pre-push checks passed."
+exit 0
