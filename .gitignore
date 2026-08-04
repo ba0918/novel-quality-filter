@@ -1,0 +1,45 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Test coverage
+coverage/
+
+# Deno
+.deno/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Spike (検証用コード、Git管理外)
+spike/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Agent Artifact Store
+/.agents/artifacts/
