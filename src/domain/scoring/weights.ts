@@ -11,7 +11,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "singleSentParaRatio",
     label: "一文一段落比率",
-    weight: 0.25,
+    weight: 0.22,
     normalize: (raw: number) => Math.min(raw, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -19,7 +19,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "sentenceLengthSD",
     label: "文長の標準偏差",
-    weight: 0.15,
+    weight: 0.12,
     normalize: (raw: number) => Math.min(raw / 25, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -59,7 +59,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "paragraphLengthSD",
     label: "段落長の標準偏差",
-    weight: 0.11,
+    weight: 0.09,
     normalize: (raw: number) => Math.min(raw / 40, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -67,7 +67,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "taigendomeEntropy",
     label: "体言止め分布の均一性",
-    weight: 0.04,
+    weight: 0.02,
     normalize: (raw: number) => raw === 0 ? 0.5 : Math.min(raw / 2, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -93,6 +93,14 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     label: "段落遷移エントロピー",
     weight: 0.04,
     normalize: (raw: number) => Math.min(raw / 1.5, 1),
+    invert: false,
+    flagThreshold: 0.3,
+  },
+  {
+    key: "sentenceLengthBurstiness",
+    label: "文長バースティネス",
+    weight: 0.10,
+    normalize: (raw: number) => Math.min(raw / 8, 1),
     invert: false,
     flagThreshold: 0.3,
   },

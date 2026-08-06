@@ -19,6 +19,7 @@ export interface RawMetrics {
   emotionDirectnessRatio: number;
   logicalConnectiveDensity: number;
   paragraphTransitionEntropy: number;
+  sentenceLengthBurstiness: number;
 }
 
 export interface MetricResult {
