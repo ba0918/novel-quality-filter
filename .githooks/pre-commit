@@ -1,5 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 set -e
+
+eval "$("$HOME/.local/bin/mise" activate bash)" 2>/dev/null || true
 
 echo "Pre-commit checks running..."
 
