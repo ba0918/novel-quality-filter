@@ -49,10 +49,11 @@ export function markAsProcessed(cardElement: HTMLElement): void {
 }
 
 function findCardContainer(link: HTMLAnchorElement): HTMLElement | null {
-  // カクヨムのランキングアイテムを最優先で探す
-  // 内側にもクラスなし <li>（レビューリスト項目）があるため、
-  // class に Rankings_item を含む <li> を直接 closest で取る
-  const rankingItem = link.closest<HTMLElement>('li[class*="Rankings_item"]');
+  // カクヨムのランキングリスト直下の <li> を取る
+  // Rankings_item（通常）と Rankings_promotionSlot（ネクスト等）の両方に対応
+  // 内側にクラスなし <li>（レビューリスト項目）があるため、
+  // Rankings_ を含むクラスの <li> を直接 closest で取る
+  const rankingItem = link.closest<HTMLElement>('li[class*="Rankings_"]');
   if (rankingItem) return rankingItem;
 
   // 汎用フォールバック
