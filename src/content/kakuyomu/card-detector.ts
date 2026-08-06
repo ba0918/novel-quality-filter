@@ -49,19 +49,17 @@ export function markAsProcessed(cardElement: HTMLElement): void {
 }
 
 function findCardContainer(link: HTMLAnchorElement): HTMLElement | null {
-  // カクヨムのランキングアイテム（li.Rankings_item）を優先
+  // カクヨムのランキングアイテムを最優先で探す
+  // 内側にもクラスなし <li>（レビューリスト項目）があるため、
+  // class に Rankings_item を含む <li> を直接 closest で取る
   const rankingItem = link.closest<HTMLElement>('li[class*="Rankings_item"]');
   if (rankingItem) return rankingItem;
 
-  // 汎用フォールバック: 最も近い <li>
-  let el: HTMLElement | null = link.parentElement;
-  while (el && el !== document.body) {
-    if (el.tagName === "LI") return el;
-    if (el.tagName === "ARTICLE" || el.tagName === "SECTION") return el;
-    el = el.parentElement;
-  }
+  // 汎用フォールバック
+  const article = link.closest<HTMLElement>("article, section");
+  if (article) return article;
 
-  return link.parentElement;
+  return link.closest<HTMLElement>("li") ?? link.parentElement;
 }
 
 export function observeNewCards(
