@@ -1,8 +1,19 @@
 import type { MetricResult, RawMetrics } from "../types.ts";
 import { METRIC_CONFIGS } from "./weights.ts";
 
-function formatReason(label: string, rawValue: number, invert: boolean, flagged: boolean): string {
+const CUSTOM_REASONS: Record<string, (rawValue: number) => string> = {
+  sentenceLengthBurstiness: (raw) => `文章の緩急が乏しい（バースティネス ${raw.toFixed(1)}）`,
+};
+
+function formatReason(
+  key: string,
+  label: string,
+  rawValue: number,
+  invert: boolean,
+  flagged: boolean,
+): string {
   if (!flagged) return "";
+  if (CUSTOM_REASONS[key]) return CUSTOM_REASONS[key](rawValue);
   const direction = invert ? "高い" : "低い";
   const formatted = rawValue < 1 ? (rawValue * 100).toFixed(1) + "%" : rawValue.toFixed(1);
   return `${label}が ${formatted} と${direction}`;
@@ -24,7 +35,7 @@ export function normalizeMetrics(raw: RawMetrics): MetricResult[] {
       weight: config.weight,
       contribution,
       flagged,
-      reason: formatReason(config.label, rawValue, config.invert, flagged),
+      reason: formatReason(config.key, config.label, rawValue, config.invert, flagged),
     };
   });
 }

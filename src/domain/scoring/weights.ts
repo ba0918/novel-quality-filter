@@ -102,7 +102,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     weight: 0.10,
     normalize: (raw: number) => Math.min(raw / 8, 1),
     invert: false,
-    flagThreshold: 0.3,
+    flagThreshold: 0.5,
   },
 ];
 
