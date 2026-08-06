@@ -52,7 +52,11 @@ function insertBadgeElement(cardElement: HTMLElement, badge: HTMLElement): void 
 }
 
 function findStarCountLink(cardElement: HTMLElement): HTMLAnchorElement | null {
-  const reviewLinks = cardElement.querySelectorAll<HTMLAnchorElement>(
+  // WorkMeta 領域内の★数リンクを探す（レビュー欄の方を拾わないように限定）
+  const metaArea = cardElement.querySelector('[class*="WorkMeta"]');
+  const searchRoot = metaArea ?? cardElement;
+
+  const reviewLinks = searchRoot.querySelectorAll<HTMLAnchorElement>(
     'a[href*="/reviews"]',
   );
   for (const link of reviewLinks) {

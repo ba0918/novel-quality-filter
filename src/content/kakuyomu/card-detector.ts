@@ -49,20 +49,16 @@ export function markAsProcessed(cardElement: HTMLElement): void {
 }
 
 function findCardContainer(link: HTMLAnchorElement): HTMLElement | null {
+  // カクヨムのランキングアイテム（li.Rankings_item）を優先
+  const rankingItem = link.closest<HTMLElement>('li[class*="Rankings_item"]');
+  if (rankingItem) return rankingItem;
+
+  // 汎用フォールバック: 最も近い <li>
   let el: HTMLElement | null = link.parentElement;
   while (el && el !== document.body) {
     if (el.tagName === "LI") return el;
     if (el.tagName === "ARTICLE" || el.tagName === "SECTION") return el;
-    if (el.dataset.workId) return el;
     el = el.parentElement;
-  }
-
-  // フォールバック: 作品リンクを1つだけ含む最小の div
-  let candidate = link.closest<HTMLElement>("div");
-  while (candidate && candidate !== document.body) {
-    const linkCount = candidate.querySelectorAll('a[href*="/works/"]').length;
-    if (linkCount <= 2) return candidate;
-    candidate = candidate.parentElement?.closest<HTMLElement>("div") ?? null;
   }
 
   return link.parentElement;
