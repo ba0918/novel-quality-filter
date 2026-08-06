@@ -29,6 +29,13 @@ export function sendClearCacheRequest(): Promise<ClearCacheResponse> {
   return sendToBackground(message) as Promise<ClearCacheResponse>;
 }
 
+const MESSAGE_TIMEOUT_MS = 30_000;
+
 function sendToBackground(message: NqfRequest): Promise<NqfResponse> {
-  return chrome.runtime.sendMessage(message);
+  return Promise.race([
+    chrome.runtime.sendMessage(message),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Message timeout")), MESSAGE_TIMEOUT_MS)
+    ),
+  ]);
 }
