@@ -106,4 +106,20 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   },
 ];
 
+export interface PenaltyRule {
+  key: string;
+  criticalThreshold: number;
+  penaltyMultiplier: number;
+  exemptWhenZero: boolean;
+}
+
+export const PENALTY_RULES: PenaltyRule[] = [
+  {
+    key: "sentenceLengthBurstiness",
+    criticalThreshold: 0.5,
+    penaltyMultiplier: 0.55,
+    exemptWhenZero: true,
+  },
+];
+
 export const DEFAULT_THRESHOLD = 40;
