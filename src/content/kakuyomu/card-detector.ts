@@ -49,18 +49,33 @@ export function markAsProcessed(cardElement: HTMLElement): void {
 }
 
 function findCardContainer(link: HTMLAnchorElement): HTMLElement | null {
-  // カクヨムのランキングリスト直下の <li> を取る
-  // Rankings_item（通常）と Rankings_promotionSlot（ネクスト等）の両方に対応
-  // 内側にクラスなし <li>（レビューリスト項目）があるため、
-  // Rankings_ を含むクラスの <li> を直接 closest で取る
+  // カクヨムのランキングアイテム（通常 + プロモーション枠）
   const rankingItem = link.closest<HTMLElement>('li[class*="Rankings_"]');
   if (rankingItem) return rankingItem;
+
+  // 検索ページ等: WorkMeta を含む最小のボーダー付きボックス
+  const workMeta = link.closest<HTMLElement>('[class*="WorkMeta"]') ??
+    findSiblingWithClass(link, "WorkMeta");
+  if (workMeta) {
+    const box = workMeta.closest<HTMLElement>('[class*="NewBox_box"][class*="borderSize"]');
+    if (box) return box;
+  }
 
   // 汎用フォールバック
   const article = link.closest<HTMLElement>("article, section");
   if (article) return article;
 
   return link.closest<HTMLElement>("li") ?? link.parentElement;
+}
+
+function findSiblingWithClass(el: HTMLElement, classFragment: string): HTMLElement | null {
+  let parent = el.parentElement;
+  for (let depth = 0; depth < 6 && parent; depth++) {
+    const found = parent.querySelector<HTMLElement>(`[class*="${classFragment}"]`);
+    if (found) return found;
+    parent = parent.parentElement;
+  }
+  return null;
 }
 
 export function observeNewCards(
