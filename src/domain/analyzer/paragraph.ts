@@ -1,4 +1,4 @@
-const SEPARATOR_PATTERN = /^[\s]*(---|＊＊＊|\*\*\*|───|——|━━)[\s]*$/;
+import { SEPARATOR_PATTERN } from "./constants.ts";
 
 export function analyzeSingleSentParagraphs(
   text: string,

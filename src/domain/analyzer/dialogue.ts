@@ -1,6 +1,5 @@
 import type { TokenData } from "../types.ts";
-
-const NON_CONTENT_POS = ["記号", "空白", "BOS/EOS"];
+import { NON_CONTENT_POS } from "./constants.ts";
 
 export function analyzeDialogues(
   text: string,

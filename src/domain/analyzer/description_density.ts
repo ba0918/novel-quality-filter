@@ -1,8 +1,7 @@
 import type { TokenData } from "../types.ts";
+import { NON_CONTENT_POS, SEPARATOR_PATTERN } from "./constants.ts";
 
 const MODIFIER_POS = ["形容詞", "副詞"];
-const NON_CONTENT_POS = ["記号", "空白", "BOS/EOS"];
-const SEPARATOR_PATTERN = /^[\s]*(---|＊＊＊|\*\*\*|───|——|━━)[\s]*$/;
 
 export function analyzeDescriptionDensity(
   text: string,
