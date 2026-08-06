@@ -6,6 +6,9 @@ import { analyzeDialogues } from "./dialogue.ts";
 import { analyzeVocabularyDiversity } from "./vocabulary.ts";
 import { analyzeDescriptionDensity } from "./description_density.ts";
 import { analyzeTaigendome } from "./taigendome.ts";
+import { analyzeEmotionDirectness } from "./emotion_directness.ts";
+import { analyzeLogicalConnectives } from "./logical_connective.ts";
+import { analyzeParagraphTransitions } from "./paragraph_transition.ts";
 
 export function analyzeAll(
   text: string,
@@ -26,6 +29,15 @@ export function analyzeAll(
   );
   const { sd: descriptionDensitySD } = analyzeDescriptionDensity(text, tokenizeFn);
   const { entropy: taigendomeEntropy } = analyzeTaigendome(text, tokenizeFn);
+  const { ratio: emotionDirectnessRatio } = analyzeEmotionDirectness(
+    text,
+    tokenizeFn,
+  );
+  const { density: logicalConnectiveDensity } = analyzeLogicalConnectives(text);
+  const { entropy: paragraphTransitionEntropy } = analyzeParagraphTransitions(
+    text,
+    tokenizeFn,
+  );
 
   return {
     charCount: text.length,
@@ -40,6 +52,9 @@ export function analyzeAll(
     dialogueEndingVariety,
     descriptionDensitySD,
     taigendomeEntropy,
+    emotionDirectnessRatio,
+    logicalConnectiveDensity,
+    paragraphTransitionEntropy,
   };
 }
 
@@ -50,3 +65,6 @@ export { analyzeDialogues } from "./dialogue.ts";
 export { analyzeVocabularyDiversity } from "./vocabulary.ts";
 export { analyzeDescriptionDensity } from "./description_density.ts";
 export { analyzeTaigendome } from "./taigendome.ts";
+export { analyzeEmotionDirectness } from "./emotion_directness.ts";
+export { analyzeLogicalConnectives } from "./logical_connective.ts";
+export { analyzeParagraphTransitions } from "./paragraph_transition.ts";

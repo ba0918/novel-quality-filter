@@ -16,6 +16,9 @@ export interface RawMetrics {
   dialogueEndingVariety: number;
   descriptionDensitySD: number;
   taigendomeEntropy: number;
+  emotionDirectnessRatio: number;
+  logicalConnectiveDensity: number;
+  paragraphTransitionEntropy: number;
 }
 
 export interface MetricResult {

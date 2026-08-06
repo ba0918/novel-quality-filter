@@ -11,7 +11,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "singleSentParaRatio",
     label: "一文一段落比率",
-    weight: 0.30,
+    weight: 0.25,
     normalize: (raw: number) => Math.min(raw, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -19,7 +19,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "sentenceLengthSD",
     label: "文長の標準偏差",
-    weight: 0.18,
+    weight: 0.15,
     normalize: (raw: number) => Math.min(raw / 25, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -27,7 +27,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "separatorFrequency",
     label: "水平線/区切りの頻度",
-    weight: 0.09,
+    weight: 0.07,
     normalize: (raw: number) => Math.min(raw * 10, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -35,7 +35,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "dialogueEndingVariety",
     label: "会話語尾の多様性",
-    weight: 0.10,
+    weight: 0.08,
     normalize: (raw: number) => Math.min(raw, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -43,7 +43,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "ttr",
     label: "語彙多様性（TTR）",
-    weight: 0.07,
+    weight: 0.06,
     normalize: (raw: number) => Math.min(raw / 0.7, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -51,7 +51,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "descriptionDensitySD",
     label: "描写密度の分散",
-    weight: 0.08,
+    weight: 0.07,
     normalize: (raw: number) => Math.min(raw / 0.06, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -59,7 +59,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "paragraphLengthSD",
     label: "段落長の標準偏差",
-    weight: 0.13,
+    weight: 0.11,
     normalize: (raw: number) => Math.min(raw / 40, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -67,10 +67,34 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "taigendomeEntropy",
     label: "体言止め分布の均一性",
-    weight: 0.05,
+    weight: 0.04,
     normalize: (raw: number) => raw === 0 ? 0.5 : Math.min(raw / 2, 1),
     invert: true,
     flagThreshold: 0.4,
+  },
+  {
+    key: "emotionDirectnessRatio",
+    label: "感情直接表現率",
+    weight: 0.07,
+    normalize: (raw: number) => Math.min(raw / 0.08, 1),
+    invert: true,
+    flagThreshold: 0.4,
+  },
+  {
+    key: "logicalConnectiveDensity",
+    label: "論理接続詞密度",
+    weight: 0.06,
+    normalize: (raw: number) => Math.min(raw / 0.3, 1),
+    invert: true,
+    flagThreshold: 0.4,
+  },
+  {
+    key: "paragraphTransitionEntropy",
+    label: "段落遷移エントロピー",
+    weight: 0.04,
+    normalize: (raw: number) => Math.min(raw / 1.5, 1),
+    invert: false,
+    flagThreshold: 0.3,
   },
 ];
 
