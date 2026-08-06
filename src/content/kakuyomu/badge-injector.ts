@@ -20,12 +20,7 @@ export function injectBadge(
     onRescore(workId, cardElement);
   });
 
-  const titleLink = cardElement.querySelector('a[href*="/works/"]');
-  if (titleLink) {
-    titleLink.parentElement?.insertBefore(badge, titleLink.nextSibling);
-  } else {
-    cardElement.appendChild(badge);
-  }
+  insertBadgeElement(cardElement, badge);
 
   if (result.score <= DEFAULT_THRESHOLD) {
     cardElement.classList.add("nqf-suspect");
@@ -41,12 +36,29 @@ export function injectLoadingBadge(cardElement: HTMLElement): void {
   badge.className = "nqf-badge nqf-badge--loading";
   badge.textContent = "...";
 
-  const titleLink = cardElement.querySelector('a[href*="/works/"]');
-  if (titleLink) {
-    titleLink.parentElement?.insertBefore(badge, titleLink.nextSibling);
-  } else {
-    cardElement.appendChild(badge);
+  insertBadgeElement(cardElement, badge);
+}
+
+function insertBadgeElement(cardElement: HTMLElement, badge: HTMLElement): void {
+  // ★数リンクの横に挿入（メタデータ行）
+  const starLink = findStarCountLink(cardElement);
+  if (starLink) {
+    starLink.parentElement?.insertBefore(badge, starLink.nextSibling);
+    return;
   }
+
+  // フォールバック: カードの末尾
+  cardElement.appendChild(badge);
+}
+
+function findStarCountLink(cardElement: HTMLElement): HTMLAnchorElement | null {
+  const reviewLinks = cardElement.querySelectorAll<HTMLAnchorElement>(
+    'a[href*="/reviews"]',
+  );
+  for (const link of reviewLinks) {
+    if (link.textContent?.includes("★")) return link;
+  }
+  return null;
 }
 
 export function showError(cardElement: HTMLElement): void {
