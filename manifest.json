@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Novel Quality Filter",
+  "version": "0.1.0",
+  "description": "カクヨム・なろうのランキングから低品質作品をスコアリングでフィルタリング",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://kakuyomu.jp/*",
+    "https://ncode.syosetu.com/*",
+    "https://yomou.syosetu.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://kakuyomu.jp/rankings/*",
+        "https://kakuyomu.jp/search*",
+        "https://kakuyomu.jp/recent_works*"
+      ],
+      "js": ["content/kakuyomu.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Novel Quality Filter"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["wasm/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {}
+}
