@@ -121,7 +121,7 @@ export const PENALTY_RULES: PenaltyRule[] = [
   {
     conditions: [
       { key: "sentenceLengthBurstiness", criticalThreshold: 0.5, exemptWhenZero: true },
-      { key: "sentenceLengthSD", criticalThreshold: 0.5 },
+      { key: "sentenceLengthSD", criticalThreshold: 0.45 },
     ],
     penaltyMultiplier: 0.55,
   },
