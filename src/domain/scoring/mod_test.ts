@@ -26,12 +26,12 @@ Deno.test({
 });
 
 Deno.test({
-  name: "scoring: low-quality-01 scores below 35",
+  name: "scoring: low-quality-01 scores below 40",
   async fn() {
     await initTokenizer();
     const score = await scoreFixture("low-quality-01.txt");
     console.log(`  low-quality-01: ${score}/100`);
-    assert(score <= 35, `Expected <= 35, got ${score}`);
+    assert(score <= 40, `Expected <= 40, got ${score}`);
   },
   sanitizeResources: false,
   sanitizeOps: false,

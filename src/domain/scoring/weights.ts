@@ -11,7 +11,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "singleSentParaRatio",
     label: "一文一段落比率",
-    weight: 0.25,
+    weight: 0.30,
     normalize: (raw: number) => Math.min(raw, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -27,7 +27,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "separatorFrequency",
     label: "水平線/区切りの頻度",
-    weight: 0.10,
+    weight: 0.09,
     normalize: (raw: number) => Math.min(raw * 10, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -51,7 +51,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "descriptionDensitySD",
     label: "描写密度の分散",
-    weight: 0.10,
+    weight: 0.08,
     normalize: (raw: number) => Math.min(raw / 0.06, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -59,7 +59,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "paragraphLengthSD",
     label: "段落長の標準偏差",
-    weight: 0.15,
+    weight: 0.13,
     normalize: (raw: number) => Math.min(raw / 40, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -74,4 +74,4 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   },
 ];
 
-export const DEFAULT_THRESHOLD = 35;
+export const DEFAULT_THRESHOLD = 40;
