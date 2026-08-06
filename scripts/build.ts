@@ -7,51 +7,9 @@ const ROOT = new URL("..", import.meta.url).pathname;
 const DIST = join(ROOT, "dist");
 const CONFIG_PATH = join(ROOT, "deno.json");
 
-async function findWasmBinary(): Promise<string> {
-  const cmd = new Deno.Command("deno", {
-    args: ["info", "--json", "npm:lindera-wasm-ipadic-web@2.3.4"],
-    stdout: "piped",
-  });
-  const { stdout } = await cmd.output();
-  const info = JSON.parse(new TextDecoder().decode(stdout));
-
-  for (const mod of info.modules ?? []) {
-    if (mod.specifier?.includes("lindera-wasm-ipadic-web")) {
-      const npmCacheDir = mod.local?.replace(/\/[^/]+$/, "") ?? "";
-      const wasmPath = join(npmCacheDir, "lindera_wasm_bg.wasm");
-      try {
-        await Deno.stat(wasmPath);
-        return wasmPath;
-      } catch {
-        // continue searching
-      }
-    }
-  }
-
-  const globalCache = join(
-    Deno.env.get("DENO_DIR") ?? join(Deno.env.get("HOME") ?? "", ".cache", "deno"),
-    "npm",
-  );
-  for await (const entry of walkForWasm(globalCache)) {
-    return entry;
-  }
-
-  throw new Error("lindera_wasm_bg.wasm not found in Deno cache");
-}
-
-async function* walkForWasm(dir: string): AsyncGenerator<string> {
-  try {
-    for await (const entry of Deno.readDir(dir)) {
-      const path = join(dir, entry.name);
-      if (entry.isFile && entry.name === "lindera_wasm_bg.wasm") {
-        yield path;
-      } else if (entry.isDirectory) {
-        yield* walkForWasm(path);
-      }
-    }
-  } catch {
-    // directory doesn't exist or not readable
-  }
+function findWasmBinary(): string {
+  const resolved = import.meta.resolve("lindera-wasm-ipadic-web/lindera_wasm_bg.wasm");
+  return new URL(resolved).pathname;
 }
 
 async function build() {
@@ -108,7 +66,7 @@ async function build() {
   );
 
   console.log("5. Copying WASM binary...");
-  const wasmPath = await findWasmBinary();
+  const wasmPath = findWasmBinary();
   console.log(`   Found: ${wasmPath}`);
   await Deno.copyFile(wasmPath, join(DIST, "wasm/lindera_wasm_bg.wasm"));
   const wasmStat = await Deno.stat(join(DIST, "wasm/lindera_wasm_bg.wasm"));
