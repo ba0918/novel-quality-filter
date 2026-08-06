@@ -1,51 +1,51 @@
 # Novel Quality Filter
 
-カクヨム・なろうのランキングから低品質作品をスコアリングでフィルタリングする Chrome 拡張（Manifest
-V3）。 「AI 検出」ではなく「低品質駄文の検出」。品質が低い作品を弾く。個人利用。
+A Chrome extension (Manifest V3) that scores novels on Kakuyomu/Narou ranking pages by stylistic
+diversity, filtering out template-style writing. Personal use.
 
-## 技術スタック
+## Tech Stack
 
-| 項目                | 選定                                              |
-| ------------------- | ------------------------------------------------- |
-| ランタイム          | Deno                                              |
-| バンドラ            | esbuild + esbuild-deno-loader                     |
-| UI（popup/options） | Preact                                            |
-| 形態素解析          | lindera-wasm-ipadic-web（IPADIC 辞書同梱の WASM） |
-| テスト              | deno test（ユニット・統合）+ Playwright（E2E）    |
-| ストレージ          | IndexedDB + 薄いラッパー                          |
+| Component  | Choice                                    |
+| ---------- | ----------------------------------------- |
+| Runtime    | Deno                                      |
+| Bundler    | esbuild + esbuild-deno-loader             |
+| UI (popup) | Preact                                    |
+| Tokenizer  | lindera-wasm-ipadic-web (IPADIC, WASM)    |
+| Test       | deno test (unit/integration) + Playwright |
+| Storage    | IndexedDB + thin wrapper                  |
 
-選定の経緯は `.agents/artifacts/decisions/` に記録してある。
+Technology decisions are recorded in `.agents/artifacts/decisions/`.
 
-## 品質ゲート
+## Quality Gate
 
-`deno task check` で lint + fmt + test を一括実行する。コミット前に通すこと。
+Run `deno task check` for lint + fmt + test. Must pass before committing.
 
-## アーキテクチャ
+## Architecture
 
-レイヤードアーキテクチャを採用（ba-markdown-viewer と同方式）。
+Layered architecture.
 
 ```
 src/
-├── domain/          # 純粋なドメインロジック（ブラウザ API 非依存）
-│   ├── scoring/     #   スコア計算、重み付け、正規化
-│   ├── analyzer/    #   文長SD、段落分析、区切り検出、TTR、修飾語密度
-│   └── tokenizer/   #   lindera-wasm のラッパー（初期化・キャッシュ管理）
-├── services/        # ドメインオブジェクトのオーケストレーション
-├── messaging/       # レイヤー間通信（Chrome 拡張メッセージング）
-├── background/      # Service Worker（バックグラウンドスコアリング）
-├── content/         # カクヨム/なろう用 content script + DOM 注入
-├── settings/        # Popup UI（閾値、ブロックリスト管理）
-├── ui-components/   # スコアバッジ、ブロックボタン等
-└── shared/          # 型定義、ストレージラッパー、定数
+├── domain/          # Pure domain logic (no browser API dependency)
+│   ├── scoring/     #   Score calculation, weighting, normalization
+│   ├── analyzer/    #   Sentence length SD, paragraph analysis, TTR, burstiness, etc.
+│   └── tokenizer/   #   lindera-wasm wrapper (init & cache management)
+├── services/        # Domain object orchestration
+├── messaging/       # Inter-layer communication (Chrome extension messaging)
+├── background/      # Service Worker (background scoring)
+├── content/         # Kakuyomu/Narou content scripts + DOM injection
+├── settings/        # Popup UI (threshold, blocklist management)
+├── ui-components/   # Score badges, block buttons, etc.
+└── shared/          # Type definitions, storage wrapper, constants
 ```
 
-### レイヤー間通信ルール
+### Inter-layer Communication Rules
 
-**レイヤー間のやり取りは必ず messaging を経由する。直接 import による越境禁止。**
+**All inter-layer communication goes through messaging. No direct imports across layers.**
 
-- content / background / settings は互いを直接 import しない
-- レイヤーをまたぐ通信は全て `messaging/` 層の型付きメッセージを通す
-- domain / shared は全レイヤーから import 可（内側への依存のみ許可）
+- content / background / settings must NOT import each other directly
+- All cross-layer communication uses typed messages via `messaging/`
+- domain / shared can be imported from any layer (inward dependency only)
 
 ```
 content ──messaging──▶ background ◀──messaging── settings
@@ -57,14 +57,14 @@ content ──messaging──▶ background ◀──messaging── settings
            shared           shared
 ```
 
-## コーディング規約
+## Coding Conventions
 
-- Deno の標準フォーマッタ・リンターに従う
-- `deno fmt` / `deno lint` の設定は deno.json に集約
-- テストファイルは `*_test.ts` の命名規則
+- Follow Deno's standard formatter and linter
+- `deno fmt` / `deno lint` settings are in deno.json
+- Test files use `*_test.ts` naming convention
 
-## 注意事項
+## Notes
 
-- カクヨム/なろうへの過剰リクエストを避ける（rate limiting 必須）
-- WASM バイナリ（17MB）は Chrome 拡張にバンドルされる。ビルド出力のサイズに注意
-- lindera-wasm を Chrome 拡張で使うには CSP に `wasm-unsafe-eval` が必要
+- Avoid excessive requests to Kakuyomu/Narou (rate limiting required)
+- WASM binary (17MB) is bundled with the Chrome extension. Watch build output size
+- lindera-wasm in Chrome extensions requires `wasm-unsafe-eval` in CSP
