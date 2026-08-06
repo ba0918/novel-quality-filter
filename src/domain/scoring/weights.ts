@@ -127,9 +127,9 @@ export const PENALTY_RULES: PenaltyRule[] = [
   },
   {
     conditions: [
-      { key: "singleSentParaRatio", criticalThreshold: 0.35 },
+      { key: "singleSentParaRatio", criticalThreshold: 0.30 },
     ],
-    penaltyMultiplier: 0.7,
+    penaltyMultiplier: 0.65,
   },
 ];
 
