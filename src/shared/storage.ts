@@ -1,0 +1,91 @@
+import type { MetricResult } from "../domain/types.ts";
+import { DB_NAME, DB_VERSION, STORE_SCORES } from "./constants.ts";
+
+export interface CachedScore {
+  workId: string;
+  score: number;
+  metrics: MetricResult[];
+  scoredAt: number;
+  episodeUrl: string;
+}
+
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function openDB(): Promise<IDBDatabase> {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_SCORES)) {
+        db.createObjectStore(STORE_SCORES, { keyPath: "workId" });
+      }
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+      db.addEventListener("close", () => {
+        dbPromise = null;
+      });
+      resolve(db);
+    };
+
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error);
+    };
+
+    request.onblocked = () => {
+      dbPromise = null;
+      reject(new Error("IndexedDB open blocked by another connection"));
+    };
+  });
+
+  return dbPromise;
+}
+
+export async function getScore(workId: string): Promise<CachedScore | undefined> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SCORES, "readonly");
+    const store = tx.objectStore(STORE_SCORES);
+    const request = store.get(workId);
+    request.onsuccess = () => resolve(request.result ?? undefined);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function putScore(entry: CachedScore): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SCORES, "readwrite");
+    const store = tx.objectStore(STORE_SCORES);
+    const request = store.put(entry);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteScore(workId: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SCORES, "readwrite");
+    const store = tx.objectStore(STORE_SCORES);
+    const request = store.delete(workId);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function clearAll(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_SCORES, "readwrite");
+    const store = tx.objectStore(STORE_SCORES);
+    const request = store.clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
