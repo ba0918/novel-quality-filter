@@ -106,19 +106,30 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   },
 ];
 
-export interface PenaltyRule {
+export interface PenaltyCondition {
   key: string;
   criticalThreshold: number;
+  exemptWhenZero?: boolean;
+}
+
+export interface PenaltyRule {
+  conditions: PenaltyCondition[];
   penaltyMultiplier: number;
-  exemptWhenZero: boolean;
 }
 
 export const PENALTY_RULES: PenaltyRule[] = [
   {
-    key: "sentenceLengthBurstiness",
-    criticalThreshold: 0.5,
+    conditions: [
+      { key: "sentenceLengthBurstiness", criticalThreshold: 0.5, exemptWhenZero: true },
+      { key: "sentenceLengthSD", criticalThreshold: 0.5 },
+    ],
     penaltyMultiplier: 0.55,
-    exemptWhenZero: true,
+  },
+  {
+    conditions: [
+      { key: "singleSentParaRatio", criticalThreshold: 0.35 },
+    ],
+    penaltyMultiplier: 0.7,
   },
 ];
 

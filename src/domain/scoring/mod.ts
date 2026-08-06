@@ -9,10 +9,20 @@ export function calculateScore(rawMetrics: RawMetrics): ScoreResult {
 
   let penaltyMultiplier = 1.0;
   for (const rule of PENALTY_RULES) {
-    const rawValue = rawMetrics[rule.key as keyof RawMetrics] as number;
-    if (rule.exemptWhenZero && rawValue === 0) continue;
-    const m = metrics.find((m) => m.key === rule.key);
-    if (m && m.normalizedValue < rule.criticalThreshold) {
+    let allConditionsMet = true;
+    for (const cond of rule.conditions) {
+      const rawValue = rawMetrics[cond.key as keyof RawMetrics] as number;
+      if (cond.exemptWhenZero && rawValue === 0) {
+        allConditionsMet = false;
+        break;
+      }
+      const m = metrics.find((m) => m.key === cond.key);
+      if (!m || m.normalizedValue >= cond.criticalThreshold) {
+        allConditionsMet = false;
+        break;
+      }
+    }
+    if (allConditionsMet) {
       penaltyMultiplier *= rule.penaltyMultiplier;
     }
   }
