@@ -1,5 +1,5 @@
 export const DB_NAME = "novel-quality-filter";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 export const STORE_SCORES = "scores";
 
 export const FETCH_INTERVAL_MS = 1000;

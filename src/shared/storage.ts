@@ -1,10 +1,12 @@
-import type { MetricResult } from "../domain/types.ts";
+import type { MetricResult, PenaltyResult } from "../domain/types.ts";
 import { DB_NAME, DB_VERSION, STORE_SCORES } from "./constants.ts";
 
 export interface CachedScore {
   workId: string;
   score: number;
   metrics: MetricResult[];
+  penalties: PenaltyResult[];
+  schemaVersion: number;
   scoredAt: number;
   episodeUrl: string;
 }
@@ -17,10 +19,32 @@ function openDB(): Promise<IDBDatabase> {
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_SCORES)) {
         db.createObjectStore(STORE_SCORES, { keyPath: "workId" });
+      }
+
+      // v1 → v2: 既存レコードに schemaVersion=1, penalties=[] を設定
+      const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
+      if (oldVersion < 2) {
+        const tx = request.transaction!;
+        const store = tx.objectStore(STORE_SCORES);
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (cursor) {
+            const record = cursor.value;
+            if (record.schemaVersion === undefined) {
+              record.schemaVersion = 1;
+            }
+            if (record.penalties === undefined) {
+              record.penalties = [];
+            }
+            cursor.update(record);
+            cursor.continue();
+          }
+        };
       }
     };
 

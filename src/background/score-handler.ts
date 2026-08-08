@@ -8,6 +8,7 @@ import type {
 import { registerHandlers } from "../messaging/handler.ts";
 import { clearAll, deleteScore, getScore, putScore } from "../shared/storage.ts";
 import type { CachedScore } from "../shared/storage.ts";
+import { CURRENT_SCHEMA_VERSION, isCacheStale } from "../shared/cache-staleness.ts";
 import { enqueue } from "./fetch-queue.ts";
 import { fetchFirstEpisodeText } from "./fetchers/kakuyomu.ts";
 import { analyzeAll } from "../domain/analyzer/mod.ts";
@@ -35,10 +36,16 @@ async function handleScoreWork(message: ScoreWorkMessage): Promise<ScoreResultRe
         return { workId, result: null, fromCache: true, error: "Previously failed" };
       }
       await deleteScore(workId);
+    } else if (isCacheStale(cached.schemaVersion)) {
+      await deleteScore(workId);
     } else {
       return {
         workId,
-        result: { score: cached.score, metrics: cached.metrics, penalties: [] },
+        result: {
+          score: cached.score,
+          metrics: cached.metrics,
+          penalties: cached.penalties ?? [],
+        },
         fromCache: true,
       };
     }
@@ -75,6 +82,8 @@ async function scoreWork(workId: string): Promise<ScoreResultResponse> {
       workId,
       score: result.score,
       metrics: result.metrics,
+      penalties: result.penalties,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       scoredAt: Date.now(),
       episodeUrl: response.episodeUrl,
     });
@@ -87,6 +96,8 @@ async function scoreWork(workId: string): Promise<ScoreResultResponse> {
       workId,
       score: -1,
       metrics: [],
+      penalties: [],
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       scoredAt: Date.now(),
       episodeUrl: "",
     }).catch(() => {});
