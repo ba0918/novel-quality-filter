@@ -1,6 +1,7 @@
 import type {
   ClearCacheMessage,
   ClearCacheResponse,
+  GetCachedScoreMessage,
   NqfRequest,
   NqfResponse,
   RescoreWorkMessage,
@@ -21,6 +22,13 @@ export function sendRescoreRequest(
   workUrl: string,
 ): Promise<ScoreResultResponse> {
   const message: RescoreWorkMessage = { type: "RESCORE_WORK", workId, workUrl };
+  return sendToBackground(message) as Promise<ScoreResultResponse>;
+}
+
+export function sendGetCachedScoreRequest(
+  workId: string,
+): Promise<ScoreResultResponse> {
+  const message: GetCachedScoreMessage = { type: "GET_CACHED_SCORE", workId };
   return sendToBackground(message) as Promise<ScoreResultResponse>;
 }
 

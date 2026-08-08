@@ -1,6 +1,7 @@
 import type {
   ClearCacheMessage,
   ClearCacheResponse,
+  GetCachedScoreMessage,
   NqfRequest,
   NqfResponse,
   RescoreWorkMessage,
@@ -15,6 +16,7 @@ type MessageHandler<Req extends NqfRequest, Res extends NqfResponse> = (
 interface HandlerMap {
   SCORE_WORK?: MessageHandler<ScoreWorkMessage, ScoreResultResponse>;
   RESCORE_WORK?: MessageHandler<RescoreWorkMessage, ScoreResultResponse>;
+  GET_CACHED_SCORE?: MessageHandler<GetCachedScoreMessage, ScoreResultResponse>;
   CLEAR_CACHE?: MessageHandler<ClearCacheMessage, ClearCacheResponse>;
 }
 

@@ -77,4 +77,199 @@ const CSS = `
 .nqf-suspect:hover {
   opacity: 0.7;
 }
+
+/* --- 作品ページ用 --- */
+
+.nqf-work-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  z-index: 10;
+  line-height: 1;
+  margin-left: 8px;
+  vertical-align: middle;
+  transition: opacity 0.2s ease;
+}
+
+.nqf-work-badge:hover {
+  opacity: 0.85;
+}
+
+.nqf-work-badge--open {
+  opacity: 0.9;
+}
+
+.nqf-score-button {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid #999;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #666;
+  cursor: pointer;
+  margin-left: 8px;
+  vertical-align: middle;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.nqf-score-button:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.nqf-score-button--loading {
+  pointer-events: none;
+  color: #999;
+}
+
+.nqf-detail-panel {
+  margin: 8px 0;
+  padding: 12px 16px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  max-width: 480px;
+}
+
+.nqf-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.nqf-detail-score-label {
+  font-weight: 700;
+  color: #333;
+}
+
+.nqf-detail-score-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.nqf-detail-section-title {
+  font-weight: 700;
+  color: #555;
+  margin-bottom: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nqf-detail-section-title--penalty {
+  color: #c44;
+  margin-top: 10px;
+}
+
+.nqf-metric-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.nqf-metric-row--flagged {
+  color: #c44;
+}
+
+.nqf-metric-label {
+  flex: 0 0 140px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nqf-metric-raw {
+  flex: 0 0 50px;
+  text-align: right;
+  font-size: 11px;
+  color: #888;
+}
+
+.nqf-metric-bar-container {
+  flex: 1 1 60px;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.nqf-metric-bar {
+  height: 100%;
+  background: #4a9;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.nqf-metric-bar--flagged {
+  background: #c44;
+}
+
+.nqf-metric-norm {
+  flex: 0 0 36px;
+  text-align: right;
+  font-size: 11px;
+}
+
+.nqf-penalty-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  color: #c44;
+}
+
+.nqf-penalty-label {
+  font-size: 11px;
+}
+
+.nqf-penalty-multiplier {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nqf-rescore-button {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.nqf-rescore-button:hover {
+  background: #eee;
+}
+
+.nqf-rescore-button:disabled {
+  pointer-events: none;
+  color: #999;
+}
 `;

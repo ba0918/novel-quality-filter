@@ -1,6 +1,7 @@
 import type {
   ClearCacheMessage,
   ClearCacheResponse,
+  GetCachedScoreMessage,
   RescoreWorkMessage,
   ScoreResultResponse,
   ScoreWorkMessage,
@@ -22,6 +23,7 @@ export function setupScoreHandlers(): void {
   registerHandlers({
     SCORE_WORK: handleScoreWork,
     RESCORE_WORK: handleRescoreWork,
+    GET_CACHED_SCORE: handleGetCachedScore,
     CLEAR_CACHE: handleClearCache,
   });
 }
@@ -52,6 +54,27 @@ async function handleScoreWork(message: ScoreWorkMessage): Promise<ScoreResultRe
   }
 
   return scoreWork(workId);
+}
+
+async function handleGetCachedScore(
+  message: GetCachedScoreMessage,
+): Promise<ScoreResultResponse> {
+  const { workId } = message;
+  const cached = await getScore(workId);
+
+  if (!cached || isNegativeCache(cached) || isCacheStale(cached.schemaVersion)) {
+    return { workId, result: null, fromCache: true };
+  }
+
+  return {
+    workId,
+    result: {
+      score: cached.score,
+      metrics: cached.metrics,
+      penalties: cached.penalties ?? [],
+    },
+    fromCache: true,
+  };
 }
 
 async function handleRescoreWork(message: RescoreWorkMessage): Promise<ScoreResultResponse> {

@@ -1,4 +1,8 @@
-import { sendRescoreRequest, sendScoreRequest } from "../messaging/sender.ts";
+import {
+  sendGetCachedScoreRequest,
+  sendRescoreRequest,
+  sendScoreRequest,
+} from "../messaging/sender.ts";
 import {
   detectWorkCards,
   markAsProcessed,
@@ -6,6 +10,12 @@ import {
   type WorkCard,
 } from "./kakuyomu/card-detector.ts";
 import { injectBadge, injectLoadingBadge, showError } from "./kakuyomu/badge-injector.ts";
+import { detectWorkPage } from "./kakuyomu/work-page-detector.ts";
+import {
+  injectScoreButton,
+  injectWorkBadge,
+  injectWorkLoading,
+} from "./kakuyomu/work-page-injector.ts";
 import { injectStyles } from "./kakuyomu/styles.ts";
 
 console.log("[NQF] Content script loaded on:", globalThis.location.href);
@@ -13,6 +23,13 @@ console.log("[NQF] Content script loaded on:", globalThis.location.href);
 function main(): void {
   injectStyles();
 
+  const workId = detectWorkPage(globalThis.location.pathname);
+  if (workId) {
+    handleWorkPage(workId);
+    return;
+  }
+
+  // ランキング / 検索ページのフロー
   const initialCards = detectWorkCards();
   if (initialCards.length > 0) {
     console.log(`[NQF] Found ${initialCards.length} work cards`);
@@ -62,6 +79,86 @@ async function handleRescore(workId: string, cardElement: HTMLElement): Promise<
   } catch {
     showError(cardElement);
   }
+}
+
+async function handleWorkPage(workId: string): Promise<void> {
+  console.log(`[NQF] Work page detected: ${workId}`);
+
+  const container = findWorkPageContainer();
+  if (!container) {
+    console.warn("[NQF] Could not find work page container for badge injection");
+    return;
+  }
+
+  // キャッシュ確認（スコアリングは発動しない）
+  try {
+    const cached = await sendGetCachedScoreRequest(workId);
+    if (cached.result) {
+      injectWorkBadge(container, cached.result, () => rescoreWorkPage(workId, container));
+      return;
+    }
+  } catch {
+    // キャッシュ確認失敗はスコアリングボタン表示にフォールバック
+  }
+
+  // 未スコア: スコアリングボタンを表示
+  injectScoreButton(container, () => scoreWorkPage(workId, container));
+}
+
+async function scoreWorkPage(workId: string, container: HTMLElement): Promise<void> {
+  injectWorkLoading(container);
+
+  try {
+    const workUrl = `https://kakuyomu.jp/works/${workId}`;
+    const response = await sendScoreRequest(workId, workUrl);
+    if (response.result) {
+      injectWorkBadge(container, response.result, () => rescoreWorkPage(workId, container));
+    } else {
+      console.warn(`[NQF] Scoring failed for work page ${workId}:`, response.error);
+      injectScoreButton(container, () => scoreWorkPage(workId, container));
+    }
+  } catch (err) {
+    console.error(`[NQF] Score request failed for work page ${workId}:`, err);
+    injectScoreButton(container, () => scoreWorkPage(workId, container));
+  }
+}
+
+async function rescoreWorkPage(workId: string, container: HTMLElement): Promise<void> {
+  injectWorkLoading(container);
+
+  try {
+    const workUrl = `https://kakuyomu.jp/works/${workId}`;
+    const response = await sendRescoreRequest(workId, workUrl);
+    if (response.result) {
+      injectWorkBadge(container, response.result, () => rescoreWorkPage(workId, container));
+    } else {
+      console.warn(`[NQF] Rescore failed for work page ${workId}`);
+    }
+  } catch (err) {
+    console.error(`[NQF] Rescore request failed for work page ${workId}:`, err);
+  }
+}
+
+function findWorkPageContainer(): HTMLElement | null {
+  // サブヘッダー（★数やフォロワー数がある行）を探す
+  const starLinks = document.querySelectorAll<HTMLAnchorElement>('a[href*="/reviews"]');
+  for (const link of starLinks) {
+    if (link.textContent?.includes("★") && link.closest('[class*="WorkHeader"]')) {
+      const row = link.parentElement;
+      if (row) return row;
+    }
+  }
+
+  // フォールバック: WorkHeader 内のメタ情報行
+  const header = document.querySelector<HTMLElement>('[class*="WorkHeader"]');
+  if (header) {
+    // WorkMeta 要素を探す
+    const meta = header.querySelector<HTMLElement>('[class*="WorkMeta"]');
+    if (meta) return meta;
+    return header;
+  }
+
+  return null;
 }
 
 if (document.readyState === "loading") {
