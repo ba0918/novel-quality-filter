@@ -28,7 +28,7 @@ const CSS = `
   line-height: 1;
   margin-left: 8px;
   vertical-align: middle;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   transition: opacity 0.2s ease;
 }
 
