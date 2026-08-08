@@ -62,8 +62,12 @@ export function injectWorkBadge(
   const tooltip = createTooltip(result);
   badge.appendChild(tooltip);
 
-  insertElement(container, badge);
-  badge.insertAdjacentElement("afterend", panel);
+  const wrapper = document.createElement("span");
+  wrapper.className = "nqf-work-wrapper";
+  wrapper.appendChild(badge);
+  wrapper.appendChild(panel);
+
+  insertElement(container, wrapper);
 }
 
 export function injectWorkLoading(container: HTMLElement): void {
@@ -93,6 +97,7 @@ export function injectWorkError(container: HTMLElement, onRetry: () => void): vo
 }
 
 function removeExisting(container: HTMLElement): void {
+  container.querySelector(".nqf-work-wrapper")?.remove();
   container.querySelector(`.${BADGE_CLASS}`)?.remove();
   container.querySelector(`.${PANEL_CLASS}`)?.remove();
   container.querySelector(".nqf-score-button")?.remove();

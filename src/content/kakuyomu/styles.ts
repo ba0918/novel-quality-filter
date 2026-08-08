@@ -81,6 +81,13 @@ const CSS = `
 
 /* --- 作品ページ用 --- */
 
+.nqf-work-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
 .nqf-work-badge {
   display: inline-flex;
   align-items: center;
@@ -148,15 +155,19 @@ const CSS = `
 }
 
 .nqf-detail-panel {
-  margin: 8px 0;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
   padding: 12px 16px;
-  background: #f8f8f8;
+  background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   font-size: 12px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
-  max-width: 480px;
+  width: 400px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .nqf-detail-header {
