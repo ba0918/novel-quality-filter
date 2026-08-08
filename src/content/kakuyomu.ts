@@ -49,7 +49,7 @@ function main(): void {
   });
 }
 
-const CONCURRENT_SCORES = 3;
+const CONCURRENT_SCORES = 2;
 
 async function processCards(cards: WorkCard[]): Promise<void> {
   for (const card of cards) {
@@ -176,22 +176,29 @@ async function rescoreWorkPage(workId: string, container: HTMLElement): Promise<
 }
 
 function findWorkPageContainer(): HTMLElement | null {
-  // サブヘッダー（★数やフォロワー数がある行）を探す
-  const starLinks = document.querySelectorAll<HTMLAnchorElement>('a[href*="/reviews"]');
-  for (const link of starLinks) {
-    if (link.textContent?.includes("★") && link.closest('[class*="WorkHeader"]')) {
-      const row = link.parentElement;
-      if (row) return row;
-    }
+  // ★数リンク（/reviews への href + ★ テキスト）を探す
+  const reviewLinks = document.querySelectorAll<HTMLAnchorElement>(
+    'a[href$="/reviews"]',
+  );
+  for (const link of reviewLinks) {
+    if (!link.textContent?.includes("★")) continue;
+    // ★数リンクの親 Layout 行を返す
+    const layoutRow = link.closest<HTMLElement>(
+      '[class*="Layout_layout"]',
+    );
+    if (layoutRow) return layoutRow;
+    if (link.parentElement) return link.parentElement;
   }
 
-  // フォールバック: WorkHeader 内のメタ情報行
-  const header = document.querySelector<HTMLElement>('[class*="WorkHeader"]');
-  if (header) {
-    // WorkMeta 要素を探す
-    const meta = header.querySelector<HTMLElement>('[class*="WorkMeta"]');
-    if (meta) return meta;
-    return header;
+  // フォールバック: フォロワーリンク（/followers への href）の親行
+  const followerLink = document.querySelector<HTMLAnchorElement>(
+    'a[href*="/followers"]',
+  );
+  if (followerLink) {
+    const row = followerLink.closest<HTMLElement>(
+      '[class*="Layout_layout"]',
+    );
+    if (row) return row;
   }
 
   return null;

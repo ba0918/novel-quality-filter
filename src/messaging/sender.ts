@@ -37,7 +37,7 @@ export function sendClearCacheRequest(): Promise<ClearCacheResponse> {
   return sendToBackground(message) as Promise<ClearCacheResponse>;
 }
 
-const MESSAGE_TIMEOUT_MS = 30_000;
+const MESSAGE_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 1;
 const RETRY_DELAY_MS = 500;
 
