@@ -149,10 +149,8 @@ function createDetailPanel(result: ScoreResult): HTMLDivElement {
   panel.appendChild(metricsSection);
 
   // ペナルティセクション
-  if (result.penalties.length > 0) {
-    const penaltySection = createPenaltySection(result.penalties);
-    panel.appendChild(penaltySection);
-  }
+  const penaltySection = createPenaltySection(result.penalties);
+  panel.appendChild(penaltySection);
 
   // 再スコアボタン
   const rescoreBtn = document.createElement("button");
@@ -203,6 +201,14 @@ function createPenaltySection(penalties: PenaltyResult[]): HTMLDivElement {
   title.className = "nqf-detail-section-title nqf-detail-section-title--penalty";
   title.textContent = "ペナルティ";
   section.appendChild(title);
+
+  if (penalties.length === 0) {
+    const none = document.createElement("div");
+    none.className = "nqf-penalty-none";
+    none.textContent = "なし";
+    section.appendChild(none);
+    return section;
+  }
 
   for (const p of penalties) {
     const row = document.createElement("div");

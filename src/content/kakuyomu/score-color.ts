@@ -1,18 +1,19 @@
 import type { ScoreResult } from "../../domain/types.ts";
-import { DEFAULT_THRESHOLD } from "../../domain/scoring/mod.ts";
+
+const COLOR_RED_BOUNDARY = 35;
 
 export function scoreToColor(score: number): string {
   let hue: number;
-  if (score <= DEFAULT_THRESHOLD) {
+  if (score <= COLOR_RED_BOUNDARY) {
     hue = 0;
   } else if (score <= 65) {
-    hue = ((score - DEFAULT_THRESHOLD) / (65 - DEFAULT_THRESHOLD)) * 40;
+    hue = ((score - COLOR_RED_BOUNDARY) / 30) * 40;
   } else {
     hue = 40 + ((score - 65) / 35) * 80;
   }
 
-  const saturation = score <= DEFAULT_THRESHOLD ? 70 : 55;
-  const lightness = score <= DEFAULT_THRESHOLD ? 45 : 38;
+  const saturation = score <= COLOR_RED_BOUNDARY ? 70 : 55;
+  const lightness = score <= COLOR_RED_BOUNDARY ? 45 : 38;
   return `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`;
 }
 
