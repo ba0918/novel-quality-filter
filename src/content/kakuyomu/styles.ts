@@ -25,7 +25,6 @@ const CSS = `
   cursor: pointer;
   user-select: none;
   position: relative;
-  z-index: 999;
   line-height: 1;
   margin-left: 8px;
   vertical-align: middle;
@@ -62,7 +61,7 @@ const CSS = `
   line-height: 1.5;
   border-radius: 6px;
   white-space: nowrap;
-  z-index: 1000;
+  z-index: 999;
   pointer-events: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -108,7 +107,6 @@ const CSS = `
   cursor: pointer;
   user-select: none;
   position: relative;
-  z-index: 10;
   line-height: 1;
   vertical-align: middle;
   margin-left: 8px;
