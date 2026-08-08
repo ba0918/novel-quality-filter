@@ -9,7 +9,12 @@ import {
   observeNewCards,
   type WorkCard,
 } from "./kakuyomu/card-detector.ts";
-import { injectBadge, injectLoadingBadge, showError } from "./kakuyomu/badge-injector.ts";
+import {
+  injectBadge,
+  injectLoadingBadge,
+  injectQueuedBadge,
+  showError,
+} from "./kakuyomu/badge-injector.ts";
 import { detectWorkPage } from "./kakuyomu/work-page-detector.ts";
 import {
   injectScoreButton,
@@ -54,11 +59,14 @@ const CONCURRENT_SCORES = 2;
 async function processCards(cards: WorkCard[]): Promise<void> {
   for (const card of cards) {
     markAsProcessed(card.cardElement);
-    injectLoadingBadge(card.cardElement);
+    injectQueuedBadge(card.cardElement);
   }
 
   for (let i = 0; i < cards.length; i += CONCURRENT_SCORES) {
     const batch = cards.slice(i, i + CONCURRENT_SCORES);
+    for (const card of batch) {
+      injectLoadingBadge(card.cardElement);
+    }
     await Promise.all(batch.map((card) => scoreCard(card)));
   }
 }

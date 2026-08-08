@@ -30,6 +30,16 @@ export function injectBadge(
   }
 }
 
+export function injectQueuedBadge(cardElement: HTMLElement): void {
+  removeBadge(cardElement);
+
+  const badge = document.createElement("span");
+  badge.className = "nqf-badge nqf-badge--queued";
+  badge.textContent = "—";
+
+  insertBadgeElement(cardElement, badge);
+}
+
 export function injectLoadingBadge(cardElement: HTMLElement): void {
   removeBadge(cardElement);
 

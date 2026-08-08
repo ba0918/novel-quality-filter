@@ -36,6 +36,11 @@ const CSS = `
   opacity: 0.85;
 }
 
+.nqf-badge--queued {
+  background: #bbb;
+  pointer-events: none;
+}
+
 .nqf-badge--loading {
   background: #999;
   pointer-events: none;
