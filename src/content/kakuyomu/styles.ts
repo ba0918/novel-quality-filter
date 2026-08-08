@@ -14,11 +14,11 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 11px;
-  font-size: 12px;
+  min-width: 28px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
   font-weight: 700;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #fff;
