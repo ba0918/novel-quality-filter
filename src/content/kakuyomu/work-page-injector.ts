@@ -1,5 +1,5 @@
 import type { MetricResult, PenaltyResult, ScoreResult } from "../../domain/types.ts";
-import { DEFAULT_THRESHOLD } from "../../domain/scoring/mod.ts";
+import { createTooltip, scoreToColor } from "./score-color.ts";
 
 const BADGE_CLASS = "nqf-work-badge";
 const PANEL_CLASS = "nqf-detail-panel";
@@ -116,26 +116,6 @@ function createWorkBadge(score: number): HTMLSpanElement {
   return badge;
 }
 
-function createTooltip(result: ScoreResult): HTMLSpanElement {
-  const tooltip = document.createElement("span");
-  tooltip.className = "nqf-tooltip";
-
-  const flagged = result.metrics.filter((m) => m.flagged);
-  if (flagged.length === 0 && result.penalties.length === 0) {
-    tooltip.textContent = "問題なし";
-    return tooltip;
-  }
-
-  for (const m of flagged) {
-    const line = document.createElement("span");
-    line.className = "nqf-tooltip-line";
-    line.textContent = `⚠ ${m.reason}`;
-    tooltip.appendChild(line);
-  }
-
-  return tooltip;
-}
-
 function createDetailPanel(result: ScoreResult): HTMLDivElement {
   const panel = document.createElement("div");
   panel.className = PANEL_CLASS;
@@ -247,19 +227,4 @@ function createPenaltySection(penalties: PenaltyResult[]): HTMLDivElement {
 function formatRawValue(value: number): string {
   if (value < 1) return (value * 100).toFixed(1) + "%";
   return value.toFixed(1);
-}
-
-function scoreToColor(score: number): string {
-  let hue: number;
-  if (score <= DEFAULT_THRESHOLD) {
-    hue = 0;
-  } else if (score <= 65) {
-    hue = ((score - DEFAULT_THRESHOLD) / (65 - DEFAULT_THRESHOLD)) * 40;
-  } else {
-    hue = 40 + ((score - 65) / 35) * 80;
-  }
-
-  const saturation = score <= DEFAULT_THRESHOLD ? 70 : 55;
-  const lightness = score <= DEFAULT_THRESHOLD ? 45 : 38;
-  return `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`;
 }

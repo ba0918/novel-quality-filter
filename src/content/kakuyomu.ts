@@ -23,9 +23,15 @@ console.log("[NQF] Content script loaded on:", globalThis.location.href);
 function main(): void {
   injectStyles();
 
-  const workId = detectWorkPage(globalThis.location.pathname);
+  const pathname = globalThis.location.pathname;
+  const workId = detectWorkPage(pathname);
   if (workId) {
     handleWorkPage(workId);
+    return;
+  }
+
+  // エピソード・レビューページなど作品配下のサブページでは何もしない
+  if (pathname.startsWith("/works/")) {
     return;
   }
 

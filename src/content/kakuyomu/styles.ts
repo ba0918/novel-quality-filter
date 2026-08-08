@@ -39,6 +39,7 @@ const CSS = `
 .nqf-badge--loading {
   background: #999;
   pointer-events: none;
+  animation: nqf-pulse 1.2s ease-in-out infinite;
 }
 
 .nqf-tooltip {
@@ -143,6 +144,7 @@ const CSS = `
 .nqf-score-button--loading {
   pointer-events: none;
   color: #999;
+  animation: nqf-pulse 1.2s ease-in-out infinite;
 }
 
 .nqf-detail-panel {
@@ -279,5 +281,10 @@ const CSS = `
 .nqf-rescore-button:disabled {
   pointer-events: none;
   color: #999;
+}
+
+@keyframes nqf-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 `;
