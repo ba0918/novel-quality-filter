@@ -25,7 +25,7 @@ const CSS = `
   cursor: pointer;
   user-select: none;
   position: relative;
-  z-index: 10;
+  z-index: 999;
   line-height: 1;
   margin-left: 8px;
   vertical-align: middle;
