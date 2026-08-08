@@ -110,6 +110,7 @@ const CSS = `
   position: relative;
   line-height: 1;
   vertical-align: middle;
+  transform: translateY(-2px);
   margin-left: 8px;
   vertical-align: middle;
   transition: opacity 0.2s ease;
