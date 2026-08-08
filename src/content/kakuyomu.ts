@@ -14,6 +14,7 @@ import { detectWorkPage } from "./kakuyomu/work-page-detector.ts";
 import {
   injectScoreButton,
   injectWorkBadge,
+  injectWorkError,
   injectWorkLoading,
 } from "./kakuyomu/work-page-injector.ts";
 import { injectStyles } from "./kakuyomu/styles.ts";
@@ -87,15 +88,36 @@ async function handleRescore(workId: string, cardElement: HTMLElement): Promise<
   }
 }
 
-async function handleWorkPage(workId: string): Promise<void> {
+function handleWorkPage(workId: string): void {
   console.log(`[NQF] Work page detected: ${workId}`);
 
   const container = findWorkPageContainer();
-  if (!container) {
-    console.warn("[NQF] Could not find work page container for badge injection");
+  if (container) {
+    initWorkPageUI(workId, container);
     return;
   }
 
+  // SPA遷移や遅延レンダリングでサブヘッダーが未出現の場合、出現を待つ
+  waitForWorkPageContainer((found) => {
+    initWorkPageUI(workId, found);
+  });
+}
+
+function waitForWorkPageContainer(
+  callback: (container: HTMLElement) => void,
+): void {
+  const observer = new MutationObserver(() => {
+    const container = findWorkPageContainer();
+    if (container) {
+      observer.disconnect();
+      callback(container);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 10_000);
+}
+
+async function initWorkPageUI(workId: string, container: HTMLElement): Promise<void> {
   // キャッシュ確認（スコアリングは発動しない）
   try {
     const cached = await sendGetCachedScoreRequest(workId);
@@ -121,11 +143,11 @@ async function scoreWorkPage(workId: string, container: HTMLElement): Promise<vo
       injectWorkBadge(container, response.result, () => rescoreWorkPage(workId, container));
     } else {
       console.warn(`[NQF] Scoring failed for work page ${workId}:`, response.error);
-      injectScoreButton(container, () => scoreWorkPage(workId, container));
+      injectWorkError(container, () => scoreWorkPage(workId, container));
     }
   } catch (err) {
     console.error(`[NQF] Score request failed for work page ${workId}:`, err);
-    injectScoreButton(container, () => scoreWorkPage(workId, container));
+    injectWorkError(container, () => scoreWorkPage(workId, container));
   }
 }
 
@@ -139,11 +161,11 @@ async function rescoreWorkPage(workId: string, container: HTMLElement): Promise<
       injectWorkBadge(container, response.result, () => rescoreWorkPage(workId, container));
     } else {
       console.warn(`[NQF] Rescore failed for work page ${workId}`);
-      injectScoreButton(container, () => scoreWorkPage(workId, container));
+      injectWorkError(container, () => rescoreWorkPage(workId, container));
     }
   } catch (err) {
     console.error(`[NQF] Rescore request failed for work page ${workId}:`, err);
-    injectScoreButton(container, () => scoreWorkPage(workId, container));
+    injectWorkError(container, () => rescoreWorkPage(workId, container));
   }
 }
 

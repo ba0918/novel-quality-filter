@@ -76,6 +76,22 @@ export function injectWorkLoading(container: HTMLElement): void {
   insertElement(container, badge);
 }
 
+export function injectWorkError(container: HTMLElement, onRetry: () => void): void {
+  removeExisting(container);
+
+  const badge = document.createElement("span");
+  badge.className = `${BADGE_CLASS}`;
+  badge.style.backgroundColor = "#666";
+  badge.textContent = "!";
+  badge.title = "スコアリング失敗（クリックで再試行）";
+  badge.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onRetry();
+  });
+  insertElement(container, badge);
+}
+
 function removeExisting(container: HTMLElement): void {
   container.querySelector(`.${BADGE_CLASS}`)?.remove();
   container.querySelector(`.${PANEL_CLASS}`)?.remove();
