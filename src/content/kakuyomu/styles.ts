@@ -84,7 +84,7 @@ const CSS = `
 .nqf-work-wrapper {
   position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   margin-left: auto;
 }
 
@@ -92,11 +92,11 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 12px;
-  font-size: 13px;
+  min-width: 36px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 12px;
   font-weight: 700;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #fff;
@@ -105,6 +105,7 @@ const CSS = `
   position: relative;
   z-index: 10;
   line-height: 1;
+  vertical-align: middle;
   margin-left: 8px;
   vertical-align: middle;
   transition: opacity 0.2s ease;
