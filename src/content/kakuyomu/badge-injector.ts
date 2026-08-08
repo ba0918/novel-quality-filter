@@ -1,5 +1,6 @@
 import type { ScoreResult } from "../../domain/types.ts";
 import { DEFAULT_THRESHOLD } from "../../domain/scoring/mod.ts";
+import { createTooltip, scoreToColor } from "./score-color.ts";
 
 export function injectBadge(
   cardElement: HTMLElement,
@@ -27,6 +28,16 @@ export function injectBadge(
   } else {
     cardElement.classList.remove("nqf-suspect");
   }
+}
+
+export function injectQueuedBadge(cardElement: HTMLElement): void {
+  removeBadge(cardElement);
+
+  const badge = document.createElement("span");
+  badge.className = "nqf-badge nqf-badge--queued";
+  badge.textContent = "—";
+
+  insertBadgeElement(cardElement, badge);
 }
 
 export function injectLoadingBadge(cardElement: HTMLElement): void {
@@ -92,39 +103,4 @@ function createBadge(score: number): HTMLSpanElement {
   badge.textContent = String(score);
   badge.style.backgroundColor = scoreToColor(score);
   return badge;
-}
-
-function createTooltip(result: ScoreResult): HTMLSpanElement {
-  const tooltip = document.createElement("span");
-  tooltip.className = "nqf-tooltip";
-
-  const flagged = result.metrics.filter((m) => m.flagged);
-  if (flagged.length === 0) {
-    tooltip.textContent = "問題なし";
-    return tooltip;
-  }
-
-  for (const m of flagged) {
-    const line = document.createElement("span");
-    line.className = "nqf-tooltip-line";
-    line.textContent = `⚠ ${m.reason}`;
-    tooltip.appendChild(line);
-  }
-
-  return tooltip;
-}
-
-function scoreToColor(score: number): string {
-  let hue: number;
-  if (score <= 35) {
-    hue = 0;
-  } else if (score <= 65) {
-    hue = ((score - 35) / 30) * 40;
-  } else {
-    hue = 40 + ((score - 65) / 35) * 80;
-  }
-
-  const saturation = score <= 35 ? 70 : 55;
-  const lightness = score <= 35 ? 45 : 38;
-  return `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`;
 }

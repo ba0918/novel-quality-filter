@@ -113,12 +113,14 @@ export interface PenaltyCondition {
 }
 
 export interface PenaltyRule {
+  label: string;
   conditions: PenaltyCondition[];
   penaltyMultiplier: number;
 }
 
 export const PENALTY_RULES: PenaltyRule[] = [
   {
+    label: "文長の緩急・ばらつき不足",
     conditions: [
       { key: "sentenceLengthBurstiness", criticalThreshold: 0.5, exemptWhenZero: true },
       { key: "sentenceLengthSD", criticalThreshold: 0.45 },
@@ -126,6 +128,7 @@ export const PENALTY_RULES: PenaltyRule[] = [
     penaltyMultiplier: 0.55,
   },
   {
+    label: "一文一段落の過多",
     conditions: [
       { key: "singleSentParaRatio", criticalThreshold: 0.30 },
     ],

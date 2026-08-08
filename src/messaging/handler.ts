@@ -1,6 +1,7 @@
 import type {
   ClearCacheMessage,
   ClearCacheResponse,
+  GetCachedScoreMessage,
   NqfRequest,
   NqfResponse,
   RescoreWorkMessage,
@@ -15,6 +16,7 @@ type MessageHandler<Req extends NqfRequest, Res extends NqfResponse> = (
 interface HandlerMap {
   SCORE_WORK?: MessageHandler<ScoreWorkMessage, ScoreResultResponse>;
   RESCORE_WORK?: MessageHandler<RescoreWorkMessage, ScoreResultResponse>;
+  GET_CACHED_SCORE?: MessageHandler<GetCachedScoreMessage, ScoreResultResponse>;
   CLEAR_CACHE?: MessageHandler<ClearCacheMessage, ClearCacheResponse>;
 }
 
@@ -36,19 +38,27 @@ export function registerHandlers(handlers: HandlerMap): void {
       if (!handler) return false;
 
       handler(msg)
-        .then(sendResponse)
+        .then((response) => {
+          try {
+            sendResponse(response);
+          } catch {
+            // チャネルが既に閉じている場合（MV3 service worker 終了等）
+          }
+        })
         .catch((err) => {
           console.error(`[NQF] Handler error for ${msg.type}:`, err);
-          if (msg.type === "CLEAR_CACHE") {
-            sendResponse({ success: false } as ClearCacheResponse);
-          } else {
-            const workId = (msg as ScoreWorkMessage).workId;
-            sendResponse({
-              workId,
+          const errorResponse = msg.type === "CLEAR_CACHE"
+            ? { success: false } as ClearCacheResponse
+            : {
+              workId: (msg as ScoreWorkMessage).workId,
               result: null,
               fromCache: false,
               error: err instanceof Error ? err.message : String(err),
-            } as ScoreResultResponse);
+            } as ScoreResultResponse;
+          try {
+            sendResponse(errorResponse);
+          } catch {
+            // チャネルが既に閉じている場合
           }
         });
 

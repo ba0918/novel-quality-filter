@@ -12,11 +12,20 @@ export interface RescoreWorkMessage {
   workUrl: string;
 }
 
+export interface GetCachedScoreMessage {
+  type: "GET_CACHED_SCORE";
+  workId: string;
+}
+
 export interface ClearCacheMessage {
   type: "CLEAR_CACHE";
 }
 
-export type NqfRequest = ScoreWorkMessage | RescoreWorkMessage | ClearCacheMessage;
+export type NqfRequest =
+  | ScoreWorkMessage
+  | RescoreWorkMessage
+  | GetCachedScoreMessage
+  | ClearCacheMessage;
 
 export interface ScoreResultResponse {
   workId: string;
