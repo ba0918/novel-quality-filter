@@ -238,6 +238,7 @@ const CSS = `
 }
 
 .nqf-metric-bar {
+  display: block;
   height: 100%;
   background: #4a9;
   border-radius: 3px;
