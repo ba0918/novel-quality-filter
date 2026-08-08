@@ -133,9 +133,11 @@ async function rescoreWorkPage(workId: string, container: HTMLElement): Promise<
       injectWorkBadge(container, response.result, () => rescoreWorkPage(workId, container));
     } else {
       console.warn(`[NQF] Rescore failed for work page ${workId}`);
+      injectScoreButton(container, () => scoreWorkPage(workId, container));
     }
   } catch (err) {
     console.error(`[NQF] Rescore request failed for work page ${workId}:`, err);
+    injectScoreButton(container, () => scoreWorkPage(workId, container));
   }
 }
 

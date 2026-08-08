@@ -9,9 +9,6 @@ export function injectScoreButton(
   container: HTMLElement,
   onScore: () => void,
 ): void {
-  if (container.hasAttribute(PROCESSED_ATTR)) return;
-  container.setAttribute(PROCESSED_ATTR, "true");
-
   removeExisting(container);
 
   const button = document.createElement("button");

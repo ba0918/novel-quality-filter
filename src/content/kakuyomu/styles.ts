@@ -110,6 +110,14 @@ const CSS = `
   opacity: 0.9;
 }
 
+.nqf-work-badge:hover .nqf-tooltip {
+  display: block;
+}
+
+.nqf-work-badge--open:hover .nqf-tooltip {
+  display: none;
+}
+
 .nqf-score-button {
   display: inline-flex;
   align-items: center;
