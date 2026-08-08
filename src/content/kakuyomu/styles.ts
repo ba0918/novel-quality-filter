@@ -166,7 +166,7 @@ const CSS = `
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
   width: 400px;
-  z-index: 100;
+  z-index: 10000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
