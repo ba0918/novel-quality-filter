@@ -27,7 +27,7 @@ const CSS = `
   position: relative;
   line-height: 1;
   margin-left: 8px;
-  vertical-align: middle;
+  vertical-align: text-bottom;
   transition: opacity 0.2s ease;
 }
 
