@@ -49,11 +49,17 @@ function main(): void {
   });
 }
 
-function processCards(cards: WorkCard[]): void {
+const CONCURRENT_SCORES = 3;
+
+async function processCards(cards: WorkCard[]): Promise<void> {
   for (const card of cards) {
     markAsProcessed(card.cardElement);
     injectLoadingBadge(card.cardElement);
-    scoreCard(card);
+  }
+
+  for (let i = 0; i < cards.length; i += CONCURRENT_SCORES) {
+    const batch = cards.slice(i, i + CONCURRENT_SCORES);
+    await Promise.all(batch.map((card) => scoreCard(card)));
   }
 }
 
