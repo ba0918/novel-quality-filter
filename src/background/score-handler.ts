@@ -38,7 +38,7 @@ async function handleScoreWork(message: ScoreWorkMessage): Promise<ScoreResultRe
     } else {
       return {
         workId,
-        result: { score: cached.score, metrics: cached.metrics },
+        result: { score: cached.score, metrics: cached.metrics, penalties: [] },
         fromCache: true,
       };
     }

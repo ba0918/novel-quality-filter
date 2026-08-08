@@ -1,4 +1,4 @@
-import type { RawMetrics, ScoreResult } from "../types.ts";
+import type { PenaltyResult, RawMetrics, ScoreResult } from "../types.ts";
 import { normalizeMetrics } from "./normalizer.ts";
 import { PENALTY_RULES } from "./weights.ts";
 
@@ -8,6 +8,8 @@ export function calculateScore(rawMetrics: RawMetrics): ScoreResult {
   const baseScore = Math.max(0, Math.min(100, rawScore));
 
   let penaltyMultiplier = 1.0;
+  const penalties: PenaltyResult[] = [];
+
   for (const rule of PENALTY_RULES) {
     let allConditionsMet = true;
     for (const cond of rule.conditions) {
@@ -24,11 +26,12 @@ export function calculateScore(rawMetrics: RawMetrics): ScoreResult {
     }
     if (allConditionsMet) {
       penaltyMultiplier *= rule.penaltyMultiplier;
+      penalties.push({ label: rule.label, multiplier: rule.penaltyMultiplier });
     }
   }
 
   const score = Math.round(baseScore * penaltyMultiplier);
-  return { score, metrics };
+  return { score, metrics, penalties };
 }
 
 export { normalizeMetrics } from "./normalizer.ts";

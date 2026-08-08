@@ -33,7 +33,13 @@ export interface MetricResult {
   reason: string;
 }
 
+export interface PenaltyResult {
+  label: string;
+  multiplier: number;
+}
+
 export interface ScoreResult {
   score: number;
   metrics: MetricResult[];
+  penalties: PenaltyResult[];
 }
