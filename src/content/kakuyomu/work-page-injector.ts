@@ -1,5 +1,5 @@
 import type { MetricResult, PenaltyResult, ScoreResult } from "../../domain/types.ts";
-import { createTooltip, scoreToColor } from "./score-color.ts";
+import { scoreToColor } from "./score-color.ts";
 
 const BADGE_CLASS = "nqf-work-badge";
 const PANEL_CLASS = "nqf-detail-panel";
@@ -58,9 +58,6 @@ export function injectWorkBadge(
       onRescore();
     });
   }
-
-  const tooltip = createTooltip(result);
-  badge.appendChild(tooltip);
 
   const wrapper = document.createElement("span");
   wrapper.className = "nqf-work-wrapper";
