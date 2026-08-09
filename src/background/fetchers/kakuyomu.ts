@@ -10,6 +10,20 @@ export interface FetchedEpisode {
   nextEpisodeUrl: string | null;
 }
 
+export interface WorkMetadata {
+  title: string;
+  author: string;
+  catchphrase: string;
+  reviewCount: number;
+  totalReviewPoint: number;
+  totalCharacterCount: number;
+}
+
+export interface TargetUrl {
+  workId: string;
+  episodeId: string | null;
+}
+
 export async function fetchFirstEpisodeText(workId: string): Promise<FetchedEpisode> {
   const episodePath = await findFirstEpisodeUrl(workId);
   const episodeUrl = resolveEpisodeUrl(episodePath).href;
@@ -36,15 +50,16 @@ export function resolveEpisodeUrl(href: string): URL {
   return url;
 }
 
-async function findFirstEpisodeUrl(workId: string): Promise<string> {
-  const workPageUrl = `${KAKUYOMU_BASE}/works/${workId}`;
-  const response = await fetch(workPageUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch work page: ${response.status} ${workPageUrl}`);
+export function parseTargetUrl(href: string): TargetUrl {
+  const url = resolveEpisodeUrl(href);
+  const match = url.pathname.match(/^\/works\/(\d+)(?:\/episodes\/(\d+))?/);
+  if (!match) {
+    throw new Error(`Not a kakuyomu work URL: ${href}`);
   }
+  return { workId: match[1], episodeId: match[2] ?? null };
+}
 
-  const html = await response.text();
-
+export function extractFirstEpisodePath(html: string, workId: string): string | null {
   // workId で絞ったエピソードリンクを最優先で探す
   const episodePattern = new RegExp(
     `href=["'](/works/${workId}/episodes/\\d+)["']`,
@@ -58,6 +73,20 @@ async function findFirstEpisodeUrl(workId: string): Promise<string> {
   if (fallback && fallback[1].startsWith(`/works/${workId}/`)) {
     return fallback[1];
   }
+
+  return null;
+}
+
+async function findFirstEpisodeUrl(workId: string): Promise<string> {
+  const workPageUrl = `${KAKUYOMU_BASE}/works/${workId}`;
+  const response = await fetch(workPageUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch work page: ${response.status} ${workPageUrl}`);
+  }
+
+  const html = await response.text();
+  const path = extractFirstEpisodePath(html, workId);
+  if (path) return path;
 
   throw new Error(`No episode found for work: ${workId}`);
 }
@@ -96,6 +125,35 @@ export function extractNextEpisodeUrl(html: string): string | null {
   }
 
   return null;
+}
+
+export function extractWorkMetadata(html: string): WorkMetadata {
+  const author = matchString(html, /"activityName":"([^"]*)"/);
+
+  // og:title は「作品名（著者名） - カクヨム」形式。著者名で末尾括弧を確実に剥がす
+  let title = matchString(html, /property="og:title"\s+content="([^"]*)"/)
+    .replace(/\s*-\s*カクヨム\s*$/, "");
+  if (author && title.endsWith(`（${author}）`)) {
+    title = title.slice(0, -(author.length + 2));
+  }
+
+  return {
+    title,
+    author,
+    catchphrase: matchString(html, /"catchphrase":"([^"]*)"/),
+    reviewCount: matchNumber(html, /"reviewCount":(\d+)/),
+    totalReviewPoint: matchNumber(html, /"totalReviewPoint":(\d+)/),
+    totalCharacterCount: matchNumber(html, /"totalCharacterCount":(\d+)/),
+  };
+}
+
+function matchString(html: string, pattern: RegExp): string {
+  return html.match(pattern)?.[1] ?? "";
+}
+
+function matchNumber(html: string, pattern: RegExp): number {
+  const raw = html.match(pattern)?.[1];
+  return raw ? Number(raw) : 0;
 }
 
 export function extractTextFromHtml(html: string): string {

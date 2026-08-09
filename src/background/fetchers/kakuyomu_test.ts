@@ -1,8 +1,11 @@
 import { assertEquals, assertStrictEquals, assertThrows } from "@std/assert";
 import {
   extractEpisodeTitle,
+  extractFirstEpisodePath,
   extractNextEpisodeUrl,
   extractTextFromHtml,
+  extractWorkMetadata,
+  parseTargetUrl,
   resolveEpisodeUrl,
 } from "./kakuyomu.ts";
 
@@ -83,4 +86,66 @@ Deno.test("resolveEpisodeUrl: kakuyomu.jp の絶対 URL をそのまま使用", 
 
 Deno.test("resolveEpisodeUrl: 他ホストの URL は拒否", () => {
   assertThrows(() => resolveEpisodeUrl("https://evil.example.com/works/1/episodes/2"));
+});
+
+Deno.test("parseTargetUrl: 作品ページ URL から workId を取り出す（episodeId は null）", () => {
+  assertEquals(parseTargetUrl("https://kakuyomu.jp/works/123"), {
+    workId: "123",
+    episodeId: null,
+  });
+});
+
+Deno.test("parseTargetUrl: エピソード URL から workId と episodeId を取り出す", () => {
+  assertEquals(parseTargetUrl("https://kakuyomu.jp/works/123/episodes/456"), {
+    workId: "123",
+    episodeId: "456",
+  });
+});
+
+Deno.test("parseTargetUrl: 他ホストの URL は拒否", () => {
+  assertThrows(() => parseTargetUrl("https://evil.example.com/works/123"));
+});
+
+Deno.test("parseTargetUrl: works を含まない URL は拒否", () => {
+  assertThrows(() => parseTargetUrl("https://kakuyomu.jp/"));
+});
+
+Deno.test("extractFirstEpisodePath: 指定 workId の最初のエピソードパスを返す", () => {
+  const html =
+    '<a href="/works/123/episodes/456">第1話</a><a href="/works/123/episodes/789">第2話</a>';
+  assertEquals(extractFirstEpisodePath(html, "123"), "/works/123/episodes/456");
+});
+
+Deno.test("extractFirstEpisodePath: 該当エピソードが無い場合は null", () => {
+  const html = '<a href="/works/999/episodes/1">別作品</a>';
+  assertStrictEquals(extractFirstEpisodePath(html, "123"), null);
+});
+
+Deno.test("extractWorkMetadata: 作品ページからタイトル・著者・評価指標を抽出", () => {
+  const html = [
+    '<meta property="og:title" content="架空のダンジョン物語（テスト著者） - カクヨム" />',
+    '<script>window.__DATA__ = {"activityName":"テスト著者",',
+    '"catchphrase":"テスト用のキャッチコピー",',
+    '"reviewCount":18830,"totalReviewPoint":42098,"totalCharacterCount":2729564};</script>',
+  ].join("\n");
+  assertEquals(extractWorkMetadata(html), {
+    title: "架空のダンジョン物語",
+    author: "テスト著者",
+    catchphrase: "テスト用のキャッチコピー",
+    reviewCount: 18830,
+    totalReviewPoint: 42098,
+    totalCharacterCount: 2729564,
+  });
+});
+
+Deno.test("extractWorkMetadata: 欠損フィールドは既定値（空文字 / 0）で補完", () => {
+  const html = '<meta property="og:title" content="単独タイトル - カクヨム" />';
+  assertEquals(extractWorkMetadata(html), {
+    title: "単独タイトル",
+    author: "",
+    catchphrase: "",
+    reviewCount: 0,
+    totalReviewPoint: 0,
+    totalCharacterCount: 0,
+  });
 });

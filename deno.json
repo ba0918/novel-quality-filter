@@ -9,7 +9,8 @@
     "spike:lindera": "deno run --allow-all spike/lindera_spike.ts",
     "spike:realdata": "deno run --allow-all spike/realdata_spike.ts",
     "build": "deno run --allow-all scripts/build.ts",
-    "build:clean": "rm -rf dist && deno task build"
+    "build:clean": "rm -rf dist && deno task build",
+    "analyze": "deno run --allow-all scripts/analyze_url.ts"
   },
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "deno.ns"],
