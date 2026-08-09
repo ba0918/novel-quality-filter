@@ -1,5 +1,6 @@
 import { assertEquals, assertStrictEquals, assertThrows } from "@std/assert";
 import {
+  buildEpisodeFromHtml,
   extractEpisodeTitle,
   extractFirstEpisodePath,
   extractLinesFromHtml,
@@ -8,6 +9,7 @@ import {
   extractWorkMetadata,
   parseTargetUrl,
   resolveEpisodeUrl,
+  validateEpisodeHtml,
 } from "./kakuyomu.ts";
 
 Deno.test("extractEpisodeTitle: widget-episodeTitle からタイトルを抽出", () => {
@@ -131,6 +133,41 @@ Deno.test("extractLinesFromHtml: ルビの <rt>/<rp> を除去し base（漢字�
 
 Deno.test("extractLinesFromHtml: 本文領域が無ければ空配列（診断はスコアを止めない）", () => {
   assertEquals(extractLinesFromHtml("<html><body><p>1</p></body></html>"), []);
+});
+
+Deno.test("validateEpisodeHtml: HTTP200かつ本文抽出成功なら健全", () => {
+  const html = '<div class="widget-episodeBody"><p>あいうえお。</p><p>かきくけこ。</p></div>';
+  assertEquals(validateEpisodeHtml(200, html), { healthy: true });
+});
+
+Deno.test("validateEpisodeHtml: HTTP非200は不健全（原本として保存しない）", () => {
+  const html = '<div class="widget-episodeBody"><p>あいうえお。</p></div>';
+  const health = validateEpisodeHtml(403, html);
+  assertEquals(health.healthy, false);
+});
+
+Deno.test("validateEpisodeHtml: 本文領域が無いページ（エラー/年齢確認）は不健全", () => {
+  const html = "<html><body><h1>年齢確認</h1><p>はい</p></body></html>";
+  const health = validateEpisodeHtml(200, html);
+  assertEquals(health.healthy, false);
+});
+
+Deno.test("buildEpisodeFromHtml: 生HTMLから本文・行・タイトル・次話URLを組み立てる", () => {
+  const html = [
+    '<h1 class="widget-episodeTitle">第1話</h1>',
+    '<div class="widget-episodeBody"><p>あいうえお。</p><p class="blank"><br /></p><p>さしすせそ。</p></div>',
+    '<a href="/works/123/episodes/456" id="contentMain-readNextEpisode">次へ</a>',
+  ].join("");
+  const ep = buildEpisodeFromHtml("https://kakuyomu.jp/works/123/episodes/1", html);
+  assertEquals(ep.episodeUrl, "https://kakuyomu.jp/works/123/episodes/1");
+  assertEquals(ep.text, "あいうえお。\n\nさしすせそ。");
+  assertEquals(ep.lines, [
+    { text: "あいうえお。", isBlank: false },
+    { text: "", isBlank: true },
+    { text: "さしすせそ。", isBlank: false },
+  ]);
+  assertEquals(ep.episodeTitle, "第1話");
+  assertEquals(ep.nextEpisodeUrl, "/works/123/episodes/456");
 });
 
 Deno.test("resolveEpisodeUrl: 相対パスを kakuyomu.jp の絶対 URL に解決", () => {

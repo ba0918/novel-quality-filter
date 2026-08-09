@@ -99,7 +99,12 @@ async function fetchEpisode(url: string): Promise<FetchedEpisode> {
     throw new Error(`Failed to fetch episode: ${response.status} ${url}`);
   }
 
-  const html = await response.text();
+  return buildEpisodeFromHtml(url, await response.text());
+}
+
+// 生HTMLから採点/診断に必要な要素を組み立てる純関数。fetch を伴わないため、
+// 保存済みHTMLからの再導出（rederive）でも同じ組み立てを再利用できる。
+export function buildEpisodeFromHtml(url: string, html: string): FetchedEpisode {
   return {
     episodeUrl: url,
     text: extractTextFromHtml(html),
@@ -107,6 +112,27 @@ async function fetchEpisode(url: string): Promise<FetchedEpisode> {
     episodeTitle: extractEpisodeTitle(html) ?? "",
     nextEpisodeUrl: extractNextEpisodeUrl(html),
   };
+}
+
+export interface EpisodeHealth {
+  healthy: boolean;
+  reason?: string;
+}
+
+// 収集経路の門番: 取得応答が「本物の本文ページ」であることを検証する（C5）。
+// エラー/年齢確認/bot対策ページを不動の原本として保存すると、後で取り直せない場合に
+// データセット全体の信頼性が崩れるため、保存の前段でここを通す。
+export function validateEpisodeHtml(status: number, html: string): EpisodeHealth {
+  if (status !== 200) return { healthy: false, reason: `http-${status}` };
+  if (extractLinesFromHtml(html).length === 0) return { healthy: false, reason: "no-body" };
+  let text: string;
+  try {
+    text = extractTextFromHtml(html);
+  } catch {
+    return { healthy: false, reason: "no-body" };
+  }
+  if (text.trim().length === 0) return { healthy: false, reason: "empty-body" };
+  return { healthy: true };
 }
 
 export function extractEpisodeTitle(html: string): string | null {
