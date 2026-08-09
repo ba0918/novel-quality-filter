@@ -1,9 +1,11 @@
 // カクヨム作品を URL 一本でメタデータ取得＋スコアリングする較正用ツール。
-// Usage: deno task analyze <url...> [--csv]
-//   url  : 作品 or エピソードの URL（複数可。どの話 URL でも作品の第1話から評価する）
-//   --csv: 集計用に CSV を末尾へ出力する
+// Usage: deno task analyze <url...> [--csv] [--episode]
+//   url      : 作品 or エピソードの URL（複数可。既定はどの話 URL でも作品の第1話から評価）
+//   --csv    : 集計用に CSV を末尾へ出力する
+//   --episode: 渡したエピソードをそのまま採点（開幕サンプリングを迂回）。
+//              長編の1話 vs 後半話で文体ドリフトを比較する調査用
 //
-// 採点対象話は本番拡張と同じ sampleEpisodes（開幕形式判定＋再採点）で決める。
+// 既定の採点対象話は本番拡張と同じ sampleEpisodes（開幕形式判定＋再採点）で決める。
 // これを通さず第1話を生採点するとキャラ紹介/掲示板開幕でブラウザ表示と食い違う。
 //
 // 「現状スコア」と「候補(複合)スコア」を並べて出す。候補は一文一段落ペナルティを
@@ -27,14 +29,14 @@ import { initTokenizer, tokenize } from "../src/domain/tokenizer/mod.ts";
 import { analyzeAll } from "../src/domain/analyzer/mod.ts";
 import { analyzeBlankLineRatio } from "../src/domain/analyzer/blank_line.ts";
 import { calculateScore } from "../src/domain/scoring/mod.ts";
-import type { MetricResult, OpeningFormat } from "../src/domain/types.ts";
+import type { MetricResult } from "../src/domain/types.ts";
 
 const THRESHOLD = 40;
 
 interface Row {
   meta: WorkMetadata;
   firstEpisodeTitle: string;
-  openingType: OpeningFormat;
+  openingType: string;
   sampledCount: number;
   episodeUrl: string;
   current: number;
@@ -88,42 +90,77 @@ async function fetchEpisode(episodeUrl: string): Promise<FetchedEpisode> {
   };
 }
 
-async function analyzeUrl(url: string): Promise<Row> {
-  // どの話 URL でも作品を識別するだけに使い、採点は本番と同じく第1話から始める。
-  const { workId } = parseTargetUrl(url);
+interface Target {
+  text: string;
+  episodeUrl: string;
+  firstEpisodeTitle: string;
+  openingType: string;
+  sampledCount: number;
+}
 
-  const workHtml = await fetchText(`https://kakuyomu.jp/works/${workId}`);
-  const meta = extractWorkMetadata(workHtml);
+// 採点対象話を決める。episodeMode 時は渡された話をそのまま（開幕サンプリングを
+// 迂回して）採点し、1話と後半話の文体ドリフトを比較できるようにする。
+async function resolveTarget(
+  url: string,
+  workHtml: string,
+  workId: string,
+  episodeMode: boolean,
+): Promise<Target> {
+  const { episodeId } = parseTargetUrl(url);
+  if (episodeMode && episodeId) {
+    await sleep(FETCH_INTERVAL_MS);
+    const ep = await fetchEpisode(
+      resolveEpisodeUrl(`/works/${workId}/episodes/${episodeId}`).href,
+    );
+    return {
+      text: ep.text,
+      episodeUrl: ep.episodeUrl,
+      firstEpisodeTitle: ep.episodeTitle,
+      openingType: "直接採点",
+      sampledCount: 1,
+    };
+  }
 
   const firstPath = extractFirstEpisodePath(workHtml, workId);
   if (!firstPath) throw new Error(`No episode found for work: ${workId}`);
-
   await sleep(FETCH_INTERVAL_MS);
   const first = await fetchEpisode(resolveEpisodeUrl(firstPath).href);
-
   const sampling = await sampleEpisodes(first, async (prev) => {
     if (!prev.nextEpisodeUrl) return null;
     await sleep(FETCH_INTERVAL_MS);
     return fetchEpisode(resolveEpisodeUrl(prev.nextEpisodeUrl).href);
   });
-
-  const tokens = tokenize(sampling.targetText);
-  const { score, metrics } = calculateScore(
-    analyzeAll(sampling.targetText, tokens, tokenize),
-  );
-
   return {
-    meta,
+    text: sampling.targetText,
+    episodeUrl: sampling.episodeUrl,
     firstEpisodeTitle: first.episodeTitle,
     openingType: sampling.openingType,
     sampledCount: sampling.sampledCount,
-    episodeUrl: sampling.episodeUrl,
+  };
+}
+
+async function analyzeUrl(url: string, episodeMode: boolean): Promise<Row> {
+  const { workId } = parseTargetUrl(url);
+  const workHtml = await fetchText(`https://kakuyomu.jp/works/${workId}`);
+  const meta = extractWorkMetadata(workHtml);
+
+  const target = await resolveTarget(url, workHtml, workId, episodeMode);
+
+  const tokens = tokenize(target.text);
+  const { score, metrics } = calculateScore(analyzeAll(target.text, tokens, tokenize));
+
+  return {
+    meta,
+    firstEpisodeTitle: target.firstEpisodeTitle,
+    openingType: target.openingType,
+    sampledCount: target.sampledCount,
+    episodeUrl: target.episodeUrl,
     current: score,
     candidate: candidateScore(metrics),
     singleSentParaRatio: rawOf(metrics, "singleSentParaRatio"),
     sentenceLengthSD: rawOf(metrics, "sentenceLengthSD"),
     burstiness: rawOf(metrics, "sentenceLengthBurstiness"),
-    blankLineRatio: analyzeBlankLineRatio(sampling.targetText),
+    blankLineRatio: analyzeBlankLineRatio(target.text),
   };
 }
 
@@ -200,10 +237,12 @@ function printCsv(rows: Row[]): void {
 }
 
 async function main(): Promise<void> {
-  const args = Deno.args.filter((a) => a !== "--csv");
+  const flags = new Set(["--csv", "--episode"]);
+  const args = Deno.args.filter((a) => !flags.has(a));
   const csv = Deno.args.includes("--csv");
+  const episodeMode = Deno.args.includes("--episode");
   if (args.length === 0) {
-    console.error("Usage: deno task analyze <url...> [--csv]");
+    console.error("Usage: deno task analyze <url...> [--csv] [--episode]");
     Deno.exit(1);
   }
 
@@ -213,7 +252,7 @@ async function main(): Promise<void> {
   for (const [i, url] of args.entries()) {
     if (i > 0) await sleep(FETCH_INTERVAL_MS);
     try {
-      const row = await analyzeUrl(url);
+      const row = await analyzeUrl(url, episodeMode);
       printDetail(row);
       rows.push(row);
     } catch (e) {
