@@ -38,6 +38,9 @@ async function main(): Promise<void> {
   console.log(`データセット: ${records.length}件 (${path})\n`);
 
   // --- baseline 忠実性（保存スコア == 再計算スコア）---
+  // 注: weights.ts のスコアリングを変更（floor 実装等）した後は、変更前にクロールした
+  // レコードでこれが FAIL になる。設定ドリフトの検出であってデータ破損ではない
+  // （分析は常に rawMetrics から再計算するので有効。保存 score はクロール時点のスナップショット）。
   let mismatch = 0;
   for (const r of records) {
     if (scoreExperiment(r.rawMetrics, {}) !== r.score) mismatch++;
@@ -46,29 +49,32 @@ async function main(): Promise<void> {
     `baseline 再計算 == 保存スコア: ${mismatch === 0 ? "PASS" : `FAIL(${mismatch}件不一致)`}\n`,
   );
 
-  // --- スコア分布（現行）---
+  // --- スコア分布（現行）。通過は本番と同じ score>40（40ちょうどは除外）---
   console.log("=== スコア分布（現行）===");
   console.log(histogram(records.map((r) => r.score)));
-  const passN = records.filter((r) => r.score >= THRESHOLD).length;
+  const passN = records.filter((r) => r.score > THRESHOLD).length;
   console.log(`  通過 ${passN} / 除外 ${records.length - passN}\n`);
 
   // --- 象限 ---
   const fpSuspect = records.filter((r) =>
-    r.score >= THRESHOLD && r.rawMetrics.singleSentParaRatio > 0.70 &&
+    r.score > THRESHOLD && r.rawMetrics.singleSentParaRatio > 0.70 &&
     r.rawMetrics.sentenceLengthSD >= 15
   );
   const fnCanary = records.filter((r) =>
-    r.score < THRESHOLD && r.rawMetrics.singleSentParaRatio > 0.70 &&
+    r.score <= THRESHOLD && r.rawMetrics.singleSentParaRatio > 0.70 &&
     r.rawMetrics.sentenceLengthSD >= 13 && r.rawMetrics.sentenceLengthSD < 15
   );
   console.log(
-    `=== FP容疑（通過 AND 比率>0.70 AND SD>=15。要人手ラベル）: ${fpSuspect.length}件 ===`,
+    `=== FP容疑（通過 AND 比率>0.70 AND SD>=15。要人手ラベル。平均字/文が長い＝汚染疑い）: ${fpSuspect.length}件 ===`,
   );
   for (const r of fpSuspect) {
+    const meanLen = r.rawMetrics.sentenceCount > 0
+      ? r.rawMetrics.charCount / r.rawMetrics.sentenceCount
+      : 0;
     console.log(
       `  [${r.tags[0]}] ${r.score} 比率${r.rawMetrics.singleSentParaRatio.toFixed(2)}/SD${
         r.rawMetrics.sentenceLengthSD.toFixed(1)
-      } ${r.title}\n    ${r.url}`,
+      }/平均${meanLen.toFixed(0)}字 ${r.title}\n    ${r.url}`,
     );
   }
   console.log(
@@ -88,7 +94,7 @@ async function main(): Promise<void> {
   for (const f of floors) {
     const cfg: ExperimentConfig = { m1ContribFloor: f };
     const flips = records.filter((r) =>
-      r.score < THRESHOLD && scoreExperiment(r.rawMetrics, cfg) >= THRESHOLD
+      r.score <= THRESHOLD && scoreExperiment(r.rawMetrics, cfg) > THRESHOLD
     );
     console.log(`  floor=${f.toFixed(2)}: 新規通過 ${flips.length}件`);
     for (const r of flips) {

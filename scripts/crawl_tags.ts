@@ -91,11 +91,17 @@ async function collectCandidates(opts: Options, seen: Set<string>): Promise<Map<
   return candidates;
 }
 
+// 通過は本番と同じ score>40（40ちょうどは除外）。
 function quadrant(r: DatasetRecord): "FP容疑" | "FN予備軍" | "" {
   const { singleSentParaRatio: ratio, sentenceLengthSD: sd } = r.rawMetrics;
-  if (r.score >= 40 && ratio > 0.70 && sd >= 15) return "FP容疑"; // 複合すり抜けの通過
-  if (r.score < 40 && ratio > 0.70 && sd >= 13 && sd < 15) return "FN予備軍"; // 崩界クラス
+  if (r.score > 40 && ratio > 0.70 && sd >= 15) return "FP容疑"; // 複合すり抜けの通過
+  if (r.score <= 40 && ratio > 0.70 && sd >= 13 && sd < 15) return "FN予備軍"; // 崩界クラス
   return "";
+}
+
+// 平均文長（字/文）。非散文ブロック（ステータス表・掲示板）が長文に化けると跳ねる汚染プロキシ。
+function meanSentenceLen(r: DatasetRecord): number {
+  return r.rawMetrics.sentenceCount > 0 ? r.rawMetrics.charCount / r.rawMetrics.sentenceCount : 0;
 }
 
 async function main(): Promise<void> {
@@ -156,7 +162,11 @@ async function main(): Promise<void> {
   if (flagged.length > 0) {
     console.log(`\n=== 要チェック候補 ${flagged.length}件 ===`);
     for (const r of flagged) {
-      console.log(`  ${quadrant(r)}: [${r.tags[0]}] ${r.score} ${r.title}\n    ${r.url}`);
+      console.log(
+        `  ${quadrant(r)}: [${r.tags[0]}] ${r.score} 平均${
+          meanSentenceLen(r).toFixed(0)
+        }字/文 ${r.title}\n    ${r.url}`,
+      );
     }
   }
 }
