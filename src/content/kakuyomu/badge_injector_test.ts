@@ -106,6 +106,20 @@ Deno.test("work-page-injector: 行メタデータのカテゴリ別分量を det
     assertEquals(rows.length, 4);
     const firstLabel = rows[0].querySelector(".nqf-line-label");
     assertEquals(firstLabel?.textContent, "地の文");
+
+    // 地の文は30字軸（短行30・短チャンク30）とチャンク数・文字数の生値まで読み取れる
+    const narrativeStats = rows[0].querySelector(".nqf-line-stats")?.textContent ?? "";
+    assert(narrativeStats.includes("文字数 120"), "地の文のカテゴリ別文字数が表示される");
+    assert(narrativeStats.includes("短行 20:25% / 30:50%"), "短行の20/30両軸が表示される");
+    assert(
+      narrativeStats.includes("短チャンク 20:33% / 30:50%"),
+      "地の文短チャンクの20/30両軸が表示される",
+    );
+
+    // 非地の文カテゴリでもカテゴリ別文字数と30字軸が読み取れる
+    const dialogueStats = rows[1].querySelector(".nqf-line-stats")?.textContent ?? "";
+    assert(dialogueStats.includes("文字数 30"), "セリフのカテゴリ別文字数が表示される");
+    assert(dialogueStats.includes("短行 20:100% / 30:100%"), "セリフの短行20/30が表示される");
   });
 });
 

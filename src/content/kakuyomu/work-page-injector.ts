@@ -298,10 +298,18 @@ function createLineRow(
   const parts = [
     `${count.lineCount}行`,
     `平均${avg}字`,
-    `短行20 ${ratioPercent(count.short20, count.lineCount)}`,
+    `文字数 ${count.charCount}`,
+    `短行 20:${ratioPercent(count.short20, count.lineCount)} / 30:${
+      ratioPercent(count.short30, count.lineCount)
+    }`,
   ];
   if (narrative) {
-    parts.push(`短チャンク20 ${ratioPercent(narrative.shortChunk20, narrative.chunkCount)}`);
+    parts.push(`チャンク ${narrative.chunkCount}`);
+    parts.push(
+      `短チャンク 20:${ratioPercent(narrative.shortChunk20, narrative.chunkCount)} / 30:${
+        ratioPercent(narrative.shortChunk30, narrative.chunkCount)
+      }`,
+    );
   }
   stats.textContent = parts.join(" / ");
   row.appendChild(stats);
