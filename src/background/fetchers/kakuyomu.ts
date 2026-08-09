@@ -6,20 +6,34 @@ const KAKUYOMU_BASE = "https://kakuyomu.jp";
 export interface FetchedEpisode {
   episodeUrl: string;
   text: string;
+  episodeTitle: string;
+  nextEpisodeUrl: string | null;
 }
 
 export async function fetchFirstEpisodeText(workId: string): Promise<FetchedEpisode> {
-  const episodeUrl = await findFirstEpisodeUrl(workId);
-  const fullUrl = new URL(episodeUrl, KAKUYOMU_BASE);
-  if (fullUrl.hostname !== "kakuyomu.jp") {
-    throw new Error(`Unexpected host: ${fullUrl.hostname}`);
-  }
+  const episodePath = await findFirstEpisodeUrl(workId);
+  const episodeUrl = resolveEpisodeUrl(episodePath).href;
 
   // 2回目の fetch 前にインターバルを空ける
   await sleep(FETCH_INTERVAL_MS);
 
-  const text = await fetchEpisodeText(fullUrl.href);
-  return { episodeUrl: fullUrl.href, text };
+  return fetchEpisode(episodeUrl);
+}
+
+export function fetchNextEpisodeText(
+  prev: FetchedEpisode,
+): Promise<FetchedEpisode | null> {
+  if (!prev.nextEpisodeUrl) return Promise.resolve(null);
+  const nextUrl = resolveEpisodeUrl(prev.nextEpisodeUrl).href;
+  return fetchEpisode(nextUrl);
+}
+
+export function resolveEpisodeUrl(href: string): URL {
+  const url = new URL(href, KAKUYOMU_BASE);
+  if (url.hostname !== "kakuyomu.jp") {
+    throw new Error(`Unexpected host: ${url.hostname}`);
+  }
+  return url;
 }
 
 async function findFirstEpisodeUrl(workId: string): Promise<string> {
@@ -48,17 +62,43 @@ async function findFirstEpisodeUrl(workId: string): Promise<string> {
   throw new Error(`No episode found for work: ${workId}`);
 }
 
-async function fetchEpisodeText(url: string): Promise<string> {
+async function fetchEpisode(url: string): Promise<FetchedEpisode> {
   const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!response.ok) {
     throw new Error(`Failed to fetch episode: ${response.status} ${url}`);
   }
 
   const html = await response.text();
-  return extractTextFromHtml(html);
+  return {
+    episodeUrl: url,
+    text: extractTextFromHtml(html),
+    episodeTitle: extractEpisodeTitle(html) ?? "",
+    nextEpisodeUrl: extractNextEpisodeUrl(html),
+  };
 }
 
-function extractTextFromHtml(html: string): string {
+export function extractEpisodeTitle(html: string): string | null {
+  const match = /class="[^"]*widget-episodeTitle[^"]*"[^>]*>\s*([^<]+)/i.exec(html);
+  return match ? match[1].trim() : null;
+}
+
+export function extractNextEpisodeUrl(html: string): string | null {
+  const anchor = /<a\b[^>]*id="contentMain-readNextEpisode"[^>]*>/i.exec(html);
+  if (anchor) {
+    const href = /href="([^"]+)"/i.exec(anchor[0]);
+    if (href) return href[1];
+  }
+
+  const relNext = /<link\b[^>]*rel="next"[^>]*>/i.exec(html);
+  if (relNext) {
+    const href = /href="([^"]+)"/i.exec(relNext[0]);
+    if (href) return href[1];
+  }
+
+  return null;
+}
+
+export function extractTextFromHtml(html: string): string {
   // Service Worker には DOMParser がないため文字列操作で抽出する
 
   // 本文領域を class/id で特定
@@ -88,7 +128,7 @@ function extractTextFromHtml(html: string): string {
     return paragraphs.join("\n");
   }
 
-  throw new Error(`Could not extract episode text from: ${url}`);
+  throw new Error(`Could not extract episode text from: ${html.slice(0, 120)}`);
 }
 
 function stripHtmlTags(html: string): string {
