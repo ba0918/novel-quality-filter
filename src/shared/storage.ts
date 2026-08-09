@@ -1,4 +1,4 @@
-import type { MetricResult, OpeningFormat, PenaltyResult } from "../domain/types.ts";
+import type { LineMetadata, MetricResult, OpeningFormat, PenaltyResult } from "../domain/types.ts";
 import { DB_NAME, DB_VERSION, STORE_SCORES } from "./constants.ts";
 
 export interface CachedScore {
@@ -9,6 +9,7 @@ export interface CachedScore {
   openingType?: OpeningFormat;
   sampledCount?: number;
   targetEpisodeIndex?: number;
+  lineMetadata?: LineMetadata;
   schemaVersion: number;
   scoredAt: number;
   episodeUrl: string;

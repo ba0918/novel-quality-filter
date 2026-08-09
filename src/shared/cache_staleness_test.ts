@@ -34,6 +34,11 @@ Deno.test("cache_staleness: 一文一段落ペナルティ複合化前のスキ�
   assertEquals(isCacheStale(4), true);
 });
 
-Deno.test("cache_staleness: 一文一段落ペナルティ複合化でスキーマバージョンが5になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 5);
+Deno.test("cache_staleness: 行メタデータ追加前のスキーマ5は stale", () => {
+  // schemaVersion 5 のキャッシュは lineMetadata を持たず、対象話の再抽出も要るため無効化する
+  assertEquals(isCacheStale(5), true);
+});
+
+Deno.test("cache_staleness: 行メタデータ追加でスキーマバージョンが6になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 6);
 });
