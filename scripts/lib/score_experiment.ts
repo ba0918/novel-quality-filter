@@ -6,7 +6,51 @@
 // floor を normalize 自体に焼くと一文一段落ルールが充足不能になり黙って永久不発になる。それを禁じる。
 
 import type { RawMetrics } from "../../src/domain/types.ts";
-import { METRIC_CONFIGS, PENALTY_RULES } from "../../src/domain/scoring/weights.ts";
+import {
+  METRIC_CONFIGS,
+  type MetricConfig,
+  PENALTY_RULES,
+  type PenaltyRule,
+} from "../../src/domain/scoring/weights.ts";
+
+// 任意の重み・正規化・ペナルティでスコアを再計算する研究エンジン。mod.ts / normalizer.ts と
+// 同一の計算（normalize→invert→contribution 総和→clamp→ペナルティ乗算→round）を、設定を注入して行う。
+// production の METRIC_CONFIGS / PENALTY_RULES を渡すと calculateScore と一致する（テストで固定）。
+// 表示用の contribution-floor（scoreExperiment）と違い、正規化の変更はペナルティ発火判定にも波及する
+// （＝gate スコアそのものを研究する用途。normalizedValue を条件に読むため本番と同じ挙動）。
+export function scoreWithConfig(
+  raw: RawMetrics,
+  metricConfigs: MetricConfig[],
+  penaltyRules: PenaltyRule[],
+): number {
+  const normOf = (key: string): number => {
+    const c = metricConfigs.find((x) => x.key === key)!;
+    const n = c.normalize(raw[key as keyof RawMetrics] as number);
+    return c.invert ? 1 - n : n;
+  };
+
+  let sum = 0;
+  for (const c of metricConfigs) sum += normOf(c.key) * c.weight * 100;
+  const base = Math.max(0, Math.min(100, sum));
+
+  let mult = 1;
+  for (const rule of penaltyRules) {
+    let met = true;
+    for (const cond of rule.conditions) {
+      const rv = raw[cond.key as keyof RawMetrics] as number;
+      if (cond.exemptWhenZero && rv === 0) {
+        met = false;
+        break;
+      }
+      if (normOf(cond.key) >= cond.criticalThreshold) {
+        met = false;
+        break;
+      }
+    }
+    if (met) mult *= rule.penaltyMultiplier;
+  }
+  return Math.round(base * mult);
+}
 
 export interface ExperimentConfig {
   m1ContribFloor?: number; // M1 の invert 済みスコアに掛ける下限（寄与のみ）

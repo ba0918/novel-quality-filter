@@ -48,3 +48,28 @@ export async function loadDataset(path: string): Promise<DatasetRecord[]> {
 export async function appendRecord(path: string, rec: DatasetRecord): Promise<void> {
   await Deno.writeTextFile(path, toJsonl(rec), { append: true });
 }
+
+export interface LabelRecord {
+  workId: string;
+  label: string; // 良 / ゴミ / 対象外 など
+  note?: string;
+}
+
+export function parseLabels(text: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of text.split("\n")) {
+    if (line.trim().length === 0) continue;
+    const r = JSON.parse(line) as LabelRecord;
+    map.set(r.workId, r.label);
+  }
+  return map;
+}
+
+export async function loadLabels(path: string): Promise<Map<string, string>> {
+  try {
+    return parseLabels(await Deno.readTextFile(path));
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) return new Map();
+    throw e;
+  }
+}
