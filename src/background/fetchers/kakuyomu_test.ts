@@ -121,13 +121,15 @@ Deno.test("extractFirstEpisodePath: 該当エピソードが無い場合は null
   assertStrictEquals(extractFirstEpisodePath(html, "123"), null);
 });
 
-Deno.test("extractWorkMetadata: 作品ページからタイトル・著者・評価指標を抽出", () => {
+Deno.test("extractWorkMetadata: 対象作品の Work オブジェクトから評価指標を抽出し、先行する別作品は無視する", () => {
+  // 作品ページには推薦枠として他作品の Work オブジェクトが先に埋め込まれる。
+  // og:url の workId で対象オブジェクトを特定しないとデコイの値を拾う。
   const html = [
     '<meta property="og:title" content="架空のダンジョン物語（テスト著者） - カクヨム" />',
-    '<script>window.__DATA__ = {"activityName":"テスト著者",',
-    '"catchphrase":"テスト用のキャッチコピー",',
-    '"reviewCount":18830,"totalReviewPoint":42098,"totalCharacterCount":2729564};</script>',
-  ].join("\n");
+    '<meta property="og:url" content="https://kakuyomu.jp/works/123" />',
+    '"Work:999":{"catchphrase":"デコイのコピー","reviewCount":11,"totalReviewPoint":22,"totalCharacterCount":33},',
+    '"Work:123":{"catchphrase":"テスト用のキャッチコピー","reviewCount":18830,"totalReviewPoint":42098,"totalCharacterCount":2729564}',
+  ].join("");
   assertEquals(extractWorkMetadata(html), {
     title: "架空のダンジョン物語",
     author: "テスト著者",
@@ -138,7 +140,14 @@ Deno.test("extractWorkMetadata: 作品ページからタイトル・著者・評
   });
 });
 
-Deno.test("extractWorkMetadata: 欠損フィールドは既定値（空文字 / 0）で補完", () => {
+Deno.test("extractWorkMetadata: 著者名は og:title 末尾の括弧から取り、タイトルに括弧があっても最後の括弧を著者とする", () => {
+  const html = '<meta property="og:title" content="作品（副題）（テスト著者） - カクヨム" />';
+  const meta = extractWorkMetadata(html);
+  assertEquals(meta.title, "作品（副題）");
+  assertEquals(meta.author, "テスト著者");
+});
+
+Deno.test("extractWorkMetadata: Work オブジェクトが無ければ評価指標は既定値で補完", () => {
   const html = '<meta property="og:title" content="単独タイトル - カクヨム" />';
   assertEquals(extractWorkMetadata(html), {
     title: "単独タイトル",

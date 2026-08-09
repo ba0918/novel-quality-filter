@@ -128,23 +128,39 @@ export function extractNextEpisodeUrl(html: string): string | null {
 }
 
 export function extractWorkMetadata(html: string): WorkMetadata {
-  const author = matchString(html, /"activityName":"([^"]*)"/);
-
-  // og:title は「作品名（著者名） - カクヨム」形式。著者名で末尾括弧を確実に剥がす
-  let title = matchString(html, /property="og:title"\s+content="([^"]*)"/)
+  // og:title は「作品名（著者名） - カクヨム」形式。末尾括弧が著者名（タイトル内の
+  // 括弧より後ろ）なので、最後の全角括弧をタイトルと著者に分ける
+  const ogTitle = matchString(html, /property="og:title"\s+content="([^"]*)"/)
     .replace(/\s*-\s*カクヨム\s*$/, "");
-  if (author && title.endsWith(`（${author}）`)) {
-    title = title.slice(0, -(author.length + 2));
-  }
+  const authorSplit = ogTitle.match(/^(.*)（([^（）]*)）$/);
+  const title = authorSplit ? authorSplit[1] : ogTitle;
+  const author = authorSplit ? authorSplit[2] : "";
+
+  // 評価指標は作品ページに埋まった他作品（推薦枠）と混ざるため、
+  // og:url の workId で対象の Work オブジェクトへ絞ってから読む
+  const workId = matchString(
+    html,
+    /property="og:url"\s+content="https:\/\/kakuyomu\.jp\/works\/(\d+)"/,
+  );
+  const workObject = sliceWorkObject(html, workId);
 
   return {
     title,
     author,
-    catchphrase: matchString(html, /"catchphrase":"([^"]*)"/),
-    reviewCount: matchNumber(html, /"reviewCount":(\d+)/),
-    totalReviewPoint: matchNumber(html, /"totalReviewPoint":(\d+)/),
-    totalCharacterCount: matchNumber(html, /"totalCharacterCount":(\d+)/),
+    catchphrase: matchString(workObject, /"catchphrase":"([^"]*)"/),
+    reviewCount: matchNumber(workObject, /"reviewCount":(\d+)/),
+    totalReviewPoint: matchNumber(workObject, /"totalReviewPoint":(\d+)/),
+    totalCharacterCount: matchNumber(workObject, /"totalCharacterCount":(\d+)/),
   };
+}
+
+function sliceWorkObject(html: string, workId: string): string {
+  if (!workId) return html;
+  const start = html.indexOf(`"Work:${workId}":{`);
+  if (start === -1) return html;
+  // 対象オブジェクトの終端は次の Work 定義の直前（推薦枠は __ref なので定義キーは持たない）
+  const nextKeyOffset = html.slice(start + 1).search(/"Work:\d+":\{/);
+  return nextKeyOffset === -1 ? html.slice(start) : html.slice(start, start + 1 + nextKeyOffset);
 }
 
 function matchString(html: string, pattern: RegExp): string {
