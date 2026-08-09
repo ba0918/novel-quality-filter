@@ -1,6 +1,5 @@
 import type { MetricResult, PenaltyResult, ScoreResult } from "../../domain/types.ts";
 import { scoreToColor } from "./score-color.ts";
-import { findStarOrFollowerElement } from "./meta-element.ts";
 
 const BADGE_CLASS = "nqf-work-badge";
 const PANEL_CLASS = "nqf-detail-panel";
@@ -102,11 +101,6 @@ function removeExisting(container: HTMLElement): void {
 }
 
 function insertElement(container: HTMLElement, element: HTMLElement): void {
-  const starLink = findStarOrFollowerElement(container);
-  if (starLink) {
-    starLink.parentElement?.insertBefore(element, starLink.nextSibling);
-    return;
-  }
   container.appendChild(element);
 }
 

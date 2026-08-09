@@ -106,23 +106,24 @@ async function handleRescore(workId: string, cardElement: HTMLElement): Promise<
 function handleWorkPage(workId: string): void {
   console.log(`[NQF] Work page detected: ${workId}`);
 
-  const container = findWorkPageContainer();
+  const container = findWorkPageContainer(workId);
   if (container) {
     initWorkPageUI(workId, container);
     return;
   }
 
   // SPA遷移や遅延レンダリングでサブヘッダーが未出現の場合、出現を待つ
-  waitForWorkPageContainer((found) => {
+  waitForWorkPageContainer(workId, (found) => {
     initWorkPageUI(workId, found);
   });
 }
 
 function waitForWorkPageContainer(
+  workId: string,
   callback: (container: HTMLElement) => void,
 ): void {
   const observer = new MutationObserver(() => {
-    const container = findWorkPageContainer();
+    const container = findWorkPageContainer(workId);
     if (container) {
       observer.disconnect();
       callback(container);
@@ -204,30 +205,33 @@ async function requestWorkScore(
   }
 }
 
-function findWorkPageContainer(): HTMLElement | null {
-  // ★数リンク（/reviews への href + ★ テキスト）を探す
-  const reviewLinks = document.querySelectorAll<HTMLAnchorElement>(
-    'a[href$="/reviews"]',
+function findWorkPageContainer(workId: string): HTMLElement | null {
+  // この作品の★数リンクを探す（他作品のレビューリンクを除外）
+  const reviewLink = document.querySelector<HTMLAnchorElement>(
+    `a[href$="/works/${workId}/reviews"]`,
   );
-  for (const link of reviewLinks) {
-    if (!link.textContent?.includes("★")) continue;
-    // ★数リンクの親 Layout 行を返す
-    const layoutRow = link.closest<HTMLElement>(
+  if (reviewLink) {
+    const layoutRow = reviewLink.closest<HTMLElement>(
       '[class*="Layout_layout"]',
     );
     if (layoutRow) return layoutRow;
-    if (link.parentElement) return link.parentElement;
+    if (reviewLink.parentElement) return reviewLink.parentElement;
   }
 
-  // フォールバック: フォロワーリンク（/followers への href）の親行
+  // フォールバック: フォロワーリンクから★数を含む親行を探す
+  // ★0 などレビューリンクが存在しない場合に使われる
   const followerLink = document.querySelector<HTMLAnchorElement>(
-    'a[href*="/followers"]',
+    `a[href*="/works/${workId}/followers"]`,
   );
   if (followerLink) {
-    const row = followerLink.closest<HTMLElement>(
+    const innerRow = followerLink.closest<HTMLElement>(
       '[class*="Layout_layout"]',
     );
-    if (row) return row;
+    const topRow = innerRow?.parentElement?.closest<HTMLElement>(
+      '[class*="Layout_layout"]',
+    );
+    if (topRow) return topRow;
+    if (innerRow) return innerRow;
   }
 
   return null;
