@@ -5,6 +5,10 @@
 
 import { loadDataset } from "./lib/dataset.ts";
 import { type ExperimentConfig, scoreExperiment } from "./lib/score_experiment.ts";
+import { loadLabels2 } from "./lib/labels_store.ts";
+import { analyzeSeparation } from "./lib/analyze_separation.ts";
+
+const DEFAULT_LABELS = ".agents/runtime/labels.jsonl";
 
 const THRESHOLD = 40;
 
@@ -104,6 +108,25 @@ async function main(): Promise<void> {
         }/SD${r.rawMetrics.sentenceLengthSD.toFixed(1)} ${r.title.slice(0, 24)}`,
       );
     }
+  }
+
+  // --- 行メタ分離度（ラベル join。詳細は deno task separation）---
+  const labels = await loadLabels2(argValue("--labels", DEFAULT_LABELS));
+  if (labels.length > 0) {
+    const sep = analyzeSeparation(records, labels, THRESHOLD);
+    console.log(
+      `\n=== 行メタ分離度（良${sep.goodCount}/ゴミ${sep.junkCount}。除外 対象外${sep.scopeExcludedCount}/論理${sep.logicallyExcludedCount}/旧形式${sep.legacyExcludedCount}）===`,
+    );
+    for (const m of sep.metrics) {
+      console.log(
+        `  ${m.key.padEnd(26)} 良 ${m.goodMean.toFixed(2)} / ゴミ ${m.junkMean.toFixed(2)} / 差 ${
+          m.gap.toFixed(2)
+        }`,
+      );
+    }
+    console.log(
+      `  通過駄文 ${sep.mismatches.passedJunk.length}件 / 巻き込み良作 ${sep.mismatches.caughtGood.length}件 / リーク警告 ${sep.leakage.length}件（詳細: deno task separation）`,
+    );
   }
 }
 

@@ -17,6 +17,7 @@
     "tag": "deno run --allow-all scripts/tag.ts",
     "exclude": "deno run --allow-all scripts/exclude.ts",
     "exp": "deno run --allow-all scripts/analyze_dataset.ts",
+    "separation": "deno run --allow-all scripts/separation.ts",
     "research": "deno run --allow-all scripts/research.ts"
   },
   "compilerOptions": {
