@@ -11,6 +11,7 @@
     "jsr:@std/path@^1.1.4": "1.1.4",
     "npm:@preact/signals@2": "2.8.1_preact@10.28.3",
     "npm:esbuild@0.27": "0.27.3",
+    "npm:fake-indexeddb@6": "6.2.5",
     "npm:lindera-wasm-ipadic-web@2.3.4": "2.3.4",
     "npm:linkedom@0.18": "0.18.13",
     "npm:preact@10.28.3": "10.28.3",
@@ -305,6 +306,9 @@
       ],
       "scripts": true,
       "bin": true
+    },
+    "fake-indexeddb@6.2.5": {
+      "integrity": "sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w=="
     },
     "html-escaper@3.0.3": {
       "integrity": "sha512-RuMffC89BOWQoY0WKGpIhn5gX3iI54O6nRA0yC124NYVtzjmFWBIiFd8M0x+ZdX0P9R4lADg1mgP8C7PxGOWuQ=="
