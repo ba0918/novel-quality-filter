@@ -2,6 +2,7 @@ import { assertEquals, assertStrictEquals, assertThrows } from "@std/assert";
 import {
   extractEpisodeTitle,
   extractFirstEpisodePath,
+  extractLinesFromHtml,
   extractNextEpisodeUrl,
   extractTextFromHtml,
   extractWorkMetadata,
@@ -69,6 +70,45 @@ Deno.test("extractTextFromHtml: ルビのふりがなを本文に含めない", 
 Deno.test("extractTextFromHtml: 本文が無い場合はエラー", () => {
   const html = "<html><body><p>1</p><p>2</p><p>3</p></body></html>";
   assertThrows(() => extractTextFromHtml(html));
+});
+
+Deno.test("extractLinesFromHtml: blank クラスの <p> を空行として isBlank=true で残す", () => {
+  const html =
+    '<div class="widget-episodeBody"><p>あいうえお。</p><p class="blank"><br /></p><p>さしすせそ。</p></div>';
+  assertEquals(extractLinesFromHtml(html), [
+    { text: "あいうえお。", isBlank: false },
+    { text: "", isBlank: true },
+    { text: "さしすせそ。", isBlank: false },
+  ]);
+});
+
+Deno.test("extractLinesFromHtml: 連続空行を圧縮せず各 <p> を1要素として保持する", () => {
+  const html = [
+    '<div class="widget-episodeBody">',
+    "<p>あ。</p>",
+    '<p class="blank"><br /></p>',
+    '<p class="blank"><br /></p>',
+    "<p>い。</p>",
+    "</div>",
+  ].join("\n");
+  assertEquals(extractLinesFromHtml(html), [
+    { text: "あ。", isBlank: false },
+    { text: "", isBlank: true },
+    { text: "", isBlank: true },
+    { text: "い。", isBlank: false },
+  ]);
+});
+
+Deno.test("extractLinesFromHtml: ルビの <rt>/<rp> を除去し base（漢字）を残す", () => {
+  const html =
+    '<div class="widget-episodeBody"><p><ruby><rb>櫛名</rb><rp>（</rp><rt>くしな</rt><rp>）</rp></ruby>雫が走る。</p></div>';
+  assertEquals(extractLinesFromHtml(html), [
+    { text: "櫛名雫が走る。", isBlank: false },
+  ]);
+});
+
+Deno.test("extractLinesFromHtml: 本文領域が無ければ空配列（診断はスコアを止めない）", () => {
+  assertEquals(extractLinesFromHtml("<html><body><p>1</p></body></html>"), []);
 });
 
 Deno.test("resolveEpisodeUrl: 相対パスを kakuyomu.jp の絶対 URL に解決", () => {

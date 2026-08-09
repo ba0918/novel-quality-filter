@@ -13,7 +13,7 @@ function episode(
   title = "第1話",
   url = "https://kakuyomu.jp/works/1/episodes/1",
 ): FetchedEpisode {
-  return { episodeUrl: url, text, episodeTitle: title, nextEpisodeUrl: null };
+  return { episodeUrl: url, text, lines: [], episodeTitle: title, nextEpisodeUrl: null };
 }
 
 Deno.test("sampling: キャラ紹介開幕を次話で再採点する（開幕形式を保持）", async () => {

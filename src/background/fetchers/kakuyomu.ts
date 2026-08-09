@@ -1,11 +1,13 @@
 import { FETCH_INTERVAL_MS, FETCH_TIMEOUT_MS } from "../../shared/constants.ts";
 import { sleep } from "../../shared/async.ts";
+import type { LineData } from "../../domain/types.ts";
 
 const KAKUYOMU_BASE = "https://kakuyomu.jp";
 
 export interface FetchedEpisode {
   episodeUrl: string;
   text: string;
+  lines: LineData[];
   episodeTitle: string;
   nextEpisodeUrl: string | null;
 }
@@ -101,6 +103,7 @@ async function fetchEpisode(url: string): Promise<FetchedEpisode> {
   return {
     episodeUrl: url,
     text: extractTextFromHtml(html),
+    lines: extractLinesFromHtml(html),
     episodeTitle: extractEpisodeTitle(html) ?? "",
     nextEpisodeUrl: extractNextEpisodeUrl(html),
   };
@@ -172,21 +175,26 @@ function matchNumber(html: string, pattern: RegExp): number {
   return raw ? Number(raw) : 0;
 }
 
+// 本文領域を class/id で特定する。既存の flat 抽出と構造化行抽出で共有する。
+const BODY_PATTERNS = [
+  /class="[^"]*widget-episodeBody[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+  /class="[^"]*js-episode-body[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+  /id="episode-body"[^>]*>([\s\S]*?)<\/div>/i,
+];
+
+function findBodyRegion(html: string): string | null {
+  for (const pattern of BODY_PATTERNS) {
+    const match = html.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
 export function extractTextFromHtml(html: string): string {
   // Service Worker には DOMParser がないため文字列操作で抽出する
-
-  // 本文領域を class/id で特定
-  const bodyPatterns = [
-    /class="[^"]*widget-episodeBody[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /class="[^"]*js-episode-body[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /id="episode-body"[^>]*>([\s\S]*?)<\/div>/i,
-  ];
-
-  for (const pattern of bodyPatterns) {
-    const match = html.match(pattern);
-    if (match) {
-      return stripHtmlTags(normalizeBodyHtml(match[1]));
-    }
+  const body = findBodyRegion(html);
+  if (body !== null) {
+    return stripHtmlTags(normalizeBodyHtml(body));
   }
 
   // フォールバック: <p> タグの内容を抽出
@@ -205,23 +213,55 @@ export function extractTextFromHtml(html: string): string {
   throw new Error(`Could not extract episode text from: ${html.slice(0, 120)}`);
 }
 
+// 行メタデータ用の構造化抽出。本文領域内の <p> を1行として走査し、blank クラスを空行として
+// 保持する（連続空行の圧縮や空行の破棄はしない）。ルビは除去し base だけを残す。既存 flat 抽出
+// とは別経路で、12指標のスコア計算には影響しない。本文領域が無ければ空配列を返す（診断は採点を
+// 止めない）。
+export function extractLinesFromHtml(html: string): LineData[] {
+  const body = findBodyRegion(html);
+  if (body === null) return [];
+
+  const lines: LineData[] = [];
+  const pPattern = /<p\b([^>]*)>([\s\S]*?)<\/p>/gi;
+  let match;
+  while ((match = pPattern.exec(body)) !== null) {
+    const isBlank = /class="[^"]*\bblank\b[^"]*"/i.test(match[1]);
+    lines.push({ text: isBlank ? "" : stripLineTags(match[2]), isBlank });
+  }
+  return lines;
+}
+
+function stripLineTags(inner: string): string {
+  return decodeHtmlEntities(
+    stripRubyAnnotations(inner)
+      .replace(/<br\s*\/?>/gi, "")
+      .replace(/<[^>]+>/g, ""),
+  ).trim();
+}
+
 function normalizeBodyHtml(html: string): string {
   return html.replace(/>[ \t\r\n]+</g, "><");
 }
 
 function stripHtmlTags(html: string): string {
-  return stripRubyAnnotations(html)
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+  return decodeHtmlEntities(
+    stripRubyAnnotations(html)
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<[^>]+>/g, ""),
+  )
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+    .replace(/&nbsp;/g, " ");
 }
 
 function stripRubyAnnotations(html: string): string {
