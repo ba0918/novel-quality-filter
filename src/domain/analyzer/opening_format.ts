@@ -111,57 +111,46 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
     };
   }
 
-  // buffer（採点対象本文）と bufferLines（採点対象の行）は常に同じ話集合・
-  // 同じ順序で構成する。両者が食い違うと診断メタデータが本文とずれる。
-  let buffer: string | null = null;
-  let bufferLines: LineData[] = [];
-  let bufferStartIndex = 0;
+  // 累積連結は常に連続した話の範囲 episodes[bufferStartIndex..i] を対象にする。
+  // 開始位置だけ保持し、採点対象本文（targetText）と行（targetLines）は返却時に
+  // 同じ範囲から導出する。両者を別々に持たないことで本文と診断メタデータのずれを防ぐ。
+  let bufferStartIndex: number | null = null;
 
   for (let i = 0; i < episodes.length; i++) {
     const ep = episodes[i];
 
-    if (ep.format === "normal") {
-      if (splitSentences(ep.text).length >= MIN_SAMPLED_SENTENCES) {
-        return {
-          done: true,
-          targetText: ep.text,
-          targetLines: ep.lines,
-          openingType,
-          sampledCount: episodes.length,
-          targetEpisodeIndex: i,
-        };
-      }
-      if (buffer === null) {
-        buffer = "";
-        bufferLines = [];
-        bufferStartIndex = i;
-      }
-      buffer += ep.text;
-      bufferLines.push(...ep.lines);
-    } else if (ep.format === "too-short") {
-      // 短文 = 通常ナラティブの冒頭。累積連結の対象に含める
-      if (buffer === null) {
-        buffer = "";
-        bufferLines = [];
-        bufferStartIndex = i;
-      }
-      buffer += ep.text;
-      bufferLines.push(...ep.lines);
-    } else {
-      // 非ナラティブ形式は累積連結を断ち切る
-      buffer = null;
-      bufferLines = [];
-    }
-
-    if (buffer !== null && splitSentences(buffer).length >= MIN_SAMPLED_SENTENCES) {
+    if (ep.format === "normal" && splitSentences(ep.text).length >= MIN_SAMPLED_SENTENCES) {
       return {
         done: true,
-        targetText: buffer,
-        targetLines: bufferLines,
+        targetText: ep.text,
+        targetLines: ep.lines,
         openingType,
         sampledCount: episodes.length,
-        targetEpisodeIndex: bufferStartIndex,
+        targetEpisodeIndex: i,
       };
+    }
+
+    if (ep.format === "normal" || ep.format === "too-short") {
+      // 通常形式（30文未満）と短文（通常ナラティブの冒頭）を累積連結の対象に含める
+      if (bufferStartIndex === null) bufferStartIndex = i;
+    } else {
+      // 非ナラティブ形式は累積連結を断ち切る
+      bufferStartIndex = null;
+    }
+
+    if (bufferStartIndex !== null) {
+      const slice = episodes.slice(bufferStartIndex, i + 1);
+      const bufferText = slice.map((e) => e.text).join("");
+      if (splitSentences(bufferText).length >= MIN_SAMPLED_SENTENCES) {
+        return {
+          done: true,
+          targetText: bufferText,
+          targetLines: slice.flatMap((e) => e.lines),
+          openingType,
+          sampledCount: episodes.length,
+          targetEpisodeIndex: bufferStartIndex,
+        };
+      }
     }
   }
 

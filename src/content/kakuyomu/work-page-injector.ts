@@ -271,19 +271,24 @@ function createLineMetadataSection(meta: LineMetadata): HTMLDivElement {
     `総行数 ${meta.totalLines} / 総文字数 ${meta.totalChars} / 空行 ${meta.blankCount} / 区切り線 ${meta.separatorCount}`;
   section.appendChild(summary);
 
-  section.appendChild(createLineRow("地の文", meta.narrative, meta.narrative));
-  section.appendChild(createLineRow("セリフ", meta.dialogue));
-  section.appendChild(createLineRow("メタ", meta.meta));
-  section.appendChild(createLineRow("非文末", meta.nonTerminal));
+  const rows: Array<[string, CategoryCount]> = [
+    ["地の文", meta.narrative],
+    ["セリフ", meta.dialogue],
+    ["メタ", meta.meta],
+    ["非文末", meta.nonTerminal],
+  ];
+  for (const [label, count] of rows) {
+    section.appendChild(createLineRow(label, count));
+  }
 
   return section;
 }
 
-function createLineRow(
-  label: string,
-  count: CategoryCount,
-  narrative?: NarrativeCount,
-): HTMLDivElement {
+function isNarrativeCount(count: CategoryCount): count is NarrativeCount {
+  return "chunkCount" in count;
+}
+
+function createLineRow(label: string, count: CategoryCount): HTMLDivElement {
   const row = document.createElement("div");
   row.className = "nqf-line-row";
 
@@ -303,11 +308,11 @@ function createLineRow(
       ratioPercent(count.short30, count.lineCount)
     }`,
   ];
-  if (narrative) {
-    parts.push(`チャンク ${narrative.chunkCount}`);
+  if (isNarrativeCount(count)) {
+    parts.push(`チャンク ${count.chunkCount}`);
     parts.push(
-      `短チャンク 20:${ratioPercent(narrative.shortChunk20, narrative.chunkCount)} / 30:${
-        ratioPercent(narrative.shortChunk30, narrative.chunkCount)
+      `短チャンク 20:${ratioPercent(count.shortChunk20, count.chunkCount)} / 30:${
+        ratioPercent(count.shortChunk30, count.chunkCount)
       }`,
     );
   }
