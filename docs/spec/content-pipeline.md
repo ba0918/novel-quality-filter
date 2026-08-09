@@ -20,16 +20,32 @@
 
 ### 対象ページ
 
-| ページ種別 | URL パターン                        |
-| ---------- | ----------------------------------- |
-| ランキング | `https://kakuyomu.jp/rankings/*`    |
-| 検索結果   | `https://kakuyomu.jp/search*`       |
-| 新着       | `https://kakuyomu.jp/recent_works*` |
+| ページ種別   | URL パターン                          | カード構造                        |
+| ------------ | ------------------------------------- | --------------------------------- |
+| ランキング   | `https://kakuyomu.jp/rankings/*`      | `li[class*="Rankings_"]`          |
+| 検索結果     | `https://kakuyomu.jp/search*`         | `WorkMeta` + `NewBox`             |
+| 新着         | `https://kakuyomu.jp/recent_works*`   | `div.widget-work.float-parent`    |
+| タグ検索     | `https://kakuyomu.jp/tags/{tag}`      | `div.widget-work.float-parent`    |
+| ピックアップ | `https://kakuyomu.jp/pickup_works*`   | `div.widget-work.float-parent`    |
+| 新着レビュー | `https://kakuyomu.jp/recent_reviews*` | `div.widget-reviewsItem-workCard` |
+
+タグ検索・新着・ピックアップは同一のカード構造（`widget-work float-parent`）を持つ。
+新着レビューはカード内要素は共通だが、コンテナクラスのみ異なる。
 
 ### カード検出
 
 作品カードの DOM セレクタはカクヨムの実際の DOM 構造に合わせて決定する。 content script
 のロード時に初回走査を行い、MutationObserver で動的追加にも対応する。
+
+カードコンテナの判定はページ種別ごとの if 分岐ではなく、共通のコンテナセレクタ配列を
+順に試す方式で行う。既存のランキング（`li[class*="Rankings_"]`）と検索（`WorkMeta`）
+の判定もこの配列に含め、ページ追加時は配列にセレクタを追記するだけで済むようにする。
+
+バッジの挿入位置は、全ページ共通で★数リンク（`a.widget-workCard-reviewPoints`、
+`a[href*="/reviews"]` かつ ★ を含む）の横とする。
+
+タブ切り替え（`?order=`）・ページ送り（`?page=`）はクエリ付き通常リンクによる
+ページリロード遷移であり、SPA 特有の追加対応は不要。
 
 カードから抽出する情報:
 
