@@ -1,0 +1,134 @@
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
+import {
+  type Capture,
+  captureDir,
+  type CaptureManifest,
+  loadCapture,
+  makeCaptureId,
+  saveCapture,
+  siteWorkId,
+} from "./capture_store.ts";
+
+const BODY = '<div class="widget-episodeBody"><p>あいうえお。</p><p>かきくけこ。</p></div>';
+
+function manifest(overrides: Partial<CaptureManifest> = {}): CaptureManifest {
+  return {
+    captureId: "2026-08-10T00-00-00-000Z",
+    site: "kakuyomu",
+    workId: "123",
+    siteWorkId: "kakuyomu:123",
+    fetched: [
+      {
+        episodeId: "1",
+        url: "https://kakuyomu.jp/works/123/episodes/1",
+        order: 0,
+        file: "000_1.html",
+      },
+      {
+        episodeId: "2",
+        url: "https://kakuyomu.jp/works/123/episodes/2",
+        order: 1,
+        file: "001_2.html",
+      },
+    ],
+    decision: {
+      sampledCount: 2,
+      targetEpisodeIndex: 0,
+      openingType: "normal",
+      concatOrder: [0],
+    },
+    pipelineVersion: "line-meta-1",
+    capturedAt: "2026-08-10T00:00:00.000Z",
+    health: { healthy: true },
+    ...overrides,
+  };
+}
+
+function capture(m: CaptureManifest = manifest()): Capture {
+  return {
+    manifest: m,
+    pages: m.fetched.map((f) => ({ entry: f, html: `<!-- ${f.episodeId} -->${BODY}` })),
+  };
+}
+
+Deno.test("siteWorkId: サイト接頭辞を付ける（なろう対応時のID衝突回避）", () => {
+  assertEquals(siteWorkId("kakuyomu", "123"), "kakuyomu:123");
+});
+
+Deno.test("saveCapture→loadCapture: 生HTMLと manifest が往復で完全一致する", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const cap = capture();
+    await saveCapture(base, cap);
+    const loaded = await loadCapture(captureDir(base, "kakuyomu", "123", cap.manifest.captureId));
+    assertEquals(loaded.manifest, cap.manifest);
+    assertEquals(loaded.pages.map((p) => p.html), cap.pages.map((p) => p.html));
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("loadCapture: 順序の正は manifest 一箇所（ファイル名を並べ替えても manifest 順で復元）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    // manifest では file 名の連番と逆順（order で 2 話目を先頭に）にしても、
+    // 読み込みは manifest.fetched の並び順で返す。
+    const m = manifest({
+      fetched: [
+        { episodeId: "2", url: "u2", order: 0, file: "zzz.html" },
+        { episodeId: "1", url: "u1", order: 1, file: "aaa.html" },
+      ],
+    });
+    const cap = capture(m);
+    await saveCapture(base, cap);
+    const loaded = await loadCapture(captureDir(base, "kakuyomu", "123", m.captureId));
+    assertEquals(loaded.pages.map((p) => p.entry.episodeId), ["2", "1"]);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("saveCapture: 本文抽出できないHTMLは原本として保存しない（C5）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const bad: Capture = {
+      manifest: manifest(),
+      pages: [
+        { entry: manifest().fetched[0], html: "<html><body><h1>年齢確認</h1></body></html>" },
+        { entry: manifest().fetched[1], html: `<!-- 2 -->${BODY}` },
+      ],
+    };
+    await assertRejects(() => saveCapture(base, bad));
+    // 不良を含むキャプチャは一切書き込まない（原本の部分保存を避ける）。
+    await assertRejects(
+      () => loadCapture(captureDir(base, "kakuyomu", "123", bad.manifest.captureId)),
+    );
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("saveCapture: 同一作品の再取得は上書きでなく別 captureId のサブディレクトリに保存する", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const first = capture(manifest({ captureId: "cap-A" }));
+    const second = capture(manifest({ captureId: "cap-B" }));
+    await saveCapture(base, first);
+    await saveCapture(base, second);
+    const a = await loadCapture(captureDir(base, "kakuyomu", "123", "cap-A"));
+    const b = await loadCapture(captureDir(base, "kakuyomu", "123", "cap-B"));
+    assertEquals(a.manifest.captureId, "cap-A");
+    assertEquals(b.manifest.captureId, "cap-B");
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("captureDir: workId のパストラバーサルを拒否する", () => {
+  assertThrows(() => captureDir("/tmp/base", "kakuyomu", "../../etc", "cap"));
+});
+
+Deno.test("makeCaptureId: 取得日時から決定的にファイル名安全なIDを作る", () => {
+  const id = makeCaptureId(new Date("2026-08-10T07:47:15.123Z"));
+  assertEquals(id, "2026-08-10T07-47-15-123Z");
+});
