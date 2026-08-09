@@ -16,7 +16,7 @@ const CSS = `
   justify-content: center;
   min-width: 28px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 5px !important;
   border-radius: 9px;
   font-size: 11px;
   font-weight: 700;
@@ -26,10 +26,15 @@ const CSS = `
   user-select: none;
   position: relative;
   line-height: 1;
-  margin-left: 8px;
+  margin-right: 6px;
   vertical-align: middle;
   transform: translateY(-2px);
   transition: opacity 0.2s ease;
+}
+
+.nqf-badge::after {
+  display: none !important;
+  content: none !important;
 }
 
 .nqf-badge:hover {

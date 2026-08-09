@@ -52,21 +52,17 @@ export function injectLoadingBadge(cardElement: HTMLElement): void {
 }
 
 function insertBadgeElement(cardElement: HTMLElement, badge: HTMLElement): void {
-  // ★数リンクの横に挿入（メタデータ行）
-  const starLink = findStarCountLink(cardElement);
+  // ★数リンクの直前に挿入（全ページ種別で統一的に配置）
+  const metaArea = cardElement.querySelector<HTMLElement>('[class*="WorkMeta"]') ??
+    cardElement.querySelector<HTMLElement>(".widget-workCard-meta");
+  const starLink = findStarCountElement(metaArea ?? cardElement);
   if (starLink) {
-    starLink.parentElement?.insertBefore(badge, starLink.nextSibling);
+    starLink.parentElement?.insertBefore(badge, starLink);
     return;
   }
 
   // フォールバック: カードの末尾
   cardElement.appendChild(badge);
-}
-
-function findStarCountLink(cardElement: HTMLElement): HTMLAnchorElement | null {
-  // WorkMeta 領域内の★数リンクを探す（レビュー欄の方を拾わないように限定）
-  const metaArea = cardElement.querySelector('[class*="WorkMeta"]');
-  return findStarCountElement(metaArea ?? cardElement);
 }
 
 export function showError(cardElement: HTMLElement): void {
