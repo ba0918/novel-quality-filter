@@ -142,6 +142,29 @@ Deno.test("analyzeSeparation: 同一作者がアンカーと広域を跨る場�
   assertEquals(authorLeaks[0].value, "同一著者");
 });
 
+Deno.test("analyzeSeparation: 同一作品の再取得（重複レコード）は最新スナップショットのみ数える（1作品1票）", () => {
+  // --recapture で同一 workId のレコードが2件追記されうる。分離度で二重計上しない。
+  const records = [rec("1", { avg: 10 }), rec("1", { avg: 40 })]; // 後勝ち（新しい取得）
+  const labels = [labelOf("1", "良")];
+
+  const report = analyzeSeparation(records, labels, THRESHOLD);
+  assertEquals(report.goodCount, 1);
+  assertEquals(report.metrics.find((m) => m.key === "avgCharsPerLine")!.goodMean, 40);
+});
+
+Deno.test("analyzeSeparation: 同一bodyHashがアンカーと広域を跨る場合に警告する（C8・転載重複）", () => {
+  const records = [
+    rec("1", { bodyHash: "dup" }), // アンカー
+    rec("2", { bodyHash: "dup" }), // 広域（別作品・同一本文）
+  ];
+  const labels = [labelOf("1", "良")];
+
+  const report = analyzeSeparation(records, labels, THRESHOLD);
+  const bodyHashLeaks = report.leakage.filter((w) => w.kind === "bodyHash");
+  assertEquals(bodyHashLeaks.length, 1);
+  assertEquals(bodyHashLeaks[0].value, "dup");
+});
+
 Deno.test("analyzeSeparation: 論理除外された作品は分離から外れる", () => {
   const records = [rec("1", { avg: 40 }), rec("2", { avg: 10 })];
   let labels = [labelOf("1", "良"), labelOf("2", "ゴミ")];

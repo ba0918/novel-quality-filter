@@ -19,7 +19,6 @@ import {
 import { type FetchNextEpisode, sampleEpisodes } from "../../src/background/sampling.ts";
 import {
   type Capture,
-  captureDir,
   type CaptureManifest,
   type CapturePage,
   type FetchedEntry,
@@ -119,11 +118,6 @@ export async function collectWork(
   await appendRecord(deps.datasetPath, record);
 
   return { record, captureId };
-}
-
-// 保存先ディレクトリ（既存キャプチャの有無判定に使う）。
-export function workCaptureBase(baseDir: string, workId: string): string {
-  return captureDir(baseDir, SITE, workId, "").replace(/\/$/, "");
 }
 
 async function getHealthyPage(
