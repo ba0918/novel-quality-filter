@@ -57,9 +57,10 @@ export function aggregateLineMetadata(lines: LineData[]): LineMetadata {
   };
 }
 
-// 空白・全角スペースを除いた文字数。paragraph.ts と同じ正規化（ルビは抽出段階で除去済み）。
+// 空白・全角スペースを除いたコードポイント数。20/30の短さ境界を絵文字・補助漢字で
+// 誤判定しないよう、UTF-16 コード単位ではなくコードポイントで数える（サロゲートペアを1字）。
 function countChars(text: string): number {
-  return text.trim().replace(/[\s　]/g, "").length;
+  return [...text.trim().replace(/[\s　]/g, "")].length;
 }
 
 function addLine(category: CategoryCount, chars: number): void {

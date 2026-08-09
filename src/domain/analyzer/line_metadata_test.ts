@@ -56,6 +56,16 @@ Deno.test("aggregateLineMetadata: 短チャンクは地の文でのみ数え、�
   assertEquals(meta.meta.short20, 1);
 });
 
+Deno.test("aggregateLineMetadata: サロゲートペア（絵文字）はコードポイント数で数え20/30を判定する", () => {
+  // 絵文字20個＋句点＝21コードポイント。UTF-16 コード単位（.length）だと41になり
+  // short30 の境界（<30）を跨いで誤判定するため、コードポイント数で数える。
+  const meta = aggregateLineMetadata([line("😀".repeat(20) + "。")]);
+  assertEquals(meta.narrative.charCount, 21);
+  assertEquals(meta.narrative.short20, 0);
+  assertEquals(meta.narrative.short30, 1);
+  assertEquals(meta.totalChars, 21);
+});
+
 Deno.test("aggregateLineMetadata: 率は保存せず分子と分母だけを保持する", () => {
   const meta = aggregateLineMetadata([
     line("静かな朝だった。"),
