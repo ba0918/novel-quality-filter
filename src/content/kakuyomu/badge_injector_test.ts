@@ -2,7 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { parseHTML } from "linkedom";
 import type { LineMetadata, ScoreResult } from "../../domain/types.ts";
 import { injectBadge } from "./badge-injector.ts";
-import { injectWorkBadge } from "./work-page-injector.ts";
+import { injectScoreButton, injectWorkBadge } from "./work-page-injector.ts";
 
 function makeResult(overrides: Partial<ScoreResult> = {}): ScoreResult {
   return { score: 75, metrics: [], penalties: [], ...overrides };
@@ -71,6 +71,20 @@ Deno.test("badge-injector: ネイティブ title は使わずツールチップ�
       assertEquals(context?.textContent, "通常開幕");
     },
   );
+});
+
+Deno.test("work-page-injector: 未スコアもスコア済みも作品ヘッダー行の右端に揃える", () => {
+  withDocument("<div class='container'></div>", (doc) => {
+    const container = doc.querySelector<HTMLElement>(".container")!;
+
+    injectScoreButton(container, () => {});
+    const button = container.querySelector<HTMLElement>(".nqf-score-button");
+    assertEquals(button?.style.marginLeft, "auto");
+
+    injectWorkBadge(container, makeResult(), () => {});
+    const wrapper = container.querySelector<HTMLElement>(".nqf-work-wrapper");
+    assertEquals(wrapper?.style.marginLeft, "auto");
+  });
 });
 
 Deno.test("work-page-injector: 開幕形式を detail panel に表示しネイティブ title は使わない", () => {

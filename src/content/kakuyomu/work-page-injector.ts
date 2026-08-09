@@ -109,6 +109,9 @@ function removeExisting(container: HTMLElement): void {
 }
 
 function insertElement(container: HTMLElement, element: HTMLElement): void {
+  // 未スコア/スコア済み/ローディング/エラーのどの状態でも、作品ヘッダー行（flex 行）の
+  // 右端に揃える。各状態で注入要素が異なるため、揃えは注入層で一律に指定する。
+  element.style.marginLeft = "auto";
   container.appendChild(element);
 }
 
