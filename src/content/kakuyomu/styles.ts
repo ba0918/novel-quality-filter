@@ -80,6 +80,11 @@ const CSS = `
   display: block;
 }
 
+.nqf-tooltip-context {
+  color: #9ac7ff;
+  font-weight: 600;
+}
+
 .nqf-suspect {
   opacity: 0.35;
   transition: opacity 0.4s ease;
@@ -187,6 +192,13 @@ const CSS = `
   margin-bottom: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid #e0e0e0;
+}
+
+.nqf-detail-context {
+  margin-bottom: 10px;
+  color: #3a6ea5;
+  font-weight: 600;
+  font-size: 12px;
 }
 
 .nqf-detail-score-label {

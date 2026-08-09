@@ -36,11 +36,6 @@ export function injectWorkBadge(
   container.setAttribute(PROCESSED_ATTR, "true");
 
   const badge = createWorkBadge(result.score);
-  badge.title = formatOpeningContext(
-    result.openingType,
-    result.sampledCount,
-    result.targetEpisodeIndex ?? 0,
-  );
   const panel = createDetailPanel(result);
   panel.style.display = "none";
 
@@ -135,6 +130,16 @@ function createDetailPanel(result: ScoreResult): HTMLDivElement {
   header.appendChild(scoreLabel);
   header.appendChild(scoreValue);
   panel.appendChild(header);
+
+  // 開幕形式・再評価文脈
+  const context = document.createElement("div");
+  context.className = "nqf-detail-context";
+  context.textContent = formatOpeningContext(
+    result.openingType,
+    result.sampledCount,
+    result.targetEpisodeIndex ?? 0,
+  );
+  panel.appendChild(context);
 
   // メトリクス一覧
   const metricsSection = document.createElement("div");

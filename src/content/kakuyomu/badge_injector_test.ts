@@ -19,7 +19,7 @@ function withDocument<T>(html: string, fn: (doc: Document) => T): T {
   }
 }
 
-Deno.test("badge-injector: 再評価情報を title に設定", () => {
+Deno.test("badge-injector: 開幕形式と再評価情報をツールチップ内に表示する", () => {
   withDocument(
     '<div class="widget-work"><a href="/works/1/reviews"><span>★10</span></a></div>',
     (doc) => {
@@ -34,25 +34,27 @@ Deno.test("badge-injector: 再評価情報を title に設定", () => {
         }),
         () => {},
       );
-      const badge = card.querySelector<HTMLElement>(".nqf-badge");
-      assertEquals(badge?.title, "キャラ紹介開幕 / 2話で再評価");
+      const context = card.querySelector<HTMLElement>(".nqf-tooltip .nqf-tooltip-context");
+      assertEquals(context?.textContent, "キャラ紹介開幕 / 2話で再評価");
     },
   );
 });
 
-Deno.test("badge-injector: 通常開幕はラベルのみを title に設定", () => {
+Deno.test("badge-injector: ネイティブ title は使わずツールチップへ一本化する", () => {
   withDocument(
     '<div class="widget-work"><a href="/works/1/reviews"><span>★10</span></a></div>',
     (doc) => {
       const card = doc.querySelector<HTMLElement>(".widget-work")!;
       injectBadge(card, "1", makeResult({ openingType: "normal", sampledCount: 1 }), () => {});
       const badge = card.querySelector<HTMLElement>(".nqf-badge");
-      assertEquals(badge?.title, "通常開幕");
+      assertEquals(badge?.title, "");
+      const context = card.querySelector<HTMLElement>(".nqf-tooltip .nqf-tooltip-context");
+      assertEquals(context?.textContent, "通常開幕");
     },
   );
 });
 
-Deno.test("work-page-injector: バッジの title に形式ラベルを設定", () => {
+Deno.test("work-page-injector: 開幕形式を detail panel に表示しネイティブ title は使わない", () => {
   withDocument("<div class='container'></div>", (doc) => {
     const container = doc.querySelector<HTMLElement>(".container")!;
     injectWorkBadge(
@@ -61,6 +63,8 @@ Deno.test("work-page-injector: バッジの title に形式ラベルを設定", 
       () => {},
     );
     const badge = container.querySelector<HTMLElement>(".nqf-work-badge");
-    assertEquals(badge?.title, "掲示板開幕");
+    assertEquals(badge?.title, "");
+    const context = container.querySelector<HTMLElement>(".nqf-detail-context");
+    assertEquals(context?.textContent, "掲示板開幕");
   });
 });

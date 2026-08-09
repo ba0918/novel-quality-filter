@@ -1,4 +1,5 @@
 import type { ScoreResult } from "../../domain/types.ts";
+import { formatOpeningContext } from "../../domain/analyzer/opening_format.ts";
 
 const COLOR_RED_BOUNDARY = 35;
 const COLOR_GREEN_BOUNDARY = 65;
@@ -32,9 +33,21 @@ export function createTooltip(result: ScoreResult): HTMLSpanElement {
   const tooltip = document.createElement("span");
   tooltip.className = "nqf-tooltip";
 
+  const context = document.createElement("span");
+  context.className = "nqf-tooltip-line nqf-tooltip-context";
+  context.textContent = formatOpeningContext(
+    result.openingType,
+    result.sampledCount,
+    result.targetEpisodeIndex ?? 0,
+  );
+  tooltip.appendChild(context);
+
   const flagged = result.metrics.filter((m) => m.flagged);
   if (flagged.length === 0 && result.penalties.length === 0) {
-    tooltip.textContent = "問題なし";
+    const ok = document.createElement("span");
+    ok.className = "nqf-tooltip-line";
+    ok.textContent = "問題なし";
+    tooltip.appendChild(ok);
     return tooltip;
   }
 
