@@ -67,6 +67,20 @@ Deno.test("extractTextFromHtml: ルビのふりがなを本文に含めない", 
   assertEquals(extractTextFromHtml(html), "櫛名雫が走る。");
 });
 
+Deno.test("extractTextFromHtml: 10進・16進（大文字小文字）の数値文字参照を復号する", () => {
+  // 【HP】あ を10進・小文字16進・大文字16進の数値参照で表す。復号されないと非本文行の
+  // 誤分類や文字数の誤りにつながる。
+  const html = '<div class="widget-episodeBody"><p>&#x3010;HP&#X3011;&#12354;</p></div>';
+  assertEquals(extractTextFromHtml(html), "【HP】あ");
+});
+
+Deno.test("extractLinesFromHtml: 数値文字参照を復号して行テキストに反映する", () => {
+  const html = '<div class="widget-episodeBody"><p>&#x3010;HP&#x3011;</p></div>';
+  assertEquals(extractLinesFromHtml(html), [
+    { text: "【HP】", isBlank: false },
+  ]);
+});
+
 Deno.test("extractTextFromHtml: 本文が無い場合はエラー", () => {
   const html = "<html><body><p>1</p><p>2</p><p>3</p></body></html>";
   assertThrows(() => extractTextFromHtml(html));

@@ -255,13 +255,22 @@ function stripHtmlTags(html: string): string {
 }
 
 function decodeHtmlEntities(s: string): string {
+  // 数値参照は名前付き実体より先に、かつ &amp; 復号より前に処理する。&amp;#65; のような
+  // 二重エスケープを A へ誤って一段余計に復号しないため（数値正規表現は &# 実体を要求する）。
   return s
+    .replace(/&#x([0-9a-fA-F]+);/gi, (m, hex) => decodeCodePoint(parseInt(hex, 16)) ?? m)
+    .replace(/&#(\d+);/g, (m, dec) => decodeCodePoint(parseInt(dec, 10)) ?? m)
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, " ");
+}
+
+// 範囲外・不正なコードポイントは復号せず呼び出し元で元の実体表記を残す（安全側に倒す）。
+function decodeCodePoint(code: number): string | null {
+  if (!Number.isInteger(code) || code < 0 || code > 0x10FFFF) return null;
+  return String.fromCodePoint(code);
 }
 
 function stripRubyAnnotations(html: string): string {
