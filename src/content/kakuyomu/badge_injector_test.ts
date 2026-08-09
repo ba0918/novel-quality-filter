@@ -27,6 +27,26 @@ const SAMPLE_META: LineMetadata = {
   nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
 };
 
+// 本文が全て空行のとき、平均字/行の分母（総行数−空行数）が0になる退化ケース。
+const ALL_BLANK_META: LineMetadata = {
+  totalLines: 3,
+  totalChars: 50,
+  blankCount: 3,
+  separatorCount: 0,
+  narrative: {
+    lineCount: 0,
+    charCount: 0,
+    short20: 0,
+    short30: 0,
+    chunkCount: 0,
+    shortChunk20: 0,
+    shortChunk30: 0,
+  },
+  dialogue: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+  meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+  nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+};
+
 function withDocument<T>(html: string, fn: (doc: Document) => T): T {
   const { document } = parseHTML(html);
   const prev = globalThis.document;
@@ -102,7 +122,7 @@ Deno.test("work-page-injector: 開幕形式を detail panel に表示しネイ�
   });
 });
 
-Deno.test("work-page-injector: 行メタデータのカテゴリ別分量を detail panel に表示する", () => {
+Deno.test("work-page-injector: 行メタデータのサマリ・見出し・カテゴリ別分量を detail panel に表示する", () => {
   withDocument("<div class='container'></div>", (doc) => {
     const container = doc.querySelector<HTMLElement>(".container")!;
     injectWorkBadge(container, makeResult({ lineMetadata: SAMPLE_META }), () => {});
@@ -110,30 +130,114 @@ Deno.test("work-page-injector: 行メタデータのカテゴリ別分量を det
     const section = container.querySelector<HTMLElement>(".nqf-line-metadata");
     assert(section !== null, "行メタデータセクションが表示される");
 
-    const title = section.querySelector<HTMLElement>(".nqf-detail-section-title");
-    assertEquals(title?.textContent, "行メタデータ");
+    // 見出しはトグルボタンに載る
+    const toggle = section.querySelector<HTMLElement>(".nqf-lm-toggle");
+    assert(toggle?.textContent?.includes("行メタデータ"), "見出しラベルが表示される");
 
-    const summary = section.querySelector<HTMLElement>(".nqf-line-summary");
-    assert(summary?.textContent?.includes("総行数 10"), "総行数が表示される");
+    // サマリ: 総行数・総文字数は実数、空行・区切り線は数＋率
+    const summary = section.querySelector<HTMLElement>(".nqf-lm-summary")?.textContent ?? "";
+    assert(summary.includes("総行数 10"), "総行数が実数で表示される");
+    assert(summary.includes("総文字数 200"), "総文字数が実数で表示される");
+    assert(summary.includes("空行 2"), "空行が実数で表示される");
+    assert(summary.includes("20%"), "空行率が表示される");
+    assert(summary.includes("区切り線 1"), "区切り線が実数で表示される");
+    assert(summary.includes("10%"), "区切り率が表示される");
 
-    const rows = section.querySelectorAll(".nqf-line-row");
-    assertEquals(rows.length, 4);
-    const firstLabel = rows[0].querySelector(".nqf-line-label");
-    assertEquals(firstLabel?.textContent, "地の文");
-
-    // 地の文は30字軸（短行30・短チャンク30）とチャンク数・文字数の生値まで読み取れる
-    const narrativeStats = rows[0].querySelector(".nqf-line-stats")?.textContent ?? "";
-    assert(narrativeStats.includes("文字数 120"), "地の文のカテゴリ別文字数が表示される");
-    assert(narrativeStats.includes("短行 20:25% / 30:50%"), "短行の20/30両軸が表示される");
+    // 見出しチップ: 平均字/行 と 地の文短行30 の2枚。総合短行率は出さない
+    const chips = section.querySelectorAll(".nqf-lm-chip");
+    assertEquals(chips.length, 2, "見出しチップは平均字/行と地の文短行30の2枚");
+    const headline = section.querySelector<HTMLElement>(".nqf-lm-headline")?.textContent ?? "";
+    // 平均字/行 = 総文字数 200 ÷（総行数 10 − 空行 2）= 25.0
+    assert(headline.includes("25.0字/行"), "平均字/行チップが算出値で表示される");
+    const concern = section.querySelector<HTMLElement>(".nqf-lm-chip--concern");
     assert(
-      narrativeStats.includes("短チャンク 20:33% / 30:50%"),
-      "地の文短チャンクの20/30両軸が表示される",
+      concern?.textContent?.includes("地の文 短行30"),
+      "地の文短行30チップが要注意色で表示される",
+    );
+    assert(concern?.textContent?.includes("50%"), "地の文短行30率（2/4）が表示される");
+
+    // カテゴリ別: 地の文・セリフ・メタ・非文末の4枚
+    const cats = section.querySelectorAll<HTMLElement>(".nqf-lm-cat");
+    assertEquals(cats.length, 4, "カテゴリブロックは4枚");
+
+    // 地の文: 行割合 4/10=40.0%・文字割合 120/200=60.0%・短行 1/4,2/4・短チャンク 2/6,3/6
+    const narrative = cats[0];
+    assertEquals(narrative.querySelector(".nqf-lm-cat-name")?.textContent, "地の文");
+    const nText = narrative.textContent ?? "";
+    assert(nText.includes("40.0%"), "地の文の行割合が表示される");
+    assert(nText.includes("60.0%"), "地の文の文字割合が表示される");
+    assert(nText.includes("25%"), "地の文短行20（1/4）が表示される");
+    assert(nText.includes("50%"), "地の文短行30（2/4）が表示される");
+    assert(nText.includes("33%"), "地の文短チャンク20（2/6）が表示される");
+    assert(nText.includes("チャンク 6"), "地の文のチャンク数が表示される");
+    // 地の文だけが短チャンク行を持つ
+    assert(
+      narrative.querySelector(".nqf-lm-metric--shortchunk") !== null,
+      "地の文には短チャンク行がある",
     );
 
-    // 非地の文カテゴリでもカテゴリ別文字数と30字軸が読み取れる
-    const dialogueStats = rows[1].querySelector(".nqf-line-stats")?.textContent ?? "";
-    assert(dialogueStats.includes("文字数 30"), "セリフのカテゴリ別文字数が表示される");
-    assert(dialogueStats.includes("短行 20:100% / 30:100%"), "セリフの短行20/30が表示される");
+    // セリフ: 行 2/10=20.0%・文字 30/200=15.0%・短行 2/2=100%、短チャンクは持たない
+    const dialogue = cats[1];
+    assertEquals(dialogue.querySelector(".nqf-lm-cat-name")?.textContent, "セリフ");
+    const dText = dialogue.textContent ?? "";
+    assert(dText.includes("15.0%"), "セリフの文字割合が表示される");
+    assert(dText.includes("100%"), "セリフの短行率が表示される");
+    assertEquals(
+      dialogue.querySelector(".nqf-lm-metric--shortchunk"),
+      null,
+      "セリフには短チャンク行がない",
+    );
+  });
+});
+
+Deno.test("work-page-injector: 行メタデータはデフォルト畳みで、トグルで開閉できる", () => {
+  withDocument("<div class='container'></div>", (doc) => {
+    const container = doc.querySelector<HTMLElement>(".container")!;
+    injectWorkBadge(container, makeResult({ lineMetadata: SAMPLE_META }), () => {});
+
+    const toggle = container.querySelector<HTMLButtonElement>(".nqf-lm-toggle")!;
+    const body = container.querySelector<HTMLElement>(".nqf-lm-body")!;
+
+    assert(body.hasAttribute("hidden"), "初期状態は畳み（body が hidden）");
+    assertEquals(toggle.getAttribute("aria-expanded"), "false", "初期は aria-expanded=false");
+
+    toggle.click();
+    assert(!body.hasAttribute("hidden"), "トグルで body が開く");
+    assertEquals(toggle.getAttribute("aria-expanded"), "true", "開くと aria-expanded=true");
+
+    toggle.click();
+    assert(body.hasAttribute("hidden"), "再度トグルで body が畳まれる");
+    assertEquals(toggle.getAttribute("aria-expanded"), "false", "畳むと aria-expanded=false");
+  });
+});
+
+Deno.test("work-page-injector: 行メタデータのダイジェストを見出し右に表示する", () => {
+  withDocument("<div class='container'></div>", (doc) => {
+    const container = doc.querySelector<HTMLElement>(".container")!;
+    injectWorkBadge(container, makeResult({ lineMetadata: SAMPLE_META }), () => {});
+
+    // 畳んだままでも読めるダイジェスト（平均字/行・空行率）
+    const peek = container.querySelector<HTMLElement>(".nqf-lm-peek")?.textContent ?? "";
+    assert(peek.includes("25.0字/行"), "ダイジェストに平均字/行が出る");
+    assert(peek.includes("20%"), "ダイジェストに空行率が出る");
+  });
+});
+
+Deno.test("work-page-injector: 平均字/行の分母が0でも行メタデータが破綻しない", () => {
+  withDocument("<div class='container'></div>", (doc) => {
+    const container = doc.querySelector<HTMLElement>(".container")!;
+    injectWorkBadge(container, makeResult({ lineMetadata: ALL_BLANK_META }), () => {});
+
+    const section = container.querySelector<HTMLElement>(".nqf-line-metadata");
+    assert(section !== null, "退化ケースでもセクションは表示される");
+
+    const text = section.textContent ?? "";
+    assert(!text.includes("NaN"), "NaN が漏れない");
+    assert(!text.includes("Infinity"), "Infinity が漏れない");
+
+    // 分母0の平均字/行は退避表示（"-"）になる
+    const peek = section.querySelector<HTMLElement>(".nqf-lm-peek")?.textContent ?? "";
+    assert(peek.includes("-"), "平均字/行が退避表示になる");
   });
 });
 

@@ -295,35 +295,249 @@ const CSS = `
 }
 
 .nqf-line-metadata {
-  margin-top: 12px;
-  padding-top: 8px;
-  border-top: 1px solid #e0e0e0;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d8d2c8;
+  font-variant-numeric: tabular-nums;
 }
 
-.nqf-line-summary {
+.nqf-lm-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #9c3b2c;
+  font-family: inherit;
+}
+
+.nqf-lm-caret {
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+
+.nqf-lm-toggle[aria-expanded="false"] .nqf-lm-caret {
+  transform: rotate(-90deg);
+}
+
+.nqf-lm-peek {
+  margin-left: auto;
+  color: #756d61;
+  font-weight: 400;
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nqf-lm-caret {
+    transition: none;
+  }
+}
+
+.nqf-lm-body {
+  margin-top: 10px;
+}
+
+.nqf-lm-body[hidden] {
+  display: none;
+}
+
+.nqf-lm-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: #756d61;
+  font-size: 11.5px;
+  margin-bottom: 8px;
+}
+
+.nqf-lm-num {
+  color: #26221d;
+  font-weight: 600;
+}
+
+.nqf-lm-rate {
+  color: #a49b8d;
+}
+
+.nqf-lm-headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-bottom: 12px;
+}
+
+.nqf-lm-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  background: #ece9e3;
+  border-radius: 999px;
+  padding: 3px 10px;
   font-size: 11px;
-  color: #666;
-  margin-bottom: 6px;
 }
 
-.nqf-line-row {
+.nqf-lm-chip-lab {
+  color: #756d61;
+}
+
+.nqf-lm-chip-num {
+  color: #26221d;
+  font-weight: 700;
+}
+
+.nqf-lm-chip--concern .nqf-lm-chip-num {
+  color: #c2452f;
+}
+
+.nqf-lm-compo {
+  display: flex;
+  height: 12px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  background: #ece9e3;
+}
+
+.nqf-lm-seg {
+  display: block;
+  height: 100%;
+}
+
+.nqf-lm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 10.5px;
+  color: #756d61;
+  margin-bottom: 8px;
+}
+
+.nqf-lm-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+.nqf-lm-seg--narrative,
+.nqf-lm-swatch--narrative,
+.nqf-lm-fill--narrative {
+  background: #3f7d6e;
+}
+
+.nqf-lm-seg--dialogue,
+.nqf-lm-swatch--dialogue,
+.nqf-lm-fill--dialogue {
+  background: #cf9a35;
+}
+
+.nqf-lm-seg--meta,
+.nqf-lm-swatch--meta,
+.nqf-lm-fill--meta {
+  background: #7d63a8;
+}
+
+.nqf-lm-seg--nonterm,
+.nqf-lm-swatch--nonterm,
+.nqf-lm-fill--nonterm {
+  background: #b06254;
+}
+
+.nqf-lm-seg--blank,
+.nqf-lm-swatch--blank {
+  background: #cfc8bd;
+}
+
+.nqf-lm-seg--sep,
+.nqf-lm-swatch--sep {
+  background: #93a0a6;
+}
+
+.nqf-lm-fill--warn {
+  background: #c2452f;
+}
+
+.nqf-lm-cat {
+  padding: 9px 0;
+  border-top: 1px solid #ebe7e0;
+}
+
+.nqf-lm-cat-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 2px 0;
+  margin-bottom: 6px;
 }
 
-.nqf-line-label {
-  flex: 0 0 56px;
-  font-size: 11px;
+.nqf-lm-cat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+  transform: translateY(1px);
+}
+
+.nqf-lm-cat-name {
   font-weight: 700;
-  color: #555;
+  font-size: 12px;
+  color: #26221d;
 }
 
-.nqf-line-stats {
-  flex: 1 1 auto;
+.nqf-lm-cat-sub {
+  margin-left: auto;
+  color: #a49b8d;
+  font-size: 10.5px;
+}
+
+.nqf-lm-metric {
+  display: grid;
+  grid-template-columns: 46px 1fr 96px;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+
+.nqf-lm-k {
+  color: #756d61;
+  font-size: 10.5px;
+}
+
+.nqf-lm-bar {
+  height: 6px;
+  background: #ece9e3;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.nqf-lm-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.nqf-lm-v {
   font-size: 11px;
-  color: #888;
+  color: #26221d;
+  text-align: right;
+}
+
+.nqf-lm-pct {
+  color: #756d61;
+}
+
+.nqf-lm-metric--short .nqf-lm-hi,
+.nqf-lm-metric--shortchunk .nqf-lm-hi {
+  color: #c2452f;
+  font-weight: 600;
 }
 
 .nqf-rescore-button {

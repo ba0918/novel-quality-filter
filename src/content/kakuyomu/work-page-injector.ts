@@ -257,75 +257,330 @@ function formatRawValue(value: number): string {
   return value.toFixed(1);
 }
 
-// 行ベース文体メタデータ（診断用）。既存メトリクスとは別枠で、カテゴリ別の分量・短行率・
-// 1行あたり平均文字数を表示する。本文由来テキストは含まないため textContent で安全に組み立てる。
+// 行ベース文体メタデータ（診断用）。既存メトリクスとは別枠で、開閉式セクションとして
+// カテゴリ別の分量・短行率・1行あたり平均文字数を表示する。総合スコアには寄与しない。
+// 本文由来テキストは含まないため textContent で安全に組み立てる。カテゴリ色は modifier
+// クラス（styles.ts）へ寄せ、動的なバー幅だけを inline style で与える。
+interface CategoryView {
+  label: string;
+  slug: string;
+  count: CategoryCount;
+}
+
 function createLineMetadataSection(meta: LineMetadata): HTMLDivElement {
   const section = document.createElement("div");
   section.className = "nqf-line-metadata";
 
-  const title = document.createElement("div");
-  title.className = "nqf-detail-section-title";
-  title.textContent = "行メタデータ";
-  section.appendChild(title);
+  const avgLabel = averagePerLineLabel(meta);
 
-  const summary = document.createElement("div");
-  summary.className = "nqf-line-summary";
-  summary.textContent =
-    `総行数 ${meta.totalLines} / 総文字数 ${meta.totalChars} / 空行 ${meta.blankCount} / 区切り線 ${meta.separatorCount}`;
-  section.appendChild(summary);
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "nqf-lm-toggle";
+  toggle.setAttribute("aria-expanded", "false");
 
-  const rows: Array<[string, CategoryCount]> = [
-    ["地の文", meta.narrative],
-    ["セリフ", meta.dialogue],
-    ["メタ", meta.meta],
-    ["非文末", meta.nonTerminal],
+  const caret = document.createElement("span");
+  caret.className = "nqf-lm-caret";
+  caret.textContent = "▼";
+  toggle.appendChild(caret);
+  toggle.appendChild(document.createTextNode("行メタデータ"));
+
+  const peek = document.createElement("span");
+  peek.className = "nqf-lm-peek";
+  peek.textContent = `平均 ${avgLabel} ・ 空行 ${percentInt(meta.blankCount, meta.totalLines)}`;
+  toggle.appendChild(peek);
+  section.appendChild(toggle);
+
+  const body = document.createElement("div");
+  body.className = "nqf-lm-body";
+  body.setAttribute("hidden", "");
+  section.appendChild(body);
+
+  toggle.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    if (expanded) body.setAttribute("hidden", "");
+    else body.removeAttribute("hidden");
+  });
+
+  body.appendChild(createLineSummary(meta));
+  body.appendChild(createLineHeadline(meta, avgLabel));
+  body.appendChild(createCompositionBar(meta));
+  body.appendChild(createCompositionLegend(meta));
+
+  const cats: CategoryView[] = [
+    { label: "地の文", slug: "narrative", count: meta.narrative },
+    { label: "セリフ", slug: "dialogue", count: meta.dialogue },
+    { label: "メタ", slug: "meta", count: meta.meta },
+    { label: "非文末", slug: "nonterm", count: meta.nonTerminal },
   ];
-  for (const [label, count] of rows) {
-    section.appendChild(createLineRow(label, count));
+  for (const cat of cats) {
+    body.appendChild(createLineCatBlock(cat, meta));
   }
 
   return section;
+}
+
+function createLineSummary(meta: LineMetadata): HTMLDivElement {
+  const summary = document.createElement("div");
+  summary.className = "nqf-lm-summary";
+  summary.appendChild(summaryItem("総行数 ", formatInt(meta.totalLines)));
+  summary.appendChild(summaryItem("総文字数 ", formatInt(meta.totalChars)));
+  summary.appendChild(summaryRateItem("空行 ", meta.blankCount, meta.totalLines));
+  summary.appendChild(summaryRateItem("区切り線 ", meta.separatorCount, meta.totalLines));
+  return summary;
+}
+
+function summaryItem(label: string, value: string): HTMLSpanElement {
+  const item = document.createElement("span");
+  item.appendChild(document.createTextNode(label));
+  const num = document.createElement("span");
+  num.className = "nqf-lm-num";
+  num.textContent = value;
+  item.appendChild(num);
+  return item;
+}
+
+function summaryRateItem(label: string, count: number, total: number): HTMLSpanElement {
+  const item = summaryItem(label, formatInt(count));
+  item.appendChild(document.createTextNode(" "));
+  const rate = document.createElement("span");
+  rate.className = "nqf-lm-rate";
+  rate.textContent = `（${percentInt(count, total)}）`;
+  item.appendChild(rate);
+  return item;
+}
+
+// 「薄さ」の見出しスカラー。平均字/行（全体密度）と地の文短行30率（判別力のある軸）の2枚。
+// 全カテゴリを混ぜた総合短行率は判別力を失うため出さない。
+function createLineHeadline(meta: LineMetadata, avgLabel: string): HTMLDivElement {
+  const headline = document.createElement("div");
+  headline.className = "nqf-lm-headline";
+  headline.appendChild(chip("平均", avgLabel, false));
+  headline.appendChild(
+    chip("地の文 短行30", percentInt(meta.narrative.short30, meta.narrative.lineCount), true),
+  );
+  return headline;
+}
+
+function chip(label: string, value: string, concern: boolean): HTMLSpanElement {
+  const el = document.createElement("span");
+  el.className = concern ? "nqf-lm-chip nqf-lm-chip--concern" : "nqf-lm-chip";
+  const lab = document.createElement("span");
+  lab.className = "nqf-lm-chip-lab";
+  lab.textContent = label;
+  el.appendChild(lab);
+  const num = document.createElement("span");
+  num.className = "nqf-lm-chip-num";
+  num.textContent = value;
+  el.appendChild(num);
+  return el;
+}
+
+function compositionSegments(meta: LineMetadata): Array<[string, number]> {
+  return [
+    ["narrative", meta.narrative.lineCount],
+    ["dialogue", meta.dialogue.lineCount],
+    ["meta", meta.meta.lineCount],
+    ["nonterm", meta.nonTerminal.lineCount],
+    ["blank", meta.blankCount],
+    ["sep", meta.separatorCount],
+  ];
+}
+
+function createCompositionBar(meta: LineMetadata): HTMLDivElement {
+  const bar = document.createElement("div");
+  bar.className = "nqf-lm-compo";
+  bar.setAttribute("role", "img");
+  bar.setAttribute("aria-label", "行の構成比");
+  for (const [slug, count] of compositionSegments(meta)) {
+    const seg = document.createElement("span");
+    seg.className = `nqf-lm-seg nqf-lm-seg--${slug}`;
+    seg.style.width = `${widthPercent(count, meta.totalLines).toFixed(2)}%`;
+    bar.appendChild(seg);
+  }
+  return bar;
+}
+
+function createCompositionLegend(meta: LineMetadata): HTMLDivElement {
+  const legend = document.createElement("div");
+  legend.className = "nqf-lm-legend";
+  const entries: Array<[string, string, number]> = [
+    ["地の文", "narrative", meta.narrative.lineCount],
+    ["セリフ", "dialogue", meta.dialogue.lineCount],
+    ["メタ", "meta", meta.meta.lineCount],
+    ["非文末", "nonterm", meta.nonTerminal.lineCount],
+    ["空行", "blank", meta.blankCount],
+    ["区切り", "sep", meta.separatorCount],
+  ];
+  for (const [label, slug, count] of entries) {
+    const item = document.createElement("span");
+    const swatch = document.createElement("i");
+    swatch.className = `nqf-lm-swatch nqf-lm-swatch--${slug}`;
+    item.appendChild(swatch);
+    item.appendChild(document.createTextNode(`${label} `));
+    const num = document.createElement("span");
+    num.className = "nqf-lm-num";
+    num.textContent = percentInt(count, meta.totalLines);
+    item.appendChild(num);
+    legend.appendChild(item);
+  }
+  return legend;
+}
+
+function createLineCatBlock(cat: CategoryView, meta: LineMetadata): HTMLDivElement {
+  const block = document.createElement("div");
+  block.className = "nqf-lm-cat";
+
+  const head = document.createElement("div");
+  head.className = "nqf-lm-cat-head";
+  const dot = document.createElement("span");
+  dot.className = `nqf-lm-cat-dot nqf-lm-swatch--${cat.slug}`;
+  head.appendChild(dot);
+  const name = document.createElement("span");
+  name.className = "nqf-lm-cat-name";
+  name.textContent = cat.label;
+  head.appendChild(name);
+  const sub = document.createElement("span");
+  sub.className = "nqf-lm-cat-sub";
+  sub.textContent = isNarrativeCount(cat.count)
+    ? `平均 ${averageCharsLabel(cat.count)} / チャンク ${formatInt(cat.count.chunkCount)}`
+    : `平均 ${averageCharsLabel(cat.count)}`;
+  head.appendChild(sub);
+  block.appendChild(head);
+
+  block.appendChild(
+    amountMetricRow("lines", "行", cat.slug, cat.count.lineCount, meta.totalLines),
+  );
+  block.appendChild(
+    amountMetricRow("chars", "文字", cat.slug, cat.count.charCount, meta.totalChars),
+  );
+  block.appendChild(
+    shortMetricRow("short", "短行", cat.count.short20, cat.count.short30, cat.count.lineCount),
+  );
+  if (isNarrativeCount(cat.count)) {
+    block.appendChild(
+      shortMetricRow(
+        "shortchunk",
+        "短ﾁｬﾝｸ",
+        cat.count.shortChunk20,
+        cat.count.shortChunk30,
+        cat.count.chunkCount,
+      ),
+    );
+  }
+  return block;
+}
+
+// 行割合・文字割合。バーはカテゴリ色、値は「生数（割合）」で示す。
+function amountMetricRow(
+  kind: string,
+  key: string,
+  slug: string,
+  value: number,
+  total: number,
+): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = `nqf-lm-metric nqf-lm-metric--${kind}`;
+
+  const k = document.createElement("span");
+  k.className = "nqf-lm-k";
+  k.textContent = key;
+  row.appendChild(k);
+
+  const barBox = document.createElement("span");
+  barBox.className = "nqf-lm-bar";
+  const fill = document.createElement("i");
+  fill.className = `nqf-lm-bar-fill nqf-lm-fill--${slug}`;
+  fill.style.width = `${widthPercent(value, total).toFixed(2)}%`;
+  barBox.appendChild(fill);
+  row.appendChild(barBox);
+
+  const v = document.createElement("span");
+  v.className = "nqf-lm-v";
+  v.appendChild(document.createTextNode(`${formatInt(value)} `));
+  const pct = document.createElement("span");
+  pct.className = "nqf-lm-pct";
+  pct.textContent = percentOne(value, total);
+  v.appendChild(pct);
+  row.appendChild(v);
+
+  return row;
+}
+
+// 短行率・短チャンク率。1行の情報量が少ないほど高くなる要注意指標なのでバーは要注意色。
+function shortMetricRow(
+  kind: string,
+  key: string,
+  short20: number,
+  short30: number,
+  denominator: number,
+): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = `nqf-lm-metric nqf-lm-metric--${kind}`;
+
+  const k = document.createElement("span");
+  k.className = "nqf-lm-k";
+  k.textContent = key;
+  row.appendChild(k);
+
+  const barBox = document.createElement("span");
+  barBox.className = "nqf-lm-bar";
+  const fill = document.createElement("i");
+  fill.className = "nqf-lm-bar-fill nqf-lm-fill--warn";
+  fill.style.width = `${widthPercent(short30, denominator).toFixed(2)}%`;
+  barBox.appendChild(fill);
+  row.appendChild(barBox);
+
+  const v = document.createElement("span");
+  v.className = "nqf-lm-v";
+  v.appendChild(document.createTextNode("20:"));
+  v.appendChild(hiValue(percentInt(short20, denominator)));
+  v.appendChild(document.createTextNode(" / 30:"));
+  v.appendChild(hiValue(percentInt(short30, denominator)));
+  row.appendChild(v);
+
+  return row;
+}
+
+function hiValue(text: string): HTMLSpanElement {
+  const hi = document.createElement("span");
+  hi.className = "nqf-lm-hi";
+  hi.textContent = text;
+  return hi;
 }
 
 function isNarrativeCount(count: CategoryCount): count is NarrativeCount {
   return "chunkCount" in count;
 }
 
-function createLineRow(label: string, count: CategoryCount): HTMLDivElement {
-  const row = document.createElement("div");
-  row.className = "nqf-line-row";
-
-  const labelEl = document.createElement("span");
-  labelEl.className = "nqf-line-label";
-  labelEl.textContent = label;
-  row.appendChild(labelEl);
-
-  const stats = document.createElement("span");
-  stats.className = "nqf-line-stats";
-  const avg = count.lineCount > 0 ? (count.charCount / count.lineCount).toFixed(1) : "0.0";
-  const parts = [
-    `${count.lineCount}行`,
-    `平均${avg}字`,
-    `文字数 ${count.charCount}`,
-    `短行 20:${ratioPercent(count.short20, count.lineCount)} / 30:${
-      ratioPercent(count.short30, count.lineCount)
-    }`,
-  ];
-  if (isNarrativeCount(count)) {
-    parts.push(`チャンク ${count.chunkCount}`);
-    parts.push(
-      `短チャンク 20:${ratioPercent(count.shortChunk20, count.chunkCount)} / 30:${
-        ratioPercent(count.shortChunk30, count.chunkCount)
-      }`,
-    );
-  }
-  stats.textContent = parts.join(" / ");
-  row.appendChild(stats);
-
-  return row;
+function formatInt(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-function ratioPercent(numerator: number, denominator: number): string {
+function percentInt(numerator: number, denominator: number): string {
   if (denominator === 0) return "-";
   return `${Math.round((numerator / denominator) * 100)}%`;
+}
+
+function percentOne(numerator: number, denominator: number): string {
+  if (denominator === 0) return "-";
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
+}
+
+function widthPercent(numerator: number, denominator: number): number {
+  if (denominator === 0) return 0;
+  return Math.min(100, (numerator / denominator) * 100);
+}
+
+function averagePerLineLabel(meta: LineMetadata): string {
+  const denominator = meta.totalLines - meta.blankCount;
+  if (denominator <= 0) return "-";
+  return `${(meta.totalChars / denominator).toFixed(1)}字/行`;
+}
+
+function averageCharsLabel(count: CategoryCount): string {
+  if (count.lineCount === 0) return "-";
+  return `${(count.charCount / count.lineCount).toFixed(1)}字`;
 }
