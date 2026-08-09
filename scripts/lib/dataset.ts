@@ -1,7 +1,7 @@
 // 較正クロールのデータセット（JSONL）スキーマと入出力。collector と実験ハーネスで共有する。
 // 生指標 (rawMetrics) を丸ごと保存するので、後段は任意の重み・正規化・ペナルティで再計算できる。
 
-import type { RawMetrics } from "../../src/domain/types.ts";
+import type { LineMetadata, RawMetrics } from "../../src/domain/types.ts";
 
 export interface DatasetRecord {
   workId: string;
@@ -19,6 +19,18 @@ export interface DatasetRecord {
   blankLineRatio: number; // 観測専用
   tags: string[]; // このクロールで踏んだシードタグ
   crawledAt: string; // ISO8601
+
+  // --- 較正二段目（行メタ収集）で追加。旧レコード（108件・旧クロール）は欠損許容。 ---
+  // 行メタの集計結果（分子・分母）。行メタ分析はこれを持つレコードだけを対象にする。
+  lineMetadata?: LineMetadata;
+  // 原本（capture_store）への参照。再フェッチなしの再導出はこの capture を読む。
+  captureId?: string;
+  // サイト接頭辞付きの作品キー（例 kakuyomu:123）。labels との join キー。
+  siteWorkId?: string;
+  // 採点対象本文の SHA-256。作者と併せて転載重複（同一本文の跨り）を検出する。
+  bodyHash?: string;
+  // 収集経路の由来マーカー（新形式は "collected"）。旧形式は欠損。
+  eligibility?: string;
 }
 
 export function toJsonl(rec: DatasetRecord): string {
