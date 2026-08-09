@@ -1,12 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { parseHTML } from "linkedom";
 import { detectWorkCards, findCardContainer } from "./card-detector.ts";
-
-function loadFixture(name: string): Document {
-  const html = Deno.readTextFileSync(`tests/fixtures/${name}`);
-  const { document } = parseHTML(html);
-  return document;
-}
+import { loadFixture } from "../../../tests/helpers.ts";
 
 function firstTitleLink(document: Document): HTMLAnchorElement {
   const link = document.querySelector<HTMLAnchorElement>(".widget-workCard-title a");
@@ -50,8 +45,7 @@ const SEARCH_PAGE_HTML = `<!DOCTYPE html>
 </html>`;
 
 Deno.test("linkedom smoke: parses tags fixture and finds widget-work cards", () => {
-  const html = Deno.readTextFileSync("tests/fixtures/kakuyomu-tags-page.html");
-  const { document } = parseHTML(html);
+  const document = loadFixture("kakuyomu-tags-page.html");
   const cards = document.querySelectorAll("div.widget-work.float-parent");
   assertEquals(cards.length, 3);
 });

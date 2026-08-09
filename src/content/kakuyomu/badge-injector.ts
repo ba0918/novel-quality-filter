@@ -1,7 +1,7 @@
 import type { ScoreResult } from "../../domain/types.ts";
 import { DEFAULT_THRESHOLD } from "../../domain/scoring/mod.ts";
 import { createTooltip, scoreToColor } from "./score-color.ts";
-import { findStarCountElement } from "./meta-element.ts";
+import { findMetaArea, findStarCountElement } from "./meta-element.ts";
 
 export function injectBadge(
   cardElement: HTMLElement,
@@ -53,8 +53,7 @@ export function injectLoadingBadge(cardElement: HTMLElement): void {
 
 function insertBadgeElement(cardElement: HTMLElement, badge: HTMLElement): void {
   // ★数リンクの直前に挿入（全ページ種別で統一的に配置）
-  const metaArea = cardElement.querySelector<HTMLElement>('[class*="WorkMeta"]') ??
-    cardElement.querySelector<HTMLElement>(".widget-workCard-meta");
+  const metaArea = findMetaArea(cardElement);
   const starLink = findStarCountElement(metaArea ?? cardElement);
   if (starLink) {
     starLink.parentElement?.insertBefore(badge, starLink);

@@ -1,12 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { parseHTML } from "linkedom";
 import { findStarCountElement } from "./meta-element.ts";
-
-function loadFixture(name: string): Document {
-  const html = Deno.readTextFileSync(`tests/fixtures/${name}`);
-  const { document } = parseHTML(html);
-  return document;
-}
+import { loadFixture } from "../../../tests/helpers.ts";
 
 function firstWorkCard(document: Document): HTMLElement {
   const card = document.querySelector<HTMLElement>(
