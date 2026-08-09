@@ -25,6 +25,7 @@
     "@preact/signals": "npm:@preact/signals@^2.0.0",
     "lindera-wasm-ipadic-web": "npm:lindera-wasm-ipadic-web@2.3.4",
     "esbuild": "npm:esbuild@^0.27.0",
+    "linkedom": "npm:linkedom@^0.18.0",
     "esbuild-deno-loader": "jsr:@luca/esbuild-deno-loader@^0.11.1",
     "@std/assert": "jsr:@std/assert@^1.0.18",
     "@std/fs": "jsr:@std/fs@^1",
@@ -40,5 +41,5 @@
     "indentWidth": 2,
     "singleQuote": false
   },
-  "exclude": ["dist/", "node_modules/", "coverage/", "spike/fixtures/"]
+  "exclude": ["dist/", "node_modules/", "coverage/", "spike/fixtures/", "tests/fixtures/"]
 }
