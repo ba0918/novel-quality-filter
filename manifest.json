@@ -19,6 +19,9 @@
         "https://kakuyomu.jp/rankings/*",
         "https://kakuyomu.jp/search*",
         "https://kakuyomu.jp/recent_works*",
+        "https://kakuyomu.jp/tags/*",
+        "https://kakuyomu.jp/pickup_works*",
+        "https://kakuyomu.jp/recent_reviews*",
         "https://kakuyomu.jp/works/*"
       ],
       "js": ["content/kakuyomu.js"]

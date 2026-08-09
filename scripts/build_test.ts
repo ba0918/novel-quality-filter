@@ -21,6 +21,23 @@ Deno.test("build: manifest.json exists and is valid", async () => {
   assert(manifest.content_security_policy?.extension_pages?.includes("wasm-unsafe-eval"));
 });
 
+Deno.test("build: content script matches include list pages", async () => {
+  const manifestPath = join(DIST, "manifest.json");
+  const manifest = JSON.parse(await Deno.readTextFile(manifestPath));
+  const matches = manifest.content_scripts[0].matches;
+
+  assertEquals(Array.isArray(matches), true);
+  for (
+    const pattern of [
+      "https://kakuyomu.jp/tags/*",
+      "https://kakuyomu.jp/pickup_works*",
+      "https://kakuyomu.jp/recent_reviews*",
+    ]
+  ) {
+    assert(matches.includes(pattern), `missing content_scripts match: ${pattern}`);
+  }
+});
+
 Deno.test("build: background.js exists and has content", async () => {
   const bgPath = join(DIST, "background.js");
   assert(await exists(bgPath));
