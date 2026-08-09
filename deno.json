@@ -12,6 +12,7 @@
     "build:clean": "rm -rf dist && deno task build",
     "analyze": "deno run --allow-all scripts/analyze_url.ts",
     "crawl": "deno run --allow-all scripts/crawl_tags.ts",
+    "collect": "deno run --allow-all scripts/fetch_and_store.ts",
     "exp": "deno run --allow-all scripts/analyze_dataset.ts",
     "research": "deno run --allow-all scripts/research.ts"
   },
