@@ -15,14 +15,19 @@ Deno.test("findWorkPageContainer: ★数リンクがあればその作品ヘッ�
   assertEquals(c?.getAttribute("data-want"), "1");
 });
 
-Deno.test("findWorkPageContainer: ★0でレビュー/フォロワー自リンクが無くても作品の★表示行を掴む", () => {
-  // 実ページ再現: 作品自身の★は星単独の要素。推薦枠の★はカウントが同一要素に埋まり衝突しない。
+Deno.test("findWorkPageContainer: ★0でも作品の★を掴み、右寄せが効く幅広ヘッダー行（★の内側行でなく親行）を返す", () => {
+  // 実ページ再現: 星単独の★行(gap-5s)は幅が狭く margin-left:auto が効かない。
+  // レビュー有りと表示位置を揃えるため、その親の幅広 Layout 行を返す。
+  // 推薦枠の★はカウントが同一要素に埋まり（textContent が "★" 単独でない）衝突しない。
   const d = doc(
-    `<div class="Layout_layout__H Layout_gap-5s__R" data-want="1"><div>★</div><div class="LayoutItem_x">0</div></div>` +
+    `<div class="Layout_layout__outer Layout_gap-m__x" data-want="1">` +
+      `<div><div class="Layout_layout__inner Layout_gap-5s__y" data-inner="1"><div>★</div><div class="LayoutItem_x">0</div></div></div>` +
+      `</div>` +
       `<div class="Recommend_box"><span>★98</span></div>`,
   );
   const c = findWorkPageContainer(d, "123");
   assertEquals(c?.getAttribute("data-want"), "1");
+  assertEquals(c?.getAttribute("data-inner"), null);
 });
 
 Deno.test("findWorkPageContainer: 作品の自リンクも★表示も無ければ null", () => {

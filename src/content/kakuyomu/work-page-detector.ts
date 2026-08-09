@@ -43,10 +43,14 @@ export function findWorkPageContainer(root: ParentNode, workId: string): HTMLEle
   // フォールバック2: ★0 の作品はレビュー/フォロワーの自リンクが張られない。
   // 作品自身の★表示（星単独の要素）はカウント0でも必ず在るのでそこを掴む。
   // 推薦枠の★は「★98」のようにカウントが同一要素に埋まる（textContent が "★" 単独でない）ため衝突しない。
+  // 星単独の行(gap-5s)は幅が狭く margin-left:auto が効かないため、その親の幅広ヘッダー行を返して
+  // レビュー有りの作品と表示位置（右寄せ）を揃える。
   const starIcon = findWorkStarIcon(root);
   if (starIcon) {
-    const layoutRow = starIcon.closest<HTMLElement>('[class*="Layout_layout"]');
-    if (layoutRow) return layoutRow;
+    const innerRow = starIcon.closest<HTMLElement>('[class*="Layout_layout"]');
+    const topRow = innerRow?.parentElement?.closest<HTMLElement>('[class*="Layout_layout"]');
+    if (topRow) return topRow;
+    if (innerRow) return innerRow;
     if (starIcon.parentElement) return starIcon.parentElement;
   }
 
