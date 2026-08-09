@@ -10,7 +10,9 @@
     "spike:realdata": "deno run --allow-all spike/realdata_spike.ts",
     "build": "deno run --allow-all scripts/build.ts",
     "build:clean": "rm -rf dist && deno task build",
-    "analyze": "deno run --allow-all scripts/analyze_url.ts"
+    "analyze": "deno run --allow-all scripts/analyze_url.ts",
+    "crawl": "deno run --allow-all scripts/crawl_tags.ts",
+    "exp": "deno run --allow-all scripts/analyze_dataset.ts"
   },
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "deno.ns"],
