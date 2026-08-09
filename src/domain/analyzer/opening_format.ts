@@ -16,6 +16,26 @@ const MIN_REPLY_LINES = 5;
 const MIN_ANCHORS = 3;
 const CHARACTER_INTRO_BODY_SCORE = 15;
 
+export const OPENING_FORMAT_LABELS: Record<OpeningFormat, string> = {
+  normal: "通常開幕",
+  "character-intro": "キャラ紹介開幕",
+  "bulletin-board": "掲示板開幕",
+  "too-short": "短文開幕",
+};
+
+export function formatOpeningContext(
+  openingType: OpeningFormat | undefined,
+  sampledCount: number | undefined,
+): string {
+  const label = openingType === undefined
+    ? OPENING_FORMAT_LABELS.normal
+    : OPENING_FORMAT_LABELS[openingType];
+  if (sampledCount !== undefined && sampledCount > 1) {
+    return `${label} / ${sampledCount}話で再評価`;
+  }
+  return label;
+}
+
 export function classifyOpeningFormat(text: string, episodeTitle: string): OpeningFormat {
   if (hasBulletinBoardBodySignal(text)) return "bulletin-board";
   if (hasCharacterIntroBodySignal(text)) return "character-intro";

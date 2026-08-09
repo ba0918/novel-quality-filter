@@ -1,4 +1,5 @@
 import type { MetricResult, PenaltyResult, ScoreResult } from "../../domain/types.ts";
+import { formatOpeningContext } from "../../domain/analyzer/opening_format.ts";
 import { scoreToColor } from "./score-color.ts";
 
 const BADGE_CLASS = "nqf-work-badge";
@@ -35,6 +36,7 @@ export function injectWorkBadge(
   container.setAttribute(PROCESSED_ATTR, "true");
 
   const badge = createWorkBadge(result.score);
+  badge.title = formatOpeningContext(result.openingType, result.sampledCount);
   const panel = createDetailPanel(result);
   panel.style.display = "none";
 

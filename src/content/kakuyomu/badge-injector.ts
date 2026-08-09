@@ -1,5 +1,6 @@
 import type { ScoreResult } from "../../domain/types.ts";
 import { DEFAULT_THRESHOLD } from "../../domain/scoring/mod.ts";
+import { formatOpeningContext } from "../../domain/analyzer/opening_format.ts";
 import { createTooltip, scoreToColor } from "./score-color.ts";
 import { findMetaArea, findStarCountElement } from "./meta-element.ts";
 
@@ -12,6 +13,7 @@ export function injectBadge(
   removeBadge(cardElement);
 
   const badge = createBadge(result.score);
+  badge.title = formatOpeningContext(result.openingType, result.sampledCount);
   const tooltip = createTooltip(result);
   badge.appendChild(tooltip);
 

@@ -1,6 +1,10 @@
 import { assertEquals } from "@std/assert";
 import type { OpeningFormat } from "../types.ts";
-import { classifyOpeningFormat, selectSamplingTarget } from "./opening_format.ts";
+import {
+  classifyOpeningFormat,
+  formatOpeningContext,
+  selectSamplingTarget,
+} from "./opening_format.ts";
 
 const FIXTURES_DIR = new URL("../../../tests/fixtures/", import.meta.url).pathname;
 
@@ -238,4 +242,30 @@ Deno.test("select: 非ナラティブの連続後に通常の短文が出ても�
   assertEquals(decision.openingType, "character-intro");
   assertEquals(decision.targetText, ci);
   assertEquals(decision.sampledCount, 2);
+});
+
+// --- formatOpeningContext: ツールチップの形式ラベル ---
+
+Deno.test("formatOpeningContext: 通常開幕はラベルのみ", () => {
+  assertEquals(formatOpeningContext("normal", 1), "通常開幕");
+});
+
+Deno.test("formatOpeningContext: 再評価の場合は N話で再評価 を付与", () => {
+  assertEquals(formatOpeningContext("normal", 2), "通常開幕 / 2話で再評価");
+});
+
+Deno.test("formatOpeningContext: キャラ紹介開幕ラベル", () => {
+  assertEquals(formatOpeningContext("character-intro", 1), "キャラ紹介開幕");
+});
+
+Deno.test("formatOpeningContext: 掲示板開幕で3話再評価", () => {
+  assertEquals(formatOpeningContext("bulletin-board", 3), "掲示板開幕 / 3話で再評価");
+});
+
+Deno.test("formatOpeningContext: 短文開幕ラベル", () => {
+  assertEquals(formatOpeningContext("too-short", 1), "短文開幕");
+});
+
+Deno.test("formatOpeningContext: 未指定は通常開幕として扱う", () => {
+  assertEquals(formatOpeningContext(undefined, undefined), "通常開幕");
 });
