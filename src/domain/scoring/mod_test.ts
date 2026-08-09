@@ -90,10 +90,11 @@ Deno.test("scoring: penalties is empty when no penalty rule fires", () => {
   assertEquals(result.penalties.length, 0, "No penalties should fire for healthy metrics");
 });
 
-Deno.test("scoring: penalties contains fired rule with label and multiplier", () => {
-  // singleSentParaRatio ペナルティを発動させる（閾値 0.30 未満）
+Deno.test("scoring: 一文一段落比率が高く文長SDも小さいと過多ペナルティが発火する", () => {
+  // 一文一段落が多く（比率 0.95）、かつ文長のばらつきも小さい（SD 10 → 正規化 0.4）単調な文章
   const raw = makeSyntheticMetrics({
-    singleSentParaRatio: 0.95, // normalizedValue = min(0.95, 1) = 0.95, inverted = 1 - 0.95 = 0.05 < 0.30
+    singleSentParaRatio: 0.95,
+    sentenceLengthSD: 10,
   });
   const result = calculateScore(raw);
 
@@ -103,6 +104,22 @@ Deno.test("scoring: penalties contains fired rule with label and multiplier", ()
   assert(singleSentPenalty, "singleSentParaRatio penalty should fire");
   assert(singleSentPenalty.label.length > 0, "Penalty should have a human-readable label");
   assertEquals(singleSentPenalty.multiplier, 0.65);
+});
+
+Deno.test("scoring: 一文一段落比率が高くても文長SDが大きければ過多ペナルティは発火しない", () => {
+  // 一文一段落は多い（比率 0.95）が、文の長短は豊か（SD 25 → 正規化 1.0）＝紋切りではない良作
+  const raw = makeSyntheticMetrics({
+    singleSentParaRatio: 0.95,
+    sentenceLengthSD: 25,
+  });
+  const result = calculateScore(raw);
+
+  const singleSentPenalty = result.penalties.find((p) => p.multiplier === 0.65);
+  assertEquals(
+    singleSentPenalty,
+    undefined,
+    "文長SDが大きければ一文一段落ペナルティは免除される",
+  );
 });
 
 Deno.test("scoring: all PenaltyRules have a label", () => {

@@ -28,6 +28,12 @@ Deno.test("cache_staleness: 採点対象話数フィールド追加前のスキ�
   assertEquals(isCacheStale(3), true);
 });
 
-Deno.test("cache_staleness: 採点対象話数フィールド追加でスキーマバージョンが4になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 4);
+Deno.test("cache_staleness: 一文一段落ペナルティ複合化前のスキーマ4は stale", () => {
+  // schemaVersion 4 のキャッシュは旧スコアリング（一文一段落ペナルティが文長SD非依存）で
+  // 算出されているため、複合条件への変更後は再採点させる
+  assertEquals(isCacheStale(4), true);
+});
+
+Deno.test("cache_staleness: 一文一段落ペナルティ複合化でスキーマバージョンが5になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 5);
 });

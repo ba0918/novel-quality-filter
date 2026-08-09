@@ -128,9 +128,12 @@ export const PENALTY_RULES: PenaltyRule[] = [
     penaltyMultiplier: 0.55,
   },
   {
+    // 一文一段落が多くても、文の長短が豊かなら紋切りではない（人気長編に多い）。
+    // 文長のばらつきが小さい（単調な）ときに限って紋切り型として減点する。
     label: "一文一段落の過多",
     conditions: [
       { key: "singleSentParaRatio", criticalThreshold: 0.30 },
+      { key: "sentenceLengthSD", criticalThreshold: 0.60 },
     ],
     penaltyMultiplier: 0.65,
   },
