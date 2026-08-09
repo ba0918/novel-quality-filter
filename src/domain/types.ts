@@ -43,3 +43,5 @@ export interface ScoreResult {
   metrics: MetricResult[];
   penalties: PenaltyResult[];
 }
+
+export type OpeningFormat = "normal" | "character-intro" | "bulletin-board" | "too-short";
