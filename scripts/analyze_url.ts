@@ -25,6 +25,7 @@ import {
 import { sampleEpisodes } from "../src/background/sampling.ts";
 import { initTokenizer, tokenize } from "../src/domain/tokenizer/mod.ts";
 import { analyzeAll } from "../src/domain/analyzer/mod.ts";
+import { analyzeBlankLineRatio } from "../src/domain/analyzer/blank_line.ts";
 import { calculateScore } from "../src/domain/scoring/mod.ts";
 import type { MetricResult, OpeningFormat } from "../src/domain/types.ts";
 
@@ -41,6 +42,7 @@ interface Row {
   singleSentParaRatio: number;
   sentenceLengthSD: number;
   burstiness: number;
+  blankLineRatio: number; // 観測専用（スコア非算入）
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -121,6 +123,7 @@ async function analyzeUrl(url: string): Promise<Row> {
     singleSentParaRatio: rawOf(metrics, "singleSentParaRatio"),
     sentenceLengthSD: rawOf(metrics, "sentenceLengthSD"),
     burstiness: rawOf(metrics, "sentenceLengthBurstiness"),
+    blankLineRatio: analyzeBlankLineRatio(sampling.targetText),
   };
 }
 
@@ -146,14 +149,16 @@ function printDetail(row: Row): void {
   console.log(
     `  指標: 一文段落率 ${row.singleSentParaRatio.toFixed(3)} / 文長SD ${
       row.sentenceLengthSD.toFixed(1)
-    } / バースティ ${row.burstiness.toFixed(1)}`,
+    } / バースティ ${row.burstiness.toFixed(1)} / 空行率 ${
+      row.blankLineRatio.toFixed(3)
+    }（観測のみ）`,
   );
 }
 
 function printTable(rows: Row[]): void {
   console.log(`\n=== 比較テーブル（閾値 ${THRESHOLD}）===`);
   console.log(
-    "タイトル                       レビュー   現状   候補  一文段落率  文長SD  開幕形式",
+    "タイトル                       レビュー   現状   候補  一文段落率  文長SD  空行率  開幕形式",
   );
   for (const r of rows) {
     const title = r.meta.title.length > 28 ? r.meta.title.slice(0, 27) + "…" : r.meta.title;
@@ -162,7 +167,7 @@ function printTable(rows: Row[]): void {
         String(r.current).padStart(5)
       } ${String(r.candidate).padStart(5)} ${r.singleSentParaRatio.toFixed(3).padStart(9)} ${
         r.sentenceLengthSD.toFixed(1).padStart(7)
-      }  ${r.openingType}`,
+      } ${r.blankLineRatio.toFixed(3).padStart(6)}  ${r.openingType}`,
     );
   }
 }
@@ -170,7 +175,7 @@ function printTable(rows: Row[]): void {
 function printCsv(rows: Row[]): void {
   console.log("\n=== CSV ===");
   console.log(
-    "title,author,reviewCount,totalReviewPoint,totalCharacterCount,openingType,sampledCount,current,candidate,singleSentParaRatio,sentenceLengthSD,burstiness,episodeUrl",
+    "title,author,reviewCount,totalReviewPoint,totalCharacterCount,openingType,sampledCount,current,candidate,singleSentParaRatio,sentenceLengthSD,burstiness,blankLineRatio,episodeUrl",
   );
   for (const r of rows) {
     const m = r.meta;
@@ -188,6 +193,7 @@ function printCsv(rows: Row[]): void {
       r.singleSentParaRatio.toFixed(4),
       r.sentenceLengthSD.toFixed(4),
       r.burstiness.toFixed(4),
+      r.blankLineRatio.toFixed(4),
       cell(r.episodeUrl),
     ].join(","));
   }
