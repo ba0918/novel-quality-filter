@@ -8,8 +8,8 @@
 // 既定の採点対象話は本番拡張と同じ sampleEpisodes（開幕形式判定＋再採点）で決める。
 // これを通さず第1話を生採点するとキャラ紹介/掲示板開幕でブラウザ表示と食い違う。
 //
-// 「現状スコア」と「候補(複合)スコア」を並べて出す。候補は一文一段落ペナルティを
-// 「一文段落が多い AND 文長のばらつきが小さい」の複合条件でのみ発火させる案の評価用。
+// スコアは現行 calculateScore（一文一段落ペナルティは文長SDとの複合条件）そのまま。
+// 空行率は観測専用の診断カラムで、スコアには算入しない。
 
 import { FETCH_INTERVAL_MS, FETCH_TIMEOUT_MS } from "../src/shared/constants.ts";
 import { sleep } from "../src/shared/async.ts";
@@ -39,8 +39,7 @@ interface Row {
   openingType: string;
   sampledCount: number;
   episodeUrl: string;
-  current: number;
-  candidate: number;
+  score: number;
   singleSentParaRatio: number;
   sentenceLengthSD: number;
   burstiness: number;
@@ -56,28 +55,8 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
-function normOf(metrics: MetricResult[], key: string): number {
-  return metrics.find((m) => m.key === key)?.normalizedValue ?? 0;
-}
-
 function rawOf(metrics: MetricResult[], key: string): number {
   return metrics.find((m) => m.key === key)?.rawValue ?? 0;
-}
-
-// 候補ペナルティ: 既存「文長の緩急・ばらつき不足」は据え置き、
-// 「一文一段落の過多」だけ文長SDとの複合条件へ差し替えて再計算する。
-function candidateScore(metrics: MetricResult[]): number {
-  const base = Math.max(0, Math.min(100, metrics.reduce((s, m) => s + m.contribution, 0)));
-  let mult = 1;
-  if (
-    rawOf(metrics, "sentenceLengthBurstiness") !== 0 &&
-    normOf(metrics, "sentenceLengthBurstiness") < 0.5 &&
-    normOf(metrics, "sentenceLengthSD") < 0.45
-  ) mult *= 0.55;
-  if (normOf(metrics, "singleSentParaRatio") < 0.30 && normOf(metrics, "sentenceLengthSD") < 0.60) {
-    mult *= 0.65;
-  }
-  return Math.round(base * mult);
 }
 
 async function fetchEpisode(episodeUrl: string): Promise<FetchedEpisode> {
@@ -155,8 +134,7 @@ async function analyzeUrl(url: string, episodeMode: boolean): Promise<Row> {
     openingType: target.openingType,
     sampledCount: target.sampledCount,
     episodeUrl: target.episodeUrl,
-    current: score,
-    candidate: candidateScore(metrics),
+    score,
     singleSentParaRatio: rawOf(metrics, "singleSentParaRatio"),
     sentenceLengthSD: rawOf(metrics, "sentenceLengthSD"),
     burstiness: rawOf(metrics, "sentenceLengthBurstiness"),
@@ -178,11 +156,7 @@ function printDetail(row: Row): void {
   console.log(
     `  開幕形式 ${row.openingType}（${row.sampledCount}話サンプル）→ 採点話 ${row.episodeUrl}`,
   );
-  console.log(
-    `  スコア: 現状 ${row.current} ${verdict(row.current)}  /  候補(複合) ${row.candidate} ${
-      verdict(row.candidate)
-    }`,
-  );
+  console.log(`  スコア ${row.score} ${verdict(row.score)}`);
   console.log(
     `  指標: 一文段落率 ${row.singleSentParaRatio.toFixed(3)} / 文長SD ${
       row.sentenceLengthSD.toFixed(1)
@@ -195,14 +169,14 @@ function printDetail(row: Row): void {
 function printTable(rows: Row[]): void {
   console.log(`\n=== 比較テーブル（閾値 ${THRESHOLD}）===`);
   console.log(
-    "タイトル                       レビュー   現状   候補  一文段落率  文長SD  空行率  開幕形式",
+    "タイトル                       レビュー  スコア  一文段落率  文長SD  空行率  開幕形式",
   );
   for (const r of rows) {
     const title = r.meta.title.length > 28 ? r.meta.title.slice(0, 27) + "…" : r.meta.title;
     console.log(
       `${title.padEnd(30)} ${String(r.meta.reviewCount).padStart(7)} ${
-        String(r.current).padStart(5)
-      } ${String(r.candidate).padStart(5)} ${r.singleSentParaRatio.toFixed(3).padStart(9)} ${
+        String(r.score).padStart(5)
+      } ${r.singleSentParaRatio.toFixed(3).padStart(9)} ${
         r.sentenceLengthSD.toFixed(1).padStart(7)
       } ${r.blankLineRatio.toFixed(3).padStart(6)}  ${r.openingType}`,
     );
@@ -212,7 +186,7 @@ function printTable(rows: Row[]): void {
 function printCsv(rows: Row[]): void {
   console.log("\n=== CSV ===");
   console.log(
-    "title,author,reviewCount,totalReviewPoint,totalCharacterCount,openingType,sampledCount,current,candidate,singleSentParaRatio,sentenceLengthSD,burstiness,blankLineRatio,episodeUrl",
+    "title,author,reviewCount,totalReviewPoint,totalCharacterCount,openingType,sampledCount,score,singleSentParaRatio,sentenceLengthSD,burstiness,blankLineRatio,episodeUrl",
   );
   for (const r of rows) {
     const m = r.meta;
@@ -225,8 +199,7 @@ function printCsv(rows: Row[]): void {
       m.totalCharacterCount,
       r.openingType,
       r.sampledCount,
-      r.current,
-      r.candidate,
+      r.score,
       r.singleSentParaRatio.toFixed(4),
       r.sentenceLengthSD.toFixed(4),
       r.burstiness.toFixed(4),
