@@ -10,6 +10,7 @@ import { analyzeEmotionDirectness } from "./emotion_directness.ts";
 import { analyzeLogicalConnectives } from "./logical_connective.ts";
 import { analyzeParagraphTransitions } from "./paragraph_transition.ts";
 import { analyzeSentenceLengthBurstiness } from "./sentence_length_burstiness.ts";
+import { splitSentences } from "./sentences.ts";
 
 export function analyzeAll(
   text: string,
@@ -20,8 +21,7 @@ export function analyzeAll(
   const { ratio: singleSentParaRatio } = analyzeSingleSentParagraphs(text);
   const { sd: paragraphLengthSD } = analyzeParagraphLengths(text);
   const sepCount = countSeparators(text);
-  const sentences = text.split(/。/).filter((s) => s.trim().length > 0);
-  const sentenceCount = sentences.length;
+  const sentenceCount = splitSentences(text).length;
 
   const { ttr } = analyzeVocabularyDiversity(tokens);
   const { count: dialogueCount, variety: dialogueEndingVariety } = analyzeDialogues(
@@ -62,7 +62,7 @@ export function analyzeAll(
 
 export { analyzeSentenceLengths } from "./sentence_length.ts";
 export { analyzeParagraphLengths, analyzeSingleSentParagraphs } from "./paragraph.ts";
-export { countSeparators, separatorFrequency } from "./separator.ts";
+export { countSeparators } from "./separator.ts";
 export { analyzeDialogues } from "./dialogue.ts";
 export { analyzeVocabularyDiversity } from "./vocabulary.ts";
 export { analyzeDescriptionDensity } from "./description_density.ts";

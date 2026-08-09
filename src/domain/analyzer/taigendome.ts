@@ -1,11 +1,12 @@
 import type { TokenData } from "../types.ts";
 import { NON_CONTENT_POS } from "./constants.ts";
+import { splitSentences } from "./sentences.ts";
 
 export function analyzeTaigendome(
   text: string,
   tokenizeFn: (s: string) => TokenData[],
 ): { count: number; total: number; ratio: number; entropy: number } {
-  const sentences = text.split(/。/).filter((s) => s.trim().length > 0);
+  const sentences = splitSentences(text);
   if (sentences.length === 0) return { count: 0, total: 0, ratio: 0, entropy: 0 };
 
   const SEGMENT_COUNT = 4;

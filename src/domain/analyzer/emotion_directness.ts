@@ -1,9 +1,6 @@
 import type { TokenData } from "../types.ts";
 import { EMOTION_ADJECTIVES, EMOTION_NOUNS, MENTAL_VERBS, NON_CONTENT_POS } from "./constants.ts";
-
-function extractNarrative(text: string): string {
-  return text.replace(/「[^」]*」/g, "");
-}
+import { extractNarrative } from "./narrative.ts";
 
 function isEmotionToken(token: TokenData): boolean {
   const pos = token.details[0];

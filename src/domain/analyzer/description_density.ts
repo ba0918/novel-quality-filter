@@ -1,5 +1,6 @@
 import type { TokenData } from "../types.ts";
 import { NON_CONTENT_POS, SEPARATOR_PATTERN } from "./constants.ts";
+import { mean, standardDeviation } from "./stats.ts";
 
 const MODIFIER_POS = ["形容詞", "副詞"];
 
@@ -21,7 +22,5 @@ export function analyzeDescriptionDensity(
   }
 
   if (densities.length <= 1) return { densities, meanDensity: densities[0] ?? 0, sd: 0 };
-  const mean = densities.reduce((a, b) => a + b, 0) / densities.length;
-  const variance = densities.reduce((a, d) => a + (d - mean) ** 2, 0) / densities.length;
-  return { densities, meanDensity: mean, sd: Math.sqrt(variance) };
+  return { densities, meanDensity: mean(densities), sd: standardDeviation(densities) };
 }

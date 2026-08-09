@@ -1,5 +1,6 @@
 import type { TokenData } from "../types.ts";
 import { MENTAL_VERBS, SENSORY_WORDS, SEPARATOR_PATTERN } from "./constants.ts";
+import { extractNarrative } from "./narrative.ts";
 
 export type ParagraphType = "D" | "I" | "N" | "A";
 
@@ -12,7 +13,7 @@ export function classifyParagraph(
   const dialogueChars = dialogueMatches.reduce((sum, m) => sum + m.length, 0);
   if (dialogueChars / trimmed.length >= 0.5) return "D";
 
-  const narrative = trimmed.replace(/「[^」]*」/g, "");
+  const narrative = extractNarrative(trimmed);
   const tokens = tokenizeFn(narrative);
 
   for (const token of tokens) {

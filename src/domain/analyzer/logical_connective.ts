@@ -1,14 +1,12 @@
 import { LOGICAL_CONNECTIVES } from "./constants.ts";
-
-function extractNarrative(text: string): string {
-  return text.replace(/「[^」]*」/g, "");
-}
+import { extractNarrative } from "./narrative.ts";
+import { splitSentences } from "./sentences.ts";
 
 export function analyzeLogicalConnectives(
   text: string,
 ): { count: number; sentenceCount: number; density: number } {
   const narrative = extractNarrative(text);
-  const sentences = narrative.split(/。/).filter((s) => s.trim().length > 0);
+  const sentences = splitSentences(narrative);
   if (sentences.length === 0) {
     return { count: 0, sentenceCount: 0, density: 0 };
   }

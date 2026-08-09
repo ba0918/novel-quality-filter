@@ -1,4 +1,5 @@
 import { SEPARATOR_PATTERN } from "./constants.ts";
+import { standardDeviation } from "./stats.ts";
 
 export function analyzeSingleSentParagraphs(
   text: string,
@@ -23,8 +24,5 @@ export function analyzeParagraphLengths(text: string): { lengths: number[]; sd: 
   const paragraphs = text.split(/\n/).filter((p) => p.trim().length > 0);
   const contentParas = paragraphs.filter((p) => !SEPARATOR_PATTERN.test(p.trim()));
   const lengths = contentParas.map((p) => p.trim().replace(/[\s　]/g, "").length);
-  if (lengths.length <= 1) return { lengths, sd: 0 };
-  const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-  const variance = lengths.reduce((a, l) => a + (l - mean) ** 2, 0) / lengths.length;
-  return { lengths, sd: Math.sqrt(variance) };
+  return { lengths, sd: standardDeviation(lengths) };
 }
