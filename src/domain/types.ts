@@ -45,6 +45,44 @@ export interface ScoreResult {
   openingType?: OpeningFormat;
   sampledCount?: number;
   targetEpisodeIndex?: number;
+  lineMetadata?: LineMetadata;
 }
 
 export type OpeningFormat = "normal" | "character-intro" | "bulletin-board" | "too-short";
+
+export interface LineData {
+  text: string;
+  isBlank: boolean;
+}
+
+export type LineCategory =
+  | "blank"
+  | "separator"
+  | "meta"
+  | "dialogue"
+  | "narrative"
+  | "non-terminal";
+
+export interface CategoryCount {
+  lineCount: number;
+  charCount: number;
+  short20: number;
+  short30: number;
+}
+
+export interface NarrativeCount extends CategoryCount {
+  chunkCount: number;
+  shortChunk20: number;
+  shortChunk30: number;
+}
+
+export interface LineMetadata {
+  totalLines: number;
+  totalChars: number;
+  blankCount: number;
+  separatorCount: number;
+  narrative: NarrativeCount;
+  dialogue: CategoryCount;
+  meta: CategoryCount;
+  nonTerminal: CategoryCount;
+}

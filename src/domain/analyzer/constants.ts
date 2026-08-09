@@ -2,6 +2,32 @@ export const NON_CONTENT_POS = ["記号", "空白", "BOS/EOS"];
 export const SEPARATOR_PATTERN = /^[\s]*(---|＊＊＊|\*\*\*|───|——|━━)[\s]*$/;
 export const SEPARATOR_PATTERN_GLOBAL = new RegExp(SEPARATOR_PATTERN.source, "gm");
 
+// 行分類用: 空白を除いた行全体がダッシュ等の連続で構成される区切り線。
+// 既存指標が依存する SEPARATOR_PATTERN とは別に持ち、較正で拡張できるようにする。
+// 文字クラスはエスケープで明示（見た目の同じダッシュを取り違えないため）。
+export const SEPARATOR_LINE_PATTERN = /^[‐-―─━=＝\-＊*_＿]{3,}$/;
+
+// 行頭がこれらの装飾記号で始まる行を確定メタとみなす（【ステータス】《ＨＰ》等）。
+export const META_PREFIX_CHARS = new Set([
+  "【",
+  "《",
+  "◆",
+  "■",
+  "◇",
+  "□",
+  "●",
+  "▼",
+  "▲",
+  "★",
+  "☆",
+]);
+
+// ～…～ で全体を囲んだ見出し行を確定メタとみなす（U+FF5E と U+301C の両方）。
+export const META_WRAP_CHARS = new Set(["～", "〜"]);
+
+export const SHORT_LINE_THRESHOLD_20 = 20;
+export const SHORT_LINE_THRESHOLD_30 = 30;
+
 export const EMOTION_ADJECTIVES = new Set([
   "悲しい",
   "嬉しい",
