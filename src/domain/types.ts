@@ -44,6 +44,7 @@ export interface ScoreResult {
   penalties: PenaltyResult[];
   openingType?: OpeningFormat;
   sampledCount?: number;
+  targetEpisodeIndex?: number;
 }
 
 export type OpeningFormat = "normal" | "character-intro" | "bulletin-board" | "too-short";

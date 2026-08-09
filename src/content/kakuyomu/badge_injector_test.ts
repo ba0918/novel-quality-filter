@@ -27,7 +27,11 @@ Deno.test("badge-injector: 再評価情報を title に設定", () => {
       injectBadge(
         card,
         "1",
-        makeResult({ openingType: "character-intro", sampledCount: 2 }),
+        makeResult({
+          openingType: "character-intro",
+          sampledCount: 2,
+          targetEpisodeIndex: 1,
+        }),
         () => {},
       );
       const badge = card.querySelector<HTMLElement>(".nqf-badge");
@@ -57,6 +61,6 @@ Deno.test("work-page-injector: バッジの title に形式ラベルを設定", 
       () => {},
     );
     const badge = container.querySelector<HTMLElement>(".nqf-work-badge");
-    assertEquals(badge?.title, "掲示板開幕 / 3話で再評価");
+    assertEquals(badge?.title, "掲示板開幕");
   });
 });

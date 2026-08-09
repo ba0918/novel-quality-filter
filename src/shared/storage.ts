@@ -8,6 +8,7 @@ export interface CachedScore {
   penalties: PenaltyResult[];
   openingType?: OpeningFormat;
   sampledCount?: number;
+  targetEpisodeIndex?: number;
   schemaVersion: number;
   scoredAt: number;
   episodeUrl: string;

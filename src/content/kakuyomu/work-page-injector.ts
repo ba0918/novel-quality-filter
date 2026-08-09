@@ -36,7 +36,11 @@ export function injectWorkBadge(
   container.setAttribute(PROCESSED_ATTR, "true");
 
   const badge = createWorkBadge(result.score);
-  badge.title = formatOpeningContext(result.openingType, result.sampledCount);
+  badge.title = formatOpeningContext(
+    result.openingType,
+    result.sampledCount,
+    result.targetEpisodeIndex ?? 0,
+  );
   const panel = createDetailPanel(result);
   panel.style.display = "none";
 

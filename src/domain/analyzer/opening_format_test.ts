@@ -128,28 +128,22 @@ Deno.test("classify: キャラ紹介の構造シグナルは短文判定より�
 
 Deno.test("classify: 掲示板開幕 fixture を判定", () => {
   const text = loadFixture("opening-bulletin-board-ep1.txt");
-  assertEquals(classifyOpeningFormat(text, "プロローグ　掲示板12"), "bulletin-board");
+  assertEquals(classifyOpeningFormat(text, "第1話"), "bulletin-board");
 });
 
 Deno.test("classify: キャラ紹介開幕 fixture を判定", () => {
   const text = loadFixture("opening-char-intro-ep1.txt");
-  assertEquals(
-    classifyOpeningFormat(text, "キャラ紹介　（ネタバレ含みます）"),
-    "character-intro",
-  );
+  assertEquals(classifyOpeningFormat(text, "第1話"), "character-intro");
 });
 
 Deno.test("classify: 掲示板開幕の次話（通常ナラティブ fixture）を判定", () => {
   const text = loadFixture("opening-bulletin-board-ep2.txt");
-  assertEquals(classifyOpeningFormat(text, "第1話　或る社畜の目覚め"), "normal");
+  assertEquals(classifyOpeningFormat(text, "第1話"), "normal");
 });
 
 Deno.test("classify: キャラ紹介開幕の次話（通常ナラティブ fixture）を判定", () => {
   const text = loadFixture("opening-char-intro-ep2.txt");
-  assertEquals(
-    classifyOpeningFormat(text, "第1話　オタクに優しいギャル誕生？"),
-    "normal",
-  );
+  assertEquals(classifyOpeningFormat(text, "第1話"), "normal");
 });
 
 // --- selectSamplingTarget: 採点対象選択のフローロジック ---
@@ -160,6 +154,7 @@ Deno.test("select: 通常開幕は第1話のみで採点", () => {
   assertEquals(decision.done, true);
   assertEquals(decision.openingType, "normal");
   assertEquals(decision.sampledCount, 1);
+  assertEquals(decision.targetEpisodeIndex, 0);
   assertEquals(decision.targetText, ep1.text);
 });
 
@@ -168,8 +163,9 @@ Deno.test("select: キャラ紹介開幕は次話（通常）で単独再採点"
   const ep2 = episode(loadFixture("opening-char-intro-ep2.txt"), "normal");
   const decision = selectSamplingTarget([ep1, ep2]);
   assertEquals(decision.done, true);
-  assertEquals(decision.openingType, "normal");
+  assertEquals(decision.openingType, "character-intro");
   assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetEpisodeIndex, 1);
   assertEquals(decision.targetText, ep2.text);
 });
 
@@ -178,8 +174,9 @@ Deno.test("select: 掲示板開幕は次話（通常）で単独再採点", () =
   const ep2 = episode(loadFixture("opening-bulletin-board-ep2.txt"), "normal");
   const decision = selectSamplingTarget([ep1, ep2]);
   assertEquals(decision.done, true);
-  assertEquals(decision.openingType, "normal");
+  assertEquals(decision.openingType, "bulletin-board");
   assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetEpisodeIndex, 1);
   assertEquals(decision.targetText, ep2.text);
 });
 
@@ -193,6 +190,7 @@ Deno.test("select: 全編掲示板なら第1話を形式ラベル付きで採点
   assertEquals(decision.done, false);
   assertEquals(decision.openingType, "bulletin-board");
   assertEquals(decision.sampledCount, 3);
+  assertEquals(decision.targetEpisodeIndex, 0);
   assertEquals(decision.targetText, bb);
 });
 
@@ -202,6 +200,7 @@ Deno.test("select: 一話完結の短文でもスコアを出力（評価不能�
   assertEquals(decision.done, false);
   assertEquals(decision.openingType, "too-short");
   assertEquals(decision.sampledCount, 1);
+  assertEquals(decision.targetEpisodeIndex, 0);
   assertEquals(decision.targetText, short);
 });
 
@@ -213,8 +212,9 @@ Deno.test("select: 短文開幕+通常短文は文数30まで累積連結", () =
     episode(shortB, "normal"),
   ]);
   assertEquals(decision.done, true);
-  assertEquals(decision.openingType, "normal");
+  assertEquals(decision.openingType, "too-short");
   assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetEpisodeIndex, 0);
   assertEquals(decision.targetText, shortA + shortB);
 });
 
@@ -228,6 +228,7 @@ Deno.test("select: 短文開幕→次話が掲示板なら第1話でフォール
   assertEquals(decision.done, false);
   assertEquals(decision.openingType, "too-short");
   assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetEpisodeIndex, 0);
   assertEquals(decision.targetText, short);
 });
 
@@ -242,30 +243,35 @@ Deno.test("select: 非ナラティブの連続後に通常の短文が出ても�
   assertEquals(decision.openingType, "character-intro");
   assertEquals(decision.targetText, ci);
   assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetEpisodeIndex, 0);
 });
 
 // --- formatOpeningContext: ツールチップの形式ラベル ---
 
 Deno.test("formatOpeningContext: 通常開幕はラベルのみ", () => {
-  assertEquals(formatOpeningContext("normal", 1), "通常開幕");
+  assertEquals(formatOpeningContext("normal", 1, 0), "通常開幕");
 });
 
-Deno.test("formatOpeningContext: 再評価の場合は N話で再評価 を付与", () => {
-  assertEquals(formatOpeningContext("normal", 2), "通常開幕 / 2話で再評価");
+Deno.test("formatOpeningContext: キャラ紹介開幕を2話目で再評価", () => {
+  assertEquals(formatOpeningContext("character-intro", 2, 1), "キャラ紹介開幕 / 2話で再評価");
 });
 
-Deno.test("formatOpeningContext: キャラ紹介開幕ラベル", () => {
-  assertEquals(formatOpeningContext("character-intro", 1), "キャラ紹介開幕");
+Deno.test("formatOpeningContext: キャラ紹介開幕ラベル（第1話採点）", () => {
+  assertEquals(formatOpeningContext("character-intro", 1, 0), "キャラ紹介開幕");
 });
 
-Deno.test("formatOpeningContext: 掲示板開幕で3話再評価", () => {
-  assertEquals(formatOpeningContext("bulletin-board", 3), "掲示板開幕 / 3話で再評価");
+Deno.test("formatOpeningContext: 全編掲示板フォールバックは再評価表記なし", () => {
+  assertEquals(formatOpeningContext("bulletin-board", 3, 0), "掲示板開幕");
+});
+
+Deno.test("formatOpeningContext: 掲示板開幕を3話目で再評価", () => {
+  assertEquals(formatOpeningContext("bulletin-board", 3, 2), "掲示板開幕 / 3話で再評価");
 });
 
 Deno.test("formatOpeningContext: 短文開幕ラベル", () => {
-  assertEquals(formatOpeningContext("too-short", 1), "短文開幕");
+  assertEquals(formatOpeningContext("too-short", 1, 0), "短文開幕");
 });
 
 Deno.test("formatOpeningContext: 未指定は通常開幕として扱う", () => {
-  assertEquals(formatOpeningContext(undefined, undefined), "通常開幕");
+  assertEquals(formatOpeningContext(undefined, undefined, 0), "通常開幕");
 });

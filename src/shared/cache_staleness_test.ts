@@ -23,6 +23,11 @@ Deno.test("cache_staleness: 開幕形式フィールド追加前のスキーマ2
   assertEquals(isCacheStale(2), true);
 });
 
-Deno.test("cache_staleness: 開幕形式フィールド追加でスキーマバージョンが3になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 3);
+Deno.test("cache_staleness: 採点対象話数フィールド追加前のスキーマ3は stale", () => {
+  // schemaVersion 3 のキャッシュは targetEpisodeIndex を持たないため無効化する
+  assertEquals(isCacheStale(3), true);
+});
+
+Deno.test("cache_staleness: 採点対象話数フィールド追加でスキーマバージョンが4になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 4);
 });

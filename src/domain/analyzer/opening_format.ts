@@ -26,11 +26,14 @@ export const OPENING_FORMAT_LABELS: Record<OpeningFormat, string> = {
 export function formatOpeningContext(
   openingType: OpeningFormat | undefined,
   sampledCount: number | undefined,
+  targetEpisodeIndex = 0,
 ): string {
   const label = openingType === undefined
     ? OPENING_FORMAT_LABELS.normal
     : OPENING_FORMAT_LABELS[openingType];
-  if (sampledCount !== undefined && sampledCount > 1) {
+  // 再評価表記は採点対象が第1話以外のときのみ表示する
+  // （全編掲示板フォールバックは第1話採点のため再評価表記なし）
+  if (sampledCount !== undefined && targetEpisodeIndex > 0) {
     return `${label} / ${sampledCount}話で再評価`;
   }
   return label;
@@ -91,11 +94,15 @@ export interface SamplingDecision {
 
 export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecision {
   const first = episodes[0];
+  // openingType は常に開幕話（第1話）の形式を保持する。
+  // 再採点で採点対象が後続話になっても、開幕文脈は変わらない。
+  const openingType = first.format;
+
   if (first.format === "normal") {
     return {
       done: true,
       targetText: first.text,
-      openingType: "normal",
+      openingType,
       sampledCount: episodes.length,
       targetEpisodeIndex: 0,
     };
@@ -112,7 +119,7 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
         return {
           done: true,
           targetText: ep.text,
-          openingType: "normal",
+          openingType,
           sampledCount: episodes.length,
           targetEpisodeIndex: i,
         };
@@ -138,7 +145,7 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
       return {
         done: true,
         targetText: buffer,
-        openingType: "normal",
+        openingType,
         sampledCount: episodes.length,
         targetEpisodeIndex: bufferStartIndex,
       };
@@ -149,7 +156,7 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
   return {
     done: false,
     targetText: first.text,
-    openingType: first.format,
+    openingType,
     sampledCount: episodes.length,
     targetEpisodeIndex: 0,
   };

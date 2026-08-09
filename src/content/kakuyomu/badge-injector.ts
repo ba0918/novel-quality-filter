@@ -13,7 +13,11 @@ export function injectBadge(
   removeBadge(cardElement);
 
   const badge = createBadge(result.score);
-  badge.title = formatOpeningContext(result.openingType, result.sampledCount);
+  badge.title = formatOpeningContext(
+    result.openingType,
+    result.sampledCount,
+    result.targetEpisodeIndex ?? 0,
+  );
   const tooltip = createTooltip(result);
   badge.appendChild(tooltip);
 
