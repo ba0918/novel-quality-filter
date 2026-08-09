@@ -1,4 +1,4 @@
-import type { OpeningFormat } from "../domain/types.ts";
+import type { LineData, OpeningFormat } from "../domain/types.ts";
 import { MAX_SAMPLED_EPISODES } from "../shared/constants.ts";
 import { classifyOpeningFormat, selectSamplingTarget } from "../domain/analyzer/opening_format.ts";
 import type { SampledEpisode } from "../domain/analyzer/opening_format.ts";
@@ -6,6 +6,7 @@ import type { FetchedEpisode } from "./fetchers/kakuyomu.ts";
 
 export interface Sampling {
   targetText: string;
+  targetLines: LineData[];
   openingType: OpeningFormat;
   sampledCount: number;
   targetEpisodeIndex: number;
@@ -31,6 +32,7 @@ export async function sampleEpisodes(
   const decision = selectSamplingTarget(toSampled(episodes));
   return {
     targetText: decision.targetText,
+    targetLines: episodes[decision.targetEpisodeIndex].lines,
     openingType: decision.openingType,
     sampledCount: decision.sampledCount,
     targetEpisodeIndex: decision.targetEpisodeIndex,

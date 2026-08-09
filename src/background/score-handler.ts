@@ -13,6 +13,7 @@ import { CURRENT_SCHEMA_VERSION, isCacheStale } from "../shared/cache-staleness.
 import { enqueue } from "./fetch-queue.ts";
 import { fetchFirstEpisodeText, fetchNextEpisodeText } from "./fetchers/kakuyomu.ts";
 import { analyzeAll } from "../domain/analyzer/mod.ts";
+import { aggregateLineMetadata } from "../domain/analyzer/line_metadata.ts";
 import { sampleEpisodes } from "./sampling.ts";
 import { calculateScore } from "../domain/scoring/mod.ts";
 import { tokenize } from "../domain/tokenizer/mod.ts";
@@ -52,6 +53,7 @@ async function handleScoreWork(message: ScoreWorkMessage): Promise<ScoreResultRe
           openingType: cached.openingType,
           sampledCount: cached.sampledCount,
           targetEpisodeIndex: cached.targetEpisodeIndex,
+          lineMetadata: cached.lineMetadata,
         },
         fromCache: true,
       };
@@ -113,6 +115,11 @@ async function scoreWork(workId: string): Promise<ScoreResultResponse> {
     const tokens = tokenize(sampling.targetText);
     const rawMetrics = analyzeAll(sampling.targetText, tokens, tokenize);
     const calculated = calculateScore(rawMetrics);
+    // 行メタデータはスコア計算とは別経路の診断データ。抽出できた場合だけ添付し、
+    // 空（本文構造が取れない話）のときは付けずに誤解を招くゼロ集計の保存を避ける。
+    const lineMetadata = sampling.targetLines.length > 0
+      ? aggregateLineMetadata(sampling.targetLines)
+      : undefined;
     const result: ScoreResult = {
       score: calculated.score,
       metrics: calculated.metrics,
@@ -120,6 +127,7 @@ async function scoreWork(workId: string): Promise<ScoreResultResponse> {
       openingType: sampling.openingType,
       sampledCount: sampling.sampledCount,
       targetEpisodeIndex: sampling.targetEpisodeIndex,
+      lineMetadata,
     };
 
     await putScore({
@@ -130,6 +138,7 @@ async function scoreWork(workId: string): Promise<ScoreResultResponse> {
       openingType: sampling.openingType,
       sampledCount: sampling.sampledCount,
       targetEpisodeIndex: sampling.targetEpisodeIndex,
+      lineMetadata,
       schemaVersion: CURRENT_SCHEMA_VERSION,
       scoredAt: Date.now(),
       episodeUrl: sampling.episodeUrl,

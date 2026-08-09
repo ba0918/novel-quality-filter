@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import type { LineData } from "../domain/types.ts";
 import type { FetchedEpisode } from "./fetchers/kakuyomu.ts";
 import { sampleEpisodes } from "./sampling.ts";
 
@@ -12,8 +13,9 @@ function episode(
   text: string,
   title = "第1話",
   url = "https://kakuyomu.jp/works/1/episodes/1",
+  lines: LineData[] = [],
 ): FetchedEpisode {
-  return { episodeUrl: url, text, lines: [], episodeTitle: title, nextEpisodeUrl: null };
+  return { episodeUrl: url, text, lines, episodeTitle: title, nextEpisodeUrl: null };
 }
 
 Deno.test("sampling: キャラ紹介開幕を次話で再採点する（開幕形式を保持）", async () => {
@@ -42,6 +44,32 @@ Deno.test("sampling: キャラ紹介開幕を次話で再採点する（開幕�
   assertEquals(sampling.targetText, ep2.text);
   assertEquals(sampling.episodeUrl, ep2.episodeUrl);
   assertEquals(nextSpy.calls(), 1);
+});
+
+Deno.test("sampling: 採点対象話の構造化行を targetLines として持ち回す", async () => {
+  const ep1Lines: LineData[] = [{ text: "紹介文。", isBlank: false }];
+  const ep2Lines: LineData[] = [{ text: "物語本編。", isBlank: false }];
+  const ep1 = episode(
+    loadFixture("opening-char-intro-ep1.txt"),
+    "第1話",
+    "https://kakuyomu.jp/works/1/episodes/1",
+    ep1Lines,
+  );
+  const ep2 = episode(
+    loadFixture("opening-char-intro-ep2.txt"),
+    "第1話",
+    "https://kakuyomu.jp/works/1/episodes/2",
+    ep2Lines,
+  );
+
+  const sampling = await sampleEpisodes(
+    ep1,
+    (prev) => Promise.resolve(prev === ep1 ? ep2 : null),
+  );
+
+  // キャラ紹介開幕は次話（index 1）を採点対象にするため、その話の行が持ち回される
+  assertEquals(sampling.targetEpisodeIndex, 1);
+  assertEquals(sampling.targetLines, ep2Lines);
 });
 
 Deno.test("sampling: 取得失敗で終端し第1話にフォールバックする", async () => {
