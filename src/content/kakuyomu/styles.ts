@@ -294,6 +294,38 @@ const CSS = `
   font-weight: 700;
 }
 
+.nqf-line-metadata {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.nqf-line-summary {
+  font-size: 11px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.nqf-line-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.nqf-line-label {
+  flex: 0 0 56px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+}
+
+.nqf-line-stats {
+  flex: 1 1 auto;
+  font-size: 11px;
+  color: #888;
+}
+
 .nqf-rescore-button {
   display: block;
   width: 100%;

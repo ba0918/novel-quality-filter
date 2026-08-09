@@ -1,4 +1,11 @@
-import type { MetricResult, PenaltyResult, ScoreResult } from "../../domain/types.ts";
+import type {
+  CategoryCount,
+  LineMetadata,
+  MetricResult,
+  NarrativeCount,
+  PenaltyResult,
+  ScoreResult,
+} from "../../domain/types.ts";
 import { formatOpeningContext } from "../../domain/analyzer/opening_format.ts";
 import { scoreToColor } from "./score-color.ts";
 
@@ -159,6 +166,11 @@ function createDetailPanel(result: ScoreResult): HTMLDivElement {
   const penaltySection = createPenaltySection(result.penalties);
   panel.appendChild(penaltySection);
 
+  // 行メタデータセクション（診断用・総合スコアには寄与しない）
+  if (result.lineMetadata) {
+    panel.appendChild(createLineMetadataSection(result.lineMetadata));
+  }
+
   // 再スコアボタン
   const rescoreBtn = document.createElement("button");
   rescoreBtn.className = "nqf-rescore-button";
@@ -240,4 +252,64 @@ function createPenaltySection(penalties: PenaltyResult[]): HTMLDivElement {
 function formatRawValue(value: number): string {
   if (value < 1) return (value * 100).toFixed(1) + "%";
   return value.toFixed(1);
+}
+
+// 行ベース文体メタデータ（診断用）。既存メトリクスとは別枠で、カテゴリ別の分量・短行率・
+// 1行あたり平均文字数を表示する。本文由来テキストは含まないため textContent で安全に組み立てる。
+function createLineMetadataSection(meta: LineMetadata): HTMLDivElement {
+  const section = document.createElement("div");
+  section.className = "nqf-line-metadata";
+
+  const title = document.createElement("div");
+  title.className = "nqf-detail-section-title";
+  title.textContent = "行メタデータ";
+  section.appendChild(title);
+
+  const summary = document.createElement("div");
+  summary.className = "nqf-line-summary";
+  summary.textContent =
+    `総行数 ${meta.totalLines} / 総文字数 ${meta.totalChars} / 空行 ${meta.blankCount} / 区切り線 ${meta.separatorCount}`;
+  section.appendChild(summary);
+
+  section.appendChild(createLineRow("地の文", meta.narrative, meta.narrative));
+  section.appendChild(createLineRow("セリフ", meta.dialogue));
+  section.appendChild(createLineRow("メタ", meta.meta));
+  section.appendChild(createLineRow("非文末", meta.nonTerminal));
+
+  return section;
+}
+
+function createLineRow(
+  label: string,
+  count: CategoryCount,
+  narrative?: NarrativeCount,
+): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = "nqf-line-row";
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "nqf-line-label";
+  labelEl.textContent = label;
+  row.appendChild(labelEl);
+
+  const stats = document.createElement("span");
+  stats.className = "nqf-line-stats";
+  const avg = count.lineCount > 0 ? (count.charCount / count.lineCount).toFixed(1) : "0.0";
+  const parts = [
+    `${count.lineCount}行`,
+    `平均${avg}字`,
+    `短行20 ${ratioPercent(count.short20, count.lineCount)}`,
+  ];
+  if (narrative) {
+    parts.push(`短チャンク20 ${ratioPercent(narrative.shortChunk20, narrative.chunkCount)}`);
+  }
+  stats.textContent = parts.join(" / ");
+  row.appendChild(stats);
+
+  return row;
+}
+
+function ratioPercent(numerator: number, denominator: number): string {
+  if (denominator === 0) return "-";
+  return `${Math.round((numerator / denominator) * 100)}%`;
 }
