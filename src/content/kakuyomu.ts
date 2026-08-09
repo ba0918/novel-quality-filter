@@ -16,7 +16,11 @@ import {
   injectQueuedBadge,
   showError,
 } from "./kakuyomu/badge-injector.ts";
-import { buildWorkUrl, detectWorkPage } from "./kakuyomu/work-page-detector.ts";
+import {
+  buildWorkUrl,
+  detectWorkPage,
+  findWorkPageContainer,
+} from "./kakuyomu/work-page-detector.ts";
 import {
   injectScoreButton,
   injectWorkBadge,
@@ -106,7 +110,7 @@ async function handleRescore(workId: string, cardElement: HTMLElement): Promise<
 function handleWorkPage(workId: string): void {
   console.log(`[NQF] Work page detected: ${workId}`);
 
-  const container = findWorkPageContainer(workId);
+  const container = findWorkPageContainer(document, workId);
   if (container) {
     initWorkPageUI(workId, container);
     return;
@@ -123,7 +127,7 @@ function waitForWorkPageContainer(
   callback: (container: HTMLElement) => void,
 ): void {
   const observer = new MutationObserver(() => {
-    const container = findWorkPageContainer(workId);
+    const container = findWorkPageContainer(document, workId);
     if (container) {
       observer.disconnect();
       callback(container);
@@ -203,38 +207,6 @@ async function requestWorkScore(
     log.requestError(err);
     injectWorkError(container, retry);
   }
-}
-
-function findWorkPageContainer(workId: string): HTMLElement | null {
-  // この作品の★数リンクを探す（他作品のレビューリンクを除外）
-  const reviewLink = document.querySelector<HTMLAnchorElement>(
-    `a[href$="/works/${workId}/reviews"]`,
-  );
-  if (reviewLink) {
-    const layoutRow = reviewLink.closest<HTMLElement>(
-      '[class*="Layout_layout"]',
-    );
-    if (layoutRow) return layoutRow;
-    if (reviewLink.parentElement) return reviewLink.parentElement;
-  }
-
-  // フォールバック: フォロワーリンクから★数を含む親行を探す
-  // ★0 などレビューリンクが存在しない場合に使われる
-  const followerLink = document.querySelector<HTMLAnchorElement>(
-    `a[href*="/works/${workId}/followers"]`,
-  );
-  if (followerLink) {
-    const innerRow = followerLink.closest<HTMLElement>(
-      '[class*="Layout_layout"]',
-    );
-    const topRow = innerRow?.parentElement?.closest<HTMLElement>(
-      '[class*="Layout_layout"]',
-    );
-    if (topRow) return topRow;
-    if (innerRow) return innerRow;
-  }
-
-  return null;
 }
 
 if (document.readyState === "loading") {
