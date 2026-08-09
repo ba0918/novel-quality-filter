@@ -38,8 +38,11 @@
 のロード時に初回走査を行い、MutationObserver で動的追加にも対応する。
 
 カードコンテナの判定はページ種別ごとの if 分岐ではなく、共通のコンテナセレクタ配列を
-順に試す方式で行う。既存のランキング（`li[class*="Rankings_"]`）と検索（`WorkMeta`）
-の判定もこの配列に含め、ページ追加時は配列にセレクタを追記するだけで済むようにする。
+順に試す方式で行う。ランキング（`li[class*="Rankings_"]`）と `widget-work` 系
+（`div.widget-work.float-parent`）・新着レビュー（`div.widget-reviewsItem-workCard`）を
+配列で扱う。検索ページの `WorkMeta` はセレクタ1つでは解決できない二段階判定 （`WorkMeta` 検出 →
+`NewBox` ボックス解決）のため配列からは除外し、個別に処理する。
+ページ追加時は配列にセレクタを追記するだけで済むようにする。
 
 バッジの挿入位置は、全ページ共通で★数リンク（`a.widget-workCard-reviewPoints`、
 `a[href*="/reviews"]` かつ ★ を含む）の横とする。
