@@ -1,7 +1,10 @@
 // カクヨム作品を URL 一本でメタデータ取得＋スコアリングする較正用ツール。
 // Usage: deno task analyze <url...> [--csv]
-//   url  : 作品ページ or エピソードページの URL（複数可）
+//   url  : 作品 or エピソードの URL（複数可。どの話 URL でも作品の第1話から評価する）
 //   --csv: 集計用に CSV を末尾へ出力する
+//
+// 採点対象話は本番拡張と同じ sampleEpisodes（開幕形式判定＋再採点）で決める。
+// これを通さず第1話を生採点するとキャラ紹介/掲示板開幕でブラウザ表示と食い違う。
 //
 // 「現状スコア」と「候補(複合)スコア」を並べて出す。候補は一文一段落ペナルティを
 // 「一文段落が多い AND 文長のばらつきが小さい」の複合条件でのみ発火させる案の評価用。
@@ -11,22 +14,27 @@ import { sleep } from "../src/shared/async.ts";
 import {
   extractEpisodeTitle,
   extractFirstEpisodePath,
+  extractNextEpisodeUrl,
   extractTextFromHtml,
   extractWorkMetadata,
+  type FetchedEpisode,
   parseTargetUrl,
   resolveEpisodeUrl,
   type WorkMetadata,
 } from "../src/background/fetchers/kakuyomu.ts";
+import { sampleEpisodes } from "../src/background/sampling.ts";
 import { initTokenizer, tokenize } from "../src/domain/tokenizer/mod.ts";
 import { analyzeAll } from "../src/domain/analyzer/mod.ts";
 import { calculateScore } from "../src/domain/scoring/mod.ts";
-import type { MetricResult } from "../src/domain/types.ts";
+import type { MetricResult, OpeningFormat } from "../src/domain/types.ts";
 
 const THRESHOLD = 40;
 
 interface Row {
   meta: WorkMetadata;
-  episodeTitle: string;
+  firstEpisodeTitle: string;
+  openingType: OpeningFormat;
+  sampledCount: number;
   episodeUrl: string;
   current: number;
   candidate: number;
@@ -68,29 +76,46 @@ function candidateScore(metrics: MetricResult[]): number {
   return Math.round(base * mult);
 }
 
+async function fetchEpisode(episodeUrl: string): Promise<FetchedEpisode> {
+  const html = await fetchText(episodeUrl);
+  return {
+    episodeUrl,
+    text: extractTextFromHtml(html),
+    episodeTitle: extractEpisodeTitle(html) ?? "",
+    nextEpisodeUrl: extractNextEpisodeUrl(html),
+  };
+}
+
 async function analyzeUrl(url: string): Promise<Row> {
-  const { workId, episodeId } = parseTargetUrl(url);
+  // どの話 URL でも作品を識別するだけに使い、採点は本番と同じく第1話から始める。
+  const { workId } = parseTargetUrl(url);
 
   const workHtml = await fetchText(`https://kakuyomu.jp/works/${workId}`);
   const meta = extractWorkMetadata(workHtml);
 
+  const firstPath = extractFirstEpisodePath(workHtml, workId);
+  if (!firstPath) throw new Error(`No episode found for work: ${workId}`);
+
   await sleep(FETCH_INTERVAL_MS);
+  const first = await fetchEpisode(resolveEpisodeUrl(firstPath).href);
 
-  const episodePath = episodeId
-    ? `/works/${workId}/episodes/${episodeId}`
-    : extractFirstEpisodePath(workHtml, workId);
-  if (!episodePath) throw new Error(`No episode found for work: ${workId}`);
-  const episodeUrl = resolveEpisodeUrl(episodePath).href;
+  const sampling = await sampleEpisodes(first, async (prev) => {
+    if (!prev.nextEpisodeUrl) return null;
+    await sleep(FETCH_INTERVAL_MS);
+    return fetchEpisode(resolveEpisodeUrl(prev.nextEpisodeUrl).href);
+  });
 
-  const episodeHtml = await fetchText(episodeUrl);
-  const text = extractTextFromHtml(episodeHtml);
-  const tokens = tokenize(text);
-  const { score, metrics } = calculateScore(analyzeAll(text, tokens, tokenize));
+  const tokens = tokenize(sampling.targetText);
+  const { score, metrics } = calculateScore(
+    analyzeAll(sampling.targetText, tokens, tokenize),
+  );
 
   return {
     meta,
-    episodeTitle: extractEpisodeTitle(episodeHtml) ?? "",
-    episodeUrl,
+    firstEpisodeTitle: first.episodeTitle,
+    openingType: sampling.openingType,
+    sampledCount: sampling.sampledCount,
+    episodeUrl: sampling.episodeUrl,
     current: score,
     candidate: candidateScore(metrics),
     singleSentParaRatio: rawOf(metrics, "singleSentParaRatio"),
@@ -109,7 +134,10 @@ function printDetail(row: Row): void {
   console.log(
     `  レビュー ${m.reviewCount} / 評価pt ${m.totalReviewPoint} / 総文字 ${m.totalCharacterCount}`,
   );
-  console.log(`  第1話「${row.episodeTitle}」 ${row.episodeUrl}`);
+  console.log(`  第1話「${row.firstEpisodeTitle}」`);
+  console.log(
+    `  開幕形式 ${row.openingType}（${row.sampledCount}話サンプル）→ 採点話 ${row.episodeUrl}`,
+  );
   console.log(
     `  スコア: 現状 ${row.current} ${verdict(row.current)}  /  候補(複合) ${row.candidate} ${
       verdict(row.candidate)
@@ -124,7 +152,9 @@ function printDetail(row: Row): void {
 
 function printTable(rows: Row[]): void {
   console.log(`\n=== 比較テーブル（閾値 ${THRESHOLD}）===`);
-  console.log("タイトル                       レビュー   現状   候補  一文段落率  文長SD");
+  console.log(
+    "タイトル                       レビュー   現状   候補  一文段落率  文長SD  開幕形式",
+  );
   for (const r of rows) {
     const title = r.meta.title.length > 28 ? r.meta.title.slice(0, 27) + "…" : r.meta.title;
     console.log(
@@ -132,7 +162,7 @@ function printTable(rows: Row[]): void {
         String(r.current).padStart(5)
       } ${String(r.candidate).padStart(5)} ${r.singleSentParaRatio.toFixed(3).padStart(9)} ${
         r.sentenceLengthSD.toFixed(1).padStart(7)
-      }`,
+      }  ${r.openingType}`,
     );
   }
 }
@@ -140,7 +170,7 @@ function printTable(rows: Row[]): void {
 function printCsv(rows: Row[]): void {
   console.log("\n=== CSV ===");
   console.log(
-    "title,author,reviewCount,totalReviewPoint,totalCharacterCount,current,candidate,singleSentParaRatio,sentenceLengthSD,burstiness,episodeUrl",
+    "title,author,reviewCount,totalReviewPoint,totalCharacterCount,openingType,sampledCount,current,candidate,singleSentParaRatio,sentenceLengthSD,burstiness,episodeUrl",
   );
   for (const r of rows) {
     const m = r.meta;
@@ -151,6 +181,8 @@ function printCsv(rows: Row[]): void {
       m.reviewCount,
       m.totalReviewPoint,
       m.totalCharacterCount,
+      r.openingType,
+      r.sampledCount,
       r.current,
       r.candidate,
       r.singleSentParaRatio.toFixed(4),
