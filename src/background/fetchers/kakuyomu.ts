@@ -111,7 +111,7 @@ export function extractTextFromHtml(html: string): string {
   for (const pattern of bodyPatterns) {
     const match = html.match(pattern);
     if (match) {
-      return stripHtmlTags(match[1]);
+      return stripHtmlTags(normalizeBodyHtml(match[1]));
     }
   }
 
@@ -131,8 +131,12 @@ export function extractTextFromHtml(html: string): string {
   throw new Error(`Could not extract episode text from: ${html.slice(0, 120)}`);
 }
 
+function normalizeBodyHtml(html: string): string {
+  return html.replace(/>[ \t\r\n]+</g, "><");
+}
+
 function stripHtmlTags(html: string): string {
-  return html
+  return stripRubyAnnotations(html)
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<[^>]+>/g, "")
@@ -144,4 +148,10 @@ function stripHtmlTags(html: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function stripRubyAnnotations(html: string): string {
+  return html
+    .replace(/<rt\b[^>]*>[\s\S]*?<\/rt>/gi, "")
+    .replace(/<rp\b[^>]*>[\s\S]*?<\/rp>/gi, "");
 }

@@ -42,6 +42,27 @@ Deno.test("extractTextFromHtml: 本文をテキスト化", () => {
   assertEquals(extractTextFromHtml(html), "あいうえお\n\nかきくけこ\nさしすせそ");
 });
 
+Deno.test("extractTextFromHtml: プリティプリントHTMLのタグ間改行を段落境界にしない", () => {
+  const html = [
+    '<div class="widget-episodeBody">',
+    "<p>あいうえお。</p>",
+    "<p>かきくけこ。</p>",
+    '<p class="blank"><br /></p>',
+    "<p>さしすせそ。</p>",
+    "</div>",
+  ].join("\n");
+  assertEquals(
+    extractTextFromHtml(html),
+    "あいうえお。\nかきくけこ。\n\nさしすせそ。",
+  );
+});
+
+Deno.test("extractTextFromHtml: ルビのふりがなを本文に含めない", () => {
+  const html =
+    '<div class="widget-episodeBody"><p><ruby><rb>櫛名</rb><rp>（</rp><rt>くしな</rt><rp>）</rp></ruby>雫が走る。</p></div>';
+  assertEquals(extractTextFromHtml(html), "櫛名雫が走る。");
+});
+
 Deno.test("extractTextFromHtml: 本文が無い場合はエラー", () => {
   const html = "<html><body><p>1</p><p>2</p><p>3</p></body></html>";
   assertThrows(() => extractTextFromHtml(html));
