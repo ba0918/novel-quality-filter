@@ -42,6 +42,8 @@ export interface ScoreResult {
   score: number;
   metrics: MetricResult[];
   penalties: PenaltyResult[];
+  openingType?: OpeningFormat;
+  sampledCount?: number;
 }
 
 export type OpeningFormat = "normal" | "character-intro" | "bulletin-board" | "too-short";

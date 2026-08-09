@@ -1,10 +1,23 @@
 import { assertEquals } from "@std/assert";
-import { classifyOpeningFormat } from "./opening_format.ts";
+import type { OpeningFormat } from "../types.ts";
+import { classifyOpeningFormat, selectSamplingTarget } from "./opening_format.ts";
 
 const FIXTURES_DIR = new URL("../../../tests/fixtures/", import.meta.url).pathname;
 
 function loadFixture(name: string): string {
   return Deno.readTextFileSync(`${FIXTURES_DIR}${name}`);
+}
+
+function sentences(count: number): string {
+  const parts: string[] = [];
+  for (let i = 0; i < count; i++) {
+    parts.push(`${i}番目のテスト文です。`);
+  }
+  return parts.join("\n");
+}
+
+function episode(text: string, format: OpeningFormat) {
+  return { text, format };
 }
 
 function normalNarrative(sentenceCount: number): string {
@@ -133,4 +146,96 @@ Deno.test("classify: キャラ紹介開幕の次話（通常ナラティブ fixt
     classifyOpeningFormat(text, "第1話　オタクに優しいギャル誕生？"),
     "normal",
   );
+});
+
+// --- selectSamplingTarget: 採点対象選択のフローロジック ---
+
+Deno.test("select: 通常開幕は第1話のみで採点", () => {
+  const ep1 = episode(loadFixture("opening-bulletin-board-ep2.txt"), "normal");
+  const decision = selectSamplingTarget([ep1]);
+  assertEquals(decision.done, true);
+  assertEquals(decision.openingType, "normal");
+  assertEquals(decision.sampledCount, 1);
+  assertEquals(decision.targetText, ep1.text);
+});
+
+Deno.test("select: キャラ紹介開幕は次話（通常）で単独再採点", () => {
+  const ep1 = episode(loadFixture("opening-char-intro-ep1.txt"), "character-intro");
+  const ep2 = episode(loadFixture("opening-char-intro-ep2.txt"), "normal");
+  const decision = selectSamplingTarget([ep1, ep2]);
+  assertEquals(decision.done, true);
+  assertEquals(decision.openingType, "normal");
+  assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetText, ep2.text);
+});
+
+Deno.test("select: 掲示板開幕は次話（通常）で単独再採点", () => {
+  const ep1 = episode(loadFixture("opening-bulletin-board-ep1.txt"), "bulletin-board");
+  const ep2 = episode(loadFixture("opening-bulletin-board-ep2.txt"), "normal");
+  const decision = selectSamplingTarget([ep1, ep2]);
+  assertEquals(decision.done, true);
+  assertEquals(decision.openingType, "normal");
+  assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetText, ep2.text);
+});
+
+Deno.test("select: 全編掲示板なら第1話を形式ラベル付きで採点", () => {
+  const bb = loadFixture("opening-bulletin-board-ep1.txt");
+  const decision = selectSamplingTarget([
+    episode(bb, "bulletin-board"),
+    episode(bb, "bulletin-board"),
+    episode(bb, "bulletin-board"),
+  ]);
+  assertEquals(decision.done, false);
+  assertEquals(decision.openingType, "bulletin-board");
+  assertEquals(decision.sampledCount, 3);
+  assertEquals(decision.targetText, bb);
+});
+
+Deno.test("select: 一話完結の短文でもスコアを出力（評価不能なし）", () => {
+  const short = sentences(10);
+  const decision = selectSamplingTarget([episode(short, "too-short")]);
+  assertEquals(decision.done, false);
+  assertEquals(decision.openingType, "too-short");
+  assertEquals(decision.sampledCount, 1);
+  assertEquals(decision.targetText, short);
+});
+
+Deno.test("select: 短文開幕+通常短文は文数30まで累積連結", () => {
+  const shortA = sentences(20);
+  const shortB = sentences(15);
+  const decision = selectSamplingTarget([
+    episode(shortA, "too-short"),
+    episode(shortB, "normal"),
+  ]);
+  assertEquals(decision.done, true);
+  assertEquals(decision.openingType, "normal");
+  assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetText, shortA + shortB);
+});
+
+Deno.test("select: 短文開幕→次話が掲示板なら第1話でフォールバック", () => {
+  const short = sentences(20);
+  const bb = loadFixture("opening-bulletin-board-ep1.txt");
+  const decision = selectSamplingTarget([
+    episode(short, "too-short"),
+    episode(bb, "bulletin-board"),
+  ]);
+  assertEquals(decision.done, false);
+  assertEquals(decision.openingType, "too-short");
+  assertEquals(decision.sampledCount, 2);
+  assertEquals(decision.targetText, short);
+});
+
+Deno.test("select: 非ナラティブの連続後に通常の短文が出ても非ナラティブは混ぜない", () => {
+  const ci = loadFixture("opening-char-intro-ep1.txt");
+  const short = sentences(20);
+  const decision = selectSamplingTarget([
+    episode(ci, "character-intro"),
+    episode(short, "normal"),
+  ]);
+  assertEquals(decision.done, false);
+  assertEquals(decision.openingType, "character-intro");
+  assertEquals(decision.targetText, ci);
+  assertEquals(decision.sampledCount, 2);
 });

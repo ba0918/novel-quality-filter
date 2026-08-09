@@ -55,3 +55,82 @@ function hasCharacterIntroBodySignal(text: string): boolean {
 function titleMatchesAny(title: string, keywords: string[]): boolean {
   return keywords.some((k) => title.includes(k));
 }
+
+export interface SampledEpisode {
+  text: string;
+  format: OpeningFormat;
+}
+
+export interface SamplingDecision {
+  done: boolean;
+  targetText: string;
+  openingType: OpeningFormat;
+  sampledCount: number;
+  targetEpisodeIndex: number;
+}
+
+export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecision {
+  const first = episodes[0];
+  if (first.format === "normal") {
+    return {
+      done: true,
+      targetText: first.text,
+      openingType: "normal",
+      sampledCount: episodes.length,
+      targetEpisodeIndex: 0,
+    };
+  }
+
+  let buffer: string | null = null;
+  let bufferStartIndex = 0;
+
+  for (let i = 0; i < episodes.length; i++) {
+    const ep = episodes[i];
+
+    if (ep.format === "normal") {
+      if (splitSentences(ep.text).length >= MIN_SAMPLED_SENTENCES) {
+        return {
+          done: true,
+          targetText: ep.text,
+          openingType: "normal",
+          sampledCount: episodes.length,
+          targetEpisodeIndex: i,
+        };
+      }
+      if (buffer === null) {
+        buffer = "";
+        bufferStartIndex = i;
+      }
+      buffer += ep.text;
+    } else if (ep.format === "too-short") {
+      // 短文 = 通常ナラティブの冒頭。累積連結の対象に含める
+      if (buffer === null) {
+        buffer = "";
+        bufferStartIndex = i;
+      }
+      buffer += ep.text;
+    } else {
+      // 非ナラティブ形式は累積連結を断ち切る
+      buffer = null;
+    }
+
+    if (buffer !== null && splitSentences(buffer).length >= MIN_SAMPLED_SENTENCES) {
+      return {
+        done: true,
+        targetText: buffer,
+        openingType: "normal",
+        sampledCount: episodes.length,
+        targetEpisodeIndex: bufferStartIndex,
+      };
+    }
+  }
+
+  // 通常形式（30文以上）に達しなかった → 第1話で採点+形式ラベル
+  return {
+    done: false,
+    targetText: first.text,
+    openingType: first.format,
+    sampledCount: episodes.length,
+    targetEpisodeIndex: 0,
+  };
+}
