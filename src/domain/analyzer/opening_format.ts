@@ -1,5 +1,5 @@
 import { MIN_SAMPLED_SENTENCES } from "../../shared/constants.ts";
-import type { OpeningFormat } from "../types.ts";
+import type { LineData, OpeningFormat } from "../types.ts";
 import { splitSentences } from "./sentences.ts";
 
 const BULLETIN_BOARD_TITLE_KEYWORDS = ["掲示板", "スレ", "Part"];
@@ -81,12 +81,14 @@ function titleMatchesAny(title: string, keywords: string[]): boolean {
 
 export interface SampledEpisode {
   text: string;
+  lines: LineData[];
   format: OpeningFormat;
 }
 
 export interface SamplingDecision {
   done: boolean;
   targetText: string;
+  targetLines: LineData[];
   openingType: OpeningFormat;
   sampledCount: number;
   targetEpisodeIndex: number;
@@ -102,13 +104,17 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
     return {
       done: true,
       targetText: first.text,
+      targetLines: first.lines,
       openingType,
       sampledCount: episodes.length,
       targetEpisodeIndex: 0,
     };
   }
 
+  // buffer（採点対象本文）と bufferLines（採点対象の行）は常に同じ話集合・
+  // 同じ順序で構成する。両者が食い違うと診断メタデータが本文とずれる。
   let buffer: string | null = null;
+  let bufferLines: LineData[] = [];
   let bufferStartIndex = 0;
 
   for (let i = 0; i < episodes.length; i++) {
@@ -119,6 +125,7 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
         return {
           done: true,
           targetText: ep.text,
+          targetLines: ep.lines,
           openingType,
           sampledCount: episodes.length,
           targetEpisodeIndex: i,
@@ -126,25 +133,31 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
       }
       if (buffer === null) {
         buffer = "";
+        bufferLines = [];
         bufferStartIndex = i;
       }
       buffer += ep.text;
+      bufferLines.push(...ep.lines);
     } else if (ep.format === "too-short") {
       // 短文 = 通常ナラティブの冒頭。累積連結の対象に含める
       if (buffer === null) {
         buffer = "";
+        bufferLines = [];
         bufferStartIndex = i;
       }
       buffer += ep.text;
+      bufferLines.push(...ep.lines);
     } else {
       // 非ナラティブ形式は累積連結を断ち切る
       buffer = null;
+      bufferLines = [];
     }
 
     if (buffer !== null && splitSentences(buffer).length >= MIN_SAMPLED_SENTENCES) {
       return {
         done: true,
         targetText: buffer,
+        targetLines: bufferLines,
         openingType,
         sampledCount: episodes.length,
         targetEpisodeIndex: bufferStartIndex,
@@ -156,6 +169,7 @@ export function selectSamplingTarget(episodes: SampledEpisode[]): SamplingDecisi
   return {
     done: false,
     targetText: first.text,
+    targetLines: first.lines,
     openingType,
     sampledCount: episodes.length,
     targetEpisodeIndex: 0,

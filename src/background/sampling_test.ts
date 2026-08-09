@@ -18,6 +18,14 @@ function episode(
   return { episodeUrl: url, text, lines, episodeTitle: title, nextEpisodeUrl: null };
 }
 
+function sentences(count: number): string {
+  const parts: string[] = [];
+  for (let i = 0; i < count; i++) {
+    parts.push(`${i}番目のテスト文です。`);
+  }
+  return parts.join("\n");
+}
+
 Deno.test("sampling: キャラ紹介開幕を次話で再採点する（開幕形式を保持）", async () => {
   const ep1 = episode(loadFixture("opening-char-intro-ep1.txt"));
   const ep2 = episode(
@@ -70,6 +78,33 @@ Deno.test("sampling: 採点対象話の構造化行を targetLines として持�
   // キャラ紹介開幕は次話（index 1）を採点対象にするため、その話の行が持ち回される
   assertEquals(sampling.targetEpisodeIndex, 1);
   assertEquals(sampling.targetLines, ep2Lines);
+});
+
+Deno.test("sampling: 累積連結で採点する経路では連結した全話の行を持ち回す", async () => {
+  // 短文話が複数連結して MIN_SAMPLED_SENTENCES に達する経路では、採点対象本文は
+  // 連結テキストなので、targetLines も連結した全話の行を含まねばならない（先頭話だけでない）
+  const ep1Lines: LineData[] = [{ text: "開幕短文。", isBlank: false }];
+  const ep2Lines: LineData[] = [{ text: "続きの短文。", isBlank: false }];
+  const ep1 = episode(
+    sentences(20),
+    "第1話",
+    "https://kakuyomu.jp/works/1/episodes/1",
+    ep1Lines,
+  );
+  const ep2 = episode(
+    sentences(15),
+    "第1話",
+    "https://kakuyomu.jp/works/1/episodes/2",
+    ep2Lines,
+  );
+
+  const sampling = await sampleEpisodes(
+    ep1,
+    (prev) => Promise.resolve(prev === ep1 ? ep2 : null),
+  );
+
+  assertEquals(sampling.targetText, ep1.text + ep2.text);
+  assertEquals(sampling.targetLines, [...ep1Lines, ...ep2Lines]);
 });
 
 Deno.test("sampling: 取得失敗で終端し第1話にフォールバックする", async () => {

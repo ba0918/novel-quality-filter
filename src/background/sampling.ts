@@ -32,7 +32,7 @@ export async function sampleEpisodes(
   const decision = selectSamplingTarget(toSampled(episodes));
   return {
     targetText: decision.targetText,
-    targetLines: episodes[decision.targetEpisodeIndex].lines,
+    targetLines: decision.targetLines,
     openingType: decision.openingType,
     sampledCount: decision.sampledCount,
     targetEpisodeIndex: decision.targetEpisodeIndex,
@@ -56,6 +56,7 @@ async function fetchNextEpisodeOrNull(
 function toSampled(episodes: FetchedEpisode[]): SampledEpisode[] {
   return episodes.map((ep) => ({
     text: ep.text,
+    lines: ep.lines,
     format: classifyOpeningFormat(ep.text, ep.episodeTitle),
   }));
 }

@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import type { OpeningFormat } from "../types.ts";
+import type { LineData, OpeningFormat } from "../types.ts";
 import {
   classifyOpeningFormat,
   formatOpeningContext,
@@ -20,8 +20,8 @@ function sentences(count: number): string {
   return parts.join("\n");
 }
 
-function episode(text: string, format: OpeningFormat) {
-  return { text, format };
+function episode(text: string, format: OpeningFormat, lines: LineData[] = []) {
+  return { text, lines, format };
 }
 
 function normalNarrative(sentenceCount: number): string {
@@ -207,15 +207,19 @@ Deno.test("select: 一話完結の短文でもスコアを出力（評価不能�
 Deno.test("select: 短文開幕+通常短文は文数30まで累積連結", () => {
   const shortA = sentences(20);
   const shortB = sentences(15);
+  const linesA: LineData[] = [{ text: "開幕。", isBlank: false }];
+  const linesB: LineData[] = [{ text: "続き。", isBlank: false }];
   const decision = selectSamplingTarget([
-    episode(shortA, "too-short"),
-    episode(shortB, "normal"),
+    episode(shortA, "too-short", linesA),
+    episode(shortB, "normal", linesB),
   ]);
   assertEquals(decision.done, true);
   assertEquals(decision.openingType, "too-short");
   assertEquals(decision.sampledCount, 2);
   assertEquals(decision.targetEpisodeIndex, 0);
   assertEquals(decision.targetText, shortA + shortB);
+  // 採点対象本文は連結テキストなので、targetLines も連結した全話の行を含む
+  assertEquals(decision.targetLines, [...linesA, ...linesB]);
 });
 
 Deno.test("select: 短文開幕→次話が掲示板なら第1話でフォールバック", () => {
