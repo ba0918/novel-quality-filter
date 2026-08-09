@@ -74,6 +74,14 @@ Deno.test("extractTextFromHtml: 10進・16進（大文字小文字）の数値�
   assertEquals(extractTextFromHtml(html), "【HP】あ");
 });
 
+Deno.test("extractTextFromHtml: サロゲート領域の数値文字参照は復号せず元表記を残す", () => {
+  // U+D800..U+DFFF は単独では不正なコードポイント。String.fromCodePoint は throw せず
+  // lone surrogate を返すため、復号すると壊れた文字列が本文に混入する。16進・10進の
+  // どちらの数値参照でも元表記のまま残すことを固定する。
+  const html = '<div class="widget-episodeBody"><p>あ&#xD800;い&#55296;う</p></div>';
+  assertEquals(extractTextFromHtml(html), "あ&#xD800;い&#55296;う");
+});
+
 Deno.test("extractLinesFromHtml: 数値文字参照を復号して行テキストに反映する", () => {
   const html = '<div class="widget-episodeBody"><p>&#x3010;HP&#x3011;</p></div>';
   assertEquals(extractLinesFromHtml(html), [

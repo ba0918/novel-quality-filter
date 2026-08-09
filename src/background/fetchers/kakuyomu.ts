@@ -267,9 +267,12 @@ function decodeHtmlEntities(s: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-// 範囲外・不正なコードポイントは復号せず呼び出し元で元の実体表記を残す（安全側に倒す）。
+// 範囲外・サロゲート領域・不正なコードポイントは復号せず呼び出し元で元の実体表記を残す
+// （安全側に倒す）。単独サロゲート U+D800..U+DFFF は String.fromCodePoint が throw せず
+// lone surrogate を返してしまうため、ここで明示的に弾く。
 function decodeCodePoint(code: number): string | null {
   if (!Number.isInteger(code) || code < 0 || code > 0x10FFFF) return null;
+  if (code >= 0xD800 && code <= 0xDFFF) return null;
   return String.fromCodePoint(code);
 }
 
