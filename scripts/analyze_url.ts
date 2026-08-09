@@ -5,168 +5,41 @@
 //   --episode: 渡したエピソードをそのまま採点（開幕サンプリングを迂回）。
 //              長編の1話 vs 後半話で文体ドリフトを比較する調査用
 //
-// 既定の採点対象話は本番拡張と同じ sampleEpisodes（開幕形式判定＋再採点）で決める。
-// これを通さず第1話を生採点するとキャラ紹介/掲示板開幕でブラウザ表示と食い違う。
-//
-// スコアは現行 calculateScore（一文一段落ペナルティは文長SDとの複合条件）そのまま。
+// 採点対象話の決定・採点はパイプライン核 analyze_core.ts に委譲する（crawl_tags.ts と共有）。
 // 空行率は観測専用の診断カラムで、スコアには算入しない。
 
-import { FETCH_INTERVAL_MS, FETCH_TIMEOUT_MS } from "../src/shared/constants.ts";
+import { FETCH_INTERVAL_MS } from "../src/shared/constants.ts";
 import { sleep } from "../src/shared/async.ts";
-import {
-  extractEpisodeTitle,
-  extractFirstEpisodePath,
-  extractNextEpisodeUrl,
-  extractTextFromHtml,
-  extractWorkMetadata,
-  type FetchedEpisode,
-  parseTargetUrl,
-  resolveEpisodeUrl,
-  type WorkMetadata,
-} from "../src/background/fetchers/kakuyomu.ts";
-import { sampleEpisodes } from "../src/background/sampling.ts";
-import { initTokenizer, tokenize } from "../src/domain/tokenizer/mod.ts";
-import { analyzeAll } from "../src/domain/analyzer/mod.ts";
-import { analyzeBlankLineRatio } from "../src/domain/analyzer/blank_line.ts";
-import { calculateScore } from "../src/domain/scoring/mod.ts";
-import type { MetricResult } from "../src/domain/types.ts";
+import { initTokenizer } from "../src/domain/tokenizer/mod.ts";
+import { type AnalyzeResult, analyzeWork } from "./lib/analyze_core.ts";
 
 const THRESHOLD = 40;
-
-interface Row {
-  meta: WorkMetadata;
-  firstEpisodeTitle: string;
-  openingType: string;
-  sampledCount: number;
-  episodeUrl: string;
-  score: number;
-  singleSentParaRatio: number;
-  sentenceLengthSD: number;
-  burstiness: number;
-  blankLineRatio: number; // 観測専用（スコア非算入）
-}
-
-async function fetchText(url: string): Promise<string> {
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    headers: { "user-agent": "Mozilla/5.0 (compatible; novel-quality-filter/analyze)" },
-  });
-  if (!res.ok) throw new Error(`Failed to fetch ${res.status}: ${url}`);
-  return res.text();
-}
-
-function rawOf(metrics: MetricResult[], key: string): number {
-  return metrics.find((m) => m.key === key)?.rawValue ?? 0;
-}
-
-async function fetchEpisode(episodeUrl: string): Promise<FetchedEpisode> {
-  const html = await fetchText(episodeUrl);
-  return {
-    episodeUrl,
-    text: extractTextFromHtml(html),
-    episodeTitle: extractEpisodeTitle(html) ?? "",
-    nextEpisodeUrl: extractNextEpisodeUrl(html),
-  };
-}
-
-interface Target {
-  text: string;
-  episodeUrl: string;
-  firstEpisodeTitle: string;
-  openingType: string;
-  sampledCount: number;
-}
-
-// 採点対象話を決める。episodeMode 時は渡された話をそのまま（開幕サンプリングを
-// 迂回して）採点し、1話と後半話の文体ドリフトを比較できるようにする。
-async function resolveTarget(
-  url: string,
-  workHtml: string,
-  workId: string,
-  episodeMode: boolean,
-): Promise<Target> {
-  const { episodeId } = parseTargetUrl(url);
-  if (episodeMode && episodeId) {
-    await sleep(FETCH_INTERVAL_MS);
-    const ep = await fetchEpisode(
-      resolveEpisodeUrl(`/works/${workId}/episodes/${episodeId}`).href,
-    );
-    return {
-      text: ep.text,
-      episodeUrl: ep.episodeUrl,
-      firstEpisodeTitle: ep.episodeTitle,
-      openingType: "直接採点",
-      sampledCount: 1,
-    };
-  }
-
-  const firstPath = extractFirstEpisodePath(workHtml, workId);
-  if (!firstPath) throw new Error(`No episode found for work: ${workId}`);
-  await sleep(FETCH_INTERVAL_MS);
-  const first = await fetchEpisode(resolveEpisodeUrl(firstPath).href);
-  const sampling = await sampleEpisodes(first, async (prev) => {
-    if (!prev.nextEpisodeUrl) return null;
-    await sleep(FETCH_INTERVAL_MS);
-    return fetchEpisode(resolveEpisodeUrl(prev.nextEpisodeUrl).href);
-  });
-  return {
-    text: sampling.targetText,
-    episodeUrl: sampling.episodeUrl,
-    firstEpisodeTitle: first.episodeTitle,
-    openingType: sampling.openingType,
-    sampledCount: sampling.sampledCount,
-  };
-}
-
-async function analyzeUrl(url: string, episodeMode: boolean): Promise<Row> {
-  const { workId } = parseTargetUrl(url);
-  const workHtml = await fetchText(`https://kakuyomu.jp/works/${workId}`);
-  const meta = extractWorkMetadata(workHtml);
-
-  const target = await resolveTarget(url, workHtml, workId, episodeMode);
-
-  const tokens = tokenize(target.text);
-  const { score, metrics } = calculateScore(analyzeAll(target.text, tokens, tokenize));
-
-  return {
-    meta,
-    firstEpisodeTitle: target.firstEpisodeTitle,
-    openingType: target.openingType,
-    sampledCount: target.sampledCount,
-    episodeUrl: target.episodeUrl,
-    score,
-    singleSentParaRatio: rawOf(metrics, "singleSentParaRatio"),
-    sentenceLengthSD: rawOf(metrics, "sentenceLengthSD"),
-    burstiness: rawOf(metrics, "sentenceLengthBurstiness"),
-    blankLineRatio: analyzeBlankLineRatio(target.text),
-  };
-}
 
 function verdict(score: number): string {
   return score > THRESHOLD ? "⭕通過" : "❌除外";
 }
 
-function printDetail(row: Row): void {
-  const m = row.meta;
+function printDetail(r: AnalyzeResult): void {
+  const m = r.meta;
   console.log(`\n■ ${m.title}${m.author ? `（${m.author}）` : ""}`);
   console.log(
     `  レビュー ${m.reviewCount} / 評価pt ${m.totalReviewPoint} / 総文字 ${m.totalCharacterCount}`,
   );
-  console.log(`  第1話「${row.firstEpisodeTitle}」`);
+  console.log(`  第1話「${r.firstEpisodeTitle}」`);
   console.log(
-    `  開幕形式 ${row.openingType}（${row.sampledCount}話サンプル）→ 採点話 ${row.episodeUrl}`,
+    `  開幕形式 ${r.openingType}（${r.sampledCount}話サンプル）→ 採点話 ${r.episodeUrl}`,
   );
-  console.log(`  スコア ${row.score} ${verdict(row.score)}`);
+  console.log(`  スコア ${r.score} ${verdict(r.score)}`);
   console.log(
-    `  指標: 一文段落率 ${row.singleSentParaRatio.toFixed(3)} / 文長SD ${
-      row.sentenceLengthSD.toFixed(1)
-    } / バースティ ${row.burstiness.toFixed(1)} / 空行率 ${
-      row.blankLineRatio.toFixed(3)
+    `  指標: 一文段落率 ${r.rawMetrics.singleSentParaRatio.toFixed(3)} / 文長SD ${
+      r.rawMetrics.sentenceLengthSD.toFixed(1)
+    } / バースティ ${r.rawMetrics.sentenceLengthBurstiness.toFixed(1)} / 空行率 ${
+      r.blankLineRatio.toFixed(3)
     }（観測のみ）`,
   );
 }
 
-function printTable(rows: Row[]): void {
+function printTable(rows: AnalyzeResult[]): void {
   console.log(`\n=== 比較テーブル（閾値 ${THRESHOLD}）===`);
   console.log(
     "タイトル                       レビュー  スコア  一文段落率  文長SD  空行率  開幕形式",
@@ -176,14 +49,14 @@ function printTable(rows: Row[]): void {
     console.log(
       `${title.padEnd(30)} ${String(r.meta.reviewCount).padStart(7)} ${
         String(r.score).padStart(5)
-      } ${r.singleSentParaRatio.toFixed(3).padStart(9)} ${
-        r.sentenceLengthSD.toFixed(1).padStart(7)
+      } ${r.rawMetrics.singleSentParaRatio.toFixed(3).padStart(9)} ${
+        r.rawMetrics.sentenceLengthSD.toFixed(1).padStart(7)
       } ${r.blankLineRatio.toFixed(3).padStart(6)}  ${r.openingType}`,
     );
   }
 }
 
-function printCsv(rows: Row[]): void {
+function printCsv(rows: AnalyzeResult[]): void {
   console.log("\n=== CSV ===");
   console.log(
     "title,author,reviewCount,totalReviewPoint,totalCharacterCount,openingType,sampledCount,score,singleSentParaRatio,sentenceLengthSD,burstiness,blankLineRatio,episodeUrl",
@@ -200,9 +73,9 @@ function printCsv(rows: Row[]): void {
       r.openingType,
       r.sampledCount,
       r.score,
-      r.singleSentParaRatio.toFixed(4),
-      r.sentenceLengthSD.toFixed(4),
-      r.burstiness.toFixed(4),
+      r.rawMetrics.singleSentParaRatio.toFixed(4),
+      r.rawMetrics.sentenceLengthSD.toFixed(4),
+      r.rawMetrics.sentenceLengthBurstiness.toFixed(4),
       r.blankLineRatio.toFixed(4),
       cell(r.episodeUrl),
     ].join(","));
@@ -221,11 +94,11 @@ async function main(): Promise<void> {
 
   await initTokenizer();
 
-  const rows: Row[] = [];
+  const rows: AnalyzeResult[] = [];
   for (const [i, url] of args.entries()) {
     if (i > 0) await sleep(FETCH_INTERVAL_MS);
     try {
-      const row = await analyzeUrl(url, episodeMode);
+      const row = await analyzeWork(url, episodeMode);
       printDetail(row);
       rows.push(row);
     } catch (e) {
