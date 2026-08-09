@@ -82,6 +82,7 @@ async function handleGetCachedScore(
       openingType: cached.openingType,
       sampledCount: cached.sampledCount,
       targetEpisodeIndex: cached.targetEpisodeIndex,
+      lineMetadata: cached.lineMetadata,
     },
     fromCache: true,
   };
