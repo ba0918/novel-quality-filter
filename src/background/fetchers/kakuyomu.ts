@@ -1,4 +1,5 @@
 import { FETCH_INTERVAL_MS, FETCH_TIMEOUT_MS } from "../../shared/constants.ts";
+import { sleep } from "../../shared/async.ts";
 
 const KAKUYOMU_BASE = "https://kakuyomu.jp";
 
@@ -88,10 +89,6 @@ function extractTextFromHtml(html: string): string {
   }
 
   throw new Error(`Could not extract episode text from: ${url}`);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function stripHtmlTags(html: string): string {

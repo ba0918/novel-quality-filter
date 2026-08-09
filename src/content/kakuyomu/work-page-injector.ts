@@ -1,5 +1,6 @@
 import type { MetricResult, PenaltyResult, ScoreResult } from "../../domain/types.ts";
 import { scoreToColor } from "./score-color.ts";
+import { findStarOrFollowerElement } from "./meta-element.ts";
 
 const BADGE_CLASS = "nqf-work-badge";
 const PANEL_CLASS = "nqf-detail-panel";
@@ -101,29 +102,12 @@ function removeExisting(container: HTMLElement): void {
 }
 
 function insertElement(container: HTMLElement, element: HTMLElement): void {
-  const starLink = findStarCountElement(container);
+  const starLink = findStarOrFollowerElement(container);
   if (starLink) {
     starLink.parentElement?.insertBefore(element, starLink.nextSibling);
     return;
   }
   container.appendChild(element);
-}
-
-function findStarCountElement(container: HTMLElement): HTMLElement | null {
-  const reviewLinks = container.querySelectorAll<HTMLAnchorElement>(
-    'a[href*="/reviews"]',
-  );
-  for (const link of reviewLinks) {
-    if (link.textContent?.includes("★")) return link;
-  }
-  // フォロワー数リンクにフォールバック
-  const followerLinks = container.querySelectorAll<HTMLAnchorElement>(
-    'a[href*="/followers"]',
-  );
-  for (const link of followerLinks) {
-    return link;
-  }
-  return null;
 }
 
 function createWorkBadge(score: number): HTMLSpanElement {

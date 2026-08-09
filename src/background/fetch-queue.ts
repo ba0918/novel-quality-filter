@@ -1,4 +1,5 @@
 import { FETCH_INTERVAL_MS } from "../shared/constants.ts";
+import { sleep } from "../shared/async.ts";
 
 type Task<T> = {
   execute: () => Promise<T>;
@@ -37,8 +38,4 @@ async function processQueue(): Promise<void> {
   }
 
   processing = false;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

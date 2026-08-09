@@ -70,46 +70,38 @@ function openDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-export async function getScore(workId: string): Promise<CachedScore | undefined> {
-  const db = await openDB();
+function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_SCORES, "readonly");
-    const store = tx.objectStore(STORE_SCORES);
-    const request = store.get(workId);
-    request.onsuccess = () => resolve(request.result ?? undefined);
+    request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function getScore(workId: string): Promise<CachedScore | undefined> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_SCORES, "readonly");
+  const store = tx.objectStore(STORE_SCORES);
+  const result = await requestResult(store.get(workId));
+  return result ?? undefined;
 }
 
 export async function putScore(entry: CachedScore): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_SCORES, "readwrite");
-    const store = tx.objectStore(STORE_SCORES);
-    const request = store.put(entry);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  const tx = db.transaction(STORE_SCORES, "readwrite");
+  const store = tx.objectStore(STORE_SCORES);
+  await requestResult(store.put(entry));
 }
 
 export async function deleteScore(workId: string): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_SCORES, "readwrite");
-    const store = tx.objectStore(STORE_SCORES);
-    const request = store.delete(workId);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  const tx = db.transaction(STORE_SCORES, "readwrite");
+  const store = tx.objectStore(STORE_SCORES);
+  await requestResult(store.delete(workId));
 }
 
 export async function clearAll(): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_SCORES, "readwrite");
-    const store = tx.objectStore(STORE_SCORES);
-    const request = store.clear();
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  const tx = db.transaction(STORE_SCORES, "readwrite");
+  const store = tx.objectStore(STORE_SCORES);
+  await requestResult(store.clear());
 }

@@ -3,6 +3,7 @@ import {
   sendRescoreRequest,
   sendScoreRequest,
 } from "../messaging/sender.ts";
+import type { ScoreResultResponse } from "../messaging/types.ts";
 import {
   detectWorkCards,
   markAsProcessed,
@@ -15,7 +16,7 @@ import {
   injectQueuedBadge,
   showError,
 } from "./kakuyomu/badge-injector.ts";
-import { detectWorkPage } from "./kakuyomu/work-page-detector.ts";
+import { buildWorkUrl, detectWorkPage } from "./kakuyomu/work-page-detector.ts";
 import {
   injectScoreButton,
   injectWorkBadge,
@@ -90,7 +91,7 @@ async function handleRescore(workId: string, cardElement: HTMLElement): Promise<
   injectLoadingBadge(cardElement);
 
   try {
-    const workUrl = `https://kakuyomu.jp/works/${workId}`;
+    const workUrl = buildWorkUrl(workId);
     const response = await sendRescoreRequest(workId, workUrl);
     if (response.result) {
       injectBadge(cardElement, workId, response.result, handleRescore);
@@ -148,38 +149,58 @@ async function initWorkPageUI(workId: string, container: HTMLElement): Promise<v
 }
 
 async function scoreWorkPage(workId: string, container: HTMLElement): Promise<void> {
-  injectWorkLoading(container);
-
-  try {
-    const workUrl = `https://kakuyomu.jp/works/${workId}`;
-    const response = await sendScoreRequest(workId, workUrl);
-    if (response.result) {
-      injectWorkBadge(container, response.result, () => rescoreWorkPage(workId, container));
-    } else {
-      console.warn(`[NQF] Scoring failed for work page ${workId}:`, response.error);
-      injectWorkError(container, () => scoreWorkPage(workId, container));
-    }
-  } catch (err) {
-    console.error(`[NQF] Score request failed for work page ${workId}:`, err);
-    injectWorkError(container, () => scoreWorkPage(workId, container));
-  }
+  await requestWorkScore(
+    workId,
+    container,
+    sendScoreRequest,
+    () => scoreWorkPage(workId, container),
+    {
+      failure: (error) => console.warn(`[NQF] Scoring failed for work page ${workId}:`, error),
+      requestError: (err) =>
+        console.error(`[NQF] Score request failed for work page ${workId}:`, err),
+    },
+  );
 }
 
 async function rescoreWorkPage(workId: string, container: HTMLElement): Promise<void> {
+  await requestWorkScore(
+    workId,
+    container,
+    sendRescoreRequest,
+    () => rescoreWorkPage(workId, container),
+    {
+      failure: () => console.warn(`[NQF] Rescore failed for work page ${workId}`),
+      requestError: (err) =>
+        console.error(`[NQF] Rescore request failed for work page ${workId}:`, err),
+    },
+  );
+}
+
+interface WorkScoreLogger {
+  failure: (error?: string) => void;
+  requestError: (err: unknown) => void;
+}
+
+async function requestWorkScore(
+  workId: string,
+  container: HTMLElement,
+  send: (workId: string, workUrl: string) => Promise<ScoreResultResponse>,
+  retry: () => void,
+  log: WorkScoreLogger,
+): Promise<void> {
   injectWorkLoading(container);
 
   try {
-    const workUrl = `https://kakuyomu.jp/works/${workId}`;
-    const response = await sendRescoreRequest(workId, workUrl);
+    const response = await send(workId, buildWorkUrl(workId));
     if (response.result) {
       injectWorkBadge(container, response.result, () => rescoreWorkPage(workId, container));
     } else {
-      console.warn(`[NQF] Rescore failed for work page ${workId}`);
-      injectWorkError(container, () => rescoreWorkPage(workId, container));
+      log.failure(response.error);
+      injectWorkError(container, retry);
     }
   } catch (err) {
-    console.error(`[NQF] Rescore request failed for work page ${workId}:`, err);
-    injectWorkError(container, () => rescoreWorkPage(workId, container));
+    log.requestError(err);
+    injectWorkError(container, retry);
   }
 }
 

@@ -112,7 +112,6 @@ const CSS = `
   vertical-align: middle;
   transform: translateY(-2px);
   margin-left: 8px;
-  vertical-align: middle;
   transition: opacity 0.2s ease;
 }
 

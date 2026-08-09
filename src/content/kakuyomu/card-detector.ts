@@ -1,3 +1,5 @@
+import { buildWorkUrl } from "./work-page-detector.ts";
+
 const WORK_URL_PATTERN = /\/works\/(\d+)/;
 const PROCESSED_ATTR = "data-nqf-scored";
 const DEBOUNCE_MS = 200;
@@ -36,7 +38,7 @@ export function detectWorkCards(root: Element = document.body): WorkCard[] {
     seenElements.add(cardElement);
     cards.push({
       workId,
-      workUrl: `https://kakuyomu.jp/works/${workId}`,
+      workUrl: buildWorkUrl(workId),
       cardElement,
     });
   }
