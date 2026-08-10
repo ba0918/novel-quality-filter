@@ -209,11 +209,16 @@ export async function runEvaluate(
     console.error("使い方: deno task cal evaluate");
     return 1;
   }
-  const rows = await loadRows(paths);
-  if (rows.length === 0) {
+  const allRows = await loadRows(paths);
+  if (allRows.length === 0) {
     console.error("データセットが空です（先に deno task cal register してください）");
     return 1;
   }
+  // 集計処理は scope="対象外" のレコードを除外する（docs/spec/calibration-dataset.md
+  // 「ラベル運用 / 2つの軸を分ける」参照）。対象外の作品は良/駄 の分離度計算を汚すので
+  // 分析からは外す。一覧表示 (runList / buildCalJson) はここでは扱わず、そちらは
+  // 対象外も含めて出す（サイドバーで見えないと再判定できないため）。
+  const rows = allRows.filter((r) => r.scope !== "対象外");
   console.log("ラベル  正本  実験  差分  作品");
   for (const row of rows) {
     const q = (row.quality ?? "-").padEnd(3);

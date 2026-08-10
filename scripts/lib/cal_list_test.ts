@@ -258,3 +258,44 @@ Deno.test("runEvaluate: 再計算スコアをテキスト出力し、保存 scor
     await Deno.remove(p.base, { recursive: true });
   }
 });
+
+// docs/spec/calibration-dataset.md line 210-215「対象外の作品は分離度の計算から除外する
+// / 集計処理 (runEvaluate 等) が scope='対象外' のレコードを除外する」の実装ガード。
+// 対象外レコードが混ざっていても、集計出力（runEvaluate の行）は含まないケースと一致する。
+Deno.test("runEvaluate: scope='対象外' のレコードを集計出力から除外する", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const datasetPath = join(base, "dataset.jsonl");
+    const labelsPath = join(base, "labels.jsonl");
+    await appendRecord(datasetPath, record("1", 0, raw()));
+    await appendRecord(datasetPath, record("2", 0, raw()));
+    // work 1 は良、work 2 は対象外。
+    let labels = setLabel([], "kakuyomu:1", "良", "2026-08-10T00:00:00.000Z");
+    labels = setLabel(labels, "kakuyomu:2", "対象外", "2026-08-10T00:00:00.000Z");
+    await saveLabels2(labelsPath, labels);
+
+    const lines: string[] = [];
+    const orig = console.log;
+    console.log = (...a: unknown[]) => lines.push(a.join(" "));
+    try {
+      const code = await runEvaluate([], { datasetPath, labelsPath });
+      assertEquals(code, 0);
+      const out = lines.join("\n");
+      // 対象外の作品タイトル（作品2）は集計に出さない。良の作品1 は出す。
+      assertStringIncludes(out, "作品1");
+      assertEquals(out.includes("作品2"), false);
+    } finally {
+      console.log = orig;
+    }
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("buildComparisonRows: scope='対象外' の行にも scope フィールドが立つ（呼び出し側で除外できる）", () => {
+  // buildComparisonRows 自体は一覧表示にも使うので対象外を残す。除外は呼び出し側の責務。
+  const rec = record("1", 0, raw());
+  const labels = setLabel([], "kakuyomu:1", "対象外", "2026-08-10T00:00:00.000Z");
+  const [row] = buildComparisonRows([rec], labels);
+  assertEquals(row.scope, "対象外");
+});
