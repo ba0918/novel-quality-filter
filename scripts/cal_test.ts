@@ -1,10 +1,10 @@
 import { assertEquals } from "@std/assert";
 import { type Handler, HANDLERS, route } from "./cal.ts";
 
-Deno.test("HANDLERS: 4機能＋ラベル操作の全サブコマンドを公開する", () => {
+Deno.test("HANDLERS: 4機能＋ラベル操作の全サブコマンドを公開する（detail は廃止、serve が加わる）", () => {
   assertEquals(
     Object.keys(HANDLERS).sort(),
-    ["detail", "evaluate", "exclude", "label", "list", "register", "tag"],
+    ["evaluate", "exclude", "label", "list", "register", "serve", "tag"],
   );
 });
 

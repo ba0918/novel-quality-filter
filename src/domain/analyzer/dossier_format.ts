@@ -1,5 +1,6 @@
-// 詳細分析票（dossier）の値整形の純粋関数。DOM 版（work-page-injector）と HTML 文字列版
-// （較正ツールの render_dossier）が共有する。表示ロジックを1箇所へ集約し二重実装を防ぐ。
+// 詳細分析票（dossier）の値整形の純粋関数。本番拡張の DOM 版（work-page-injector）が使う。
+// 較正ツールのブラウザ側ビューア（scripts/lib/cal_viewer/format.js）は同じロジックを別実装し、
+// format_test.ts が両者の出力一致を担保する（同一モジュール共有はせず、あえて二重実装）。
 // 本文由来文字列を HTML へ埋めるときのエスケープもここに置く。
 
 import type { CategoryCount, LineMetadata, NarrativeCount } from "../types.ts";
@@ -54,8 +55,9 @@ export function compositionSegments(meta: LineMetadata): Array<[string, number]>
   ];
 }
 
-// HTML 文字列レンダラ（render_dossier）が本文由来テキスト（タイトル・作者名）を埋めるときに
-// XSS・タグ崩れを防ぐ。DOM 版は textContent 経由なので不要だが、ここに置いて共有する。
+// 本文由来テキスト（タイトル・作者名）を HTML 文字列へ埋めるときに XSS・タグ崩れを防ぐ。
+// DOM 版（work-page-injector）は textContent 経由なので不要だが、ブラウザ側 safeHref
+// （cal_viewer/format.js）の参照実装としてここに残す。
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
