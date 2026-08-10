@@ -4,7 +4,7 @@
 // エンドポイント仕様と 1 対 1 で対応させ、ズレが起きたら Deno test 側で検知する。
 
 import { assertEquals } from "@std/assert";
-import { deleteLabelRequest, setLabelRequest } from "./label_editor.js";
+import { deleteLabelRequest, performLabelUpdate, setLabelRequest } from "./label_editor.js";
 import { computeNextLabels, primaryLabelValue } from "./label_update.js";
 
 Deno.test("setLabelRequest: POST /labels 用の url/method/body を組み立てる（「駄」）", () => {
@@ -83,4 +83,78 @@ Deno.test("primaryLabelValue: 対象外を含まなければ quality（良/駄�
 Deno.test("primaryLabelValue: 品質もスコープも無ければ null（未ラベル）", () => {
   assertEquals(primaryLabelValue([]), null);
   assertEquals(primaryLabelValue(["すり抜け"]), null); // タグだけ
+});
+
+// rollback の正しさ: primary 値だけを持ち回ると、optimistic 更新後の labels 配列を
+// 元に computeNextLabels が再計算されて元の配列が復元されない（例: 元 ["良","対象外"]
+// で「駄」を選んで失敗 → 現在 ["駄"] を元に「対象外」を戻すと ["駄","対象外"] になり
+// silent に quality が「良」→「駄」へ書き換わる）。performLabelUpdate は previousLabels
+// スナップショットを持ち回り、失敗時に onRollback(previousLabels) で labels 配列全体を
+// 一気に復元する契約にする。
+
+Deno.test("performLabelUpdate: fetch 失敗時に onRollback へ previousLabels 全体を渡して復元させる", async () => {
+  const calls: unknown[] = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:1",
+    nextValue: "駄",
+    previousLabels: ["良", "対象外", "ハードネガティブ"],
+    fetchImpl: () => Promise.resolve(new Response("nope", { status: 500 })),
+    onOptimisticUpdate: (v: string | null) => calls.push(["opt", v]),
+    onRollback: (labels: readonly string[]) => calls.push(["rollback", labels]),
+    onError: (msg: string) => calls.push(["error", msg]),
+  });
+  assertEquals(calls, [
+    ["opt", "駄"],
+    ["rollback", ["良", "対象外", "ハードネガティブ"]],
+    ["error", "ラベル更新に失敗しました（HTTP 500）"],
+  ]);
+});
+
+Deno.test("performLabelUpdate: fetch 成功時は onRollback / onError を呼ばず optimistic 更新のみ", async () => {
+  const calls: unknown[] = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:1",
+    nextValue: "良",
+    previousLabels: ["対象外"],
+    fetchImpl: () => Promise.resolve(new Response("", { status: 200 })),
+    onOptimisticUpdate: (v: string | null) => calls.push(["opt", v]),
+    onRollback: (labels: readonly string[]) => calls.push(["rollback", labels]),
+    onError: (msg: string) => calls.push(["error", msg]),
+  });
+  assertEquals(calls, [["opt", "良"]]);
+});
+
+Deno.test("performLabelUpdate: nextValue=null (未ラベルに戻す) は DELETE を投げる", async () => {
+  const requests: Array<{ url: string; method?: string }> = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:xyz",
+    nextValue: null,
+    previousLabels: ["良"],
+    fetchImpl: (url: string, init: RequestInit) => {
+      requests.push({ url, method: init.method });
+      return Promise.resolve(new Response("", { status: 200 }));
+    },
+    onOptimisticUpdate: () => {},
+    onRollback: () => {},
+    onError: () => {},
+  });
+  assertEquals(requests, [{ url: "/labels/kakuyomu%3Axyz", method: "DELETE" }]);
+});
+
+Deno.test("performLabelUpdate: fetch 例外（network error）も onRollback へ previousLabels を渡す", async () => {
+  const calls: unknown[] = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:2",
+    nextValue: "対象外",
+    previousLabels: ["良", "すり抜け"],
+    fetchImpl: () => Promise.reject(new Error("network down")),
+    onOptimisticUpdate: (v: string | null) => calls.push(["opt", v]),
+    onRollback: (labels: readonly string[]) => calls.push(["rollback", labels]),
+    onError: (msg: string) => calls.push(["error", msg]),
+  });
+  assertEquals(calls, [
+    ["opt", "対象外"],
+    ["rollback", ["良", "すり抜け"]],
+    ["error", "ラベル更新に失敗しました（network down）"],
+  ]);
 });

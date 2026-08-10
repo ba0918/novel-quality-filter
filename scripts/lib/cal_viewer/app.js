@@ -103,25 +103,31 @@ function LabelChips({ labels }) {
 // primary chip の選定規則は label_update.primaryLabelValue に集約（scope 優先、
 // docs/spec/calibration-loop-tool.md「primary chip 選定規則」参照）。
 
-function EditableLabelChip({ siteWorkId, labels, onUpdate }) {
+function EditableLabelChip({ siteWorkId, labels, onUpdate, onRestore }) {
   const primary = primaryLabelValue(labels);
   const buttonRef = useRef(null);
-  const primaryRef = useRef(primary);
-  primaryRef.current = primary;
-  // onUpdate は親側で inline arrow ((next) => onLabelUpdate(id, next)) として作られる
-  // ため、親を useCallback で memoize しても呼び出し側 arrow の identity が毎レンダ変わる。
-  // 依存に onUpdate を入れると mountLabelEditor が dispose→再 mount を繰り返し、popover
-  // クリック直後の re-render で activePopover の cleanup が走って瞬時に閉じる race を
-  // 招く。ref 経由で常に最新版を呼び、effect は siteWorkId だけを見張る。
+  // popover を開いた瞬間の labels 全体を label_editor 側へ渡すためのスナップショット源。
+  // primary 値だけでは rollback で quality/scope 両立や cal tag タグを復元できないので、
+  // labels 配列そのものを毎クリック時に渡す（getCurrentLabels は openPopover 呼出時のみ）。
+  const labelsRef = useRef(labels);
+  labelsRef.current = labels;
+  // onUpdate / onRestore は親側で inline arrow として作られるため、親を useCallback で
+  // memoize しても呼び出し側 arrow の identity が毎レンダ変わる。依存に含めると
+  // mountLabelEditor が dispose→再 mount を繰り返し、popover クリック直後の re-render で
+  // activePopover の cleanup が走って瞬時に閉じる race を招く。ref 経由で常に最新版を
+  // 呼び、effect は siteWorkId だけを見張る。
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
+  const onRestoreRef = useRef(onRestore);
+  onRestoreRef.current = onRestore;
 
   useEffect(() => {
     if (!buttonRef.current) return;
     return mountLabelEditor(buttonRef.current, {
       siteWorkId,
-      getCurrentValue: () => primaryRef.current,
+      getCurrentLabels: () => labelsRef.current,
       onUpdate: (next) => onUpdateRef.current(next),
+      onRestore: (prevLabels) => onRestoreRef.current(prevLabels),
     });
   }, [siteWorkId]);
 
@@ -273,7 +279,7 @@ function Sidebar(
   `;
 }
 
-function MetaHeader({ work, onLabelUpdate }) {
+function MetaHeader({ work, onLabelUpdate, onLabelRestore }) {
   const href = safeHref(work.url);
   return html`
     <div class="meta-header">
@@ -285,6 +291,7 @@ function MetaHeader({ work, onLabelUpdate }) {
           siteWorkId=${work.siteWorkId}
           labels=${labelsOf(work)}
           onUpdate=${(next) => onLabelUpdate(work.siteWorkId, next)}
+          onRestore=${(prevLabels) => onLabelRestore(work.siteWorkId, prevLabels)}
         />
       </div>
       <a class="meta-url" href=${href} target="_blank" rel="noopener noreferrer">${work.url} ↗</a>
@@ -641,13 +648,13 @@ function LineMetaSection({ lineMetadata }) {
   `;
 }
 
-function DetailPanel({ work, onLabelUpdate }) {
+function DetailPanel({ work, onLabelUpdate, onLabelRestore }) {
   if (!work) {
     return html`<div class="detail detail--empty">一覧から作品を選んでください</div>`;
   }
   return html`
     <div class="detail">
-      <${MetaHeader} work=${work} onLabelUpdate=${onLabelUpdate} />
+      <${MetaHeader} work=${work} onLabelUpdate=${onLabelUpdate} onLabelRestore=${onLabelRestore} />
       <${ScoreSection} work=${work} />
       <${MetricsTable} work=${work} />
       <${PenaltyList} work=${work} />
@@ -709,6 +716,22 @@ function App() {
     });
   }, []);
 
+  // ラベル復元の受け口。fetch 失敗時に呼ばれ、labels 配列を操作前スナップショットへ
+  // 丸ごと戻す（updateWorkLabel は primary 値経由の差分再計算なので、[良,対象外] のように
+  // quality と scope が両立する状態、または cal tag タグを含む配列は復元できない）。
+  // 直接 labels 配列を差し替えることで、silent な quality 書き換えを起こさない。
+  const restoreWorkLabels = useCallback((siteWorkId, prevLabels) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        works: prev.works.map((w) =>
+          w.siteWorkId === siteWorkId ? { ...w, labels: [...prevLabels] } : w
+        ),
+      };
+    });
+  }, []);
+
   if (error) return html`<p class="error">${error}</p>`;
   if (!data) return html`<p>読み込み中...</p>`;
 
@@ -725,7 +748,11 @@ function App() {
         onToggle=${toggleSidebar}
       />
       <main class="main">
-        <${DetailPanel} work=${selected} onLabelUpdate=${updateWorkLabel} />
+        <${DetailPanel}
+          work=${selected}
+          onLabelUpdate=${updateWorkLabel}
+          onLabelRestore=${restoreWorkLabels}
+        />
       </main>
     </div>
   `;

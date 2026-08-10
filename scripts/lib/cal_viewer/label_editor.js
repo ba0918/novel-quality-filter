@@ -7,6 +7,7 @@
 // 同時に複数の popover が開かないよう、単一 slot（activePopover）を module 内に持つ。
 
 import { showToast } from "./toast.js";
+import { primaryLabelValue } from "./label_update.js";
 
 const LABEL_OPTIONS = [
   { value: "良", label: "良" },
@@ -64,19 +65,38 @@ function onDocumentKeydown(event) {
   }
 }
 
-// fetch を投げ、失敗なら onRollback + toast、成功なら nop。onSuccess は optimistic に
-// 先行して UI を更新した後の追認（ここでは呼ばない設計 = 常に先に更新済み前提）。
-async function sendLabelRequest(req, { rollback, errorMessage }) {
+// ラベル更新の optimistic → fetch → 失敗時 rollback の流れを 1 関数にまとめ、
+// fetch / UI コールバックを注入可能にした純テスト対象。DOM を触らないため Deno test で
+// 直接検証できる（DOM 依存の popover open/close は Playwright 側）。
+//
+// rollback は「操作前の labels 配列全体」を previousLabels スナップショットで受け取り、
+// onRollback(previousLabels) で labels 配列を丸ごと戻す。primary 値だけを持ち回ると、
+// optimistic 更新済みの labels を元に再計算してしまい、[良,対象外] → 「駄」失敗 →
+// [駄] を元に「対象外」を差し込むと [駄,対象外] になり、silent に quality が
+// 「良」→「駄」へ書き換わる race を招くため（labels 配列全体を復元する契約）。
+export async function performLabelUpdate({
+  siteWorkId,
+  nextValue,
+  previousLabels,
+  fetchImpl,
+  onOptimisticUpdate,
+  onRollback,
+  onError,
+}) {
+  onOptimisticUpdate(nextValue);
+  const req = nextValue === null
+    ? deleteLabelRequest(siteWorkId)
+    : setLabelRequest(siteWorkId, nextValue);
   try {
-    const res = await fetch(req.url, {
+    const res = await fetchImpl(req.url, {
       method: req.method,
       headers: req.headers,
       body: req.body,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (e) {
-    rollback();
-    showToast(`${errorMessage}（${e.message ?? e}）`, { kind: "error" });
+    onRollback(previousLabels);
+    onError(`ラベル更新に失敗しました（${e.message ?? e}）`);
   }
 }
 
@@ -93,12 +113,15 @@ function buildMenuItem(text, { onSelect }) {
   return item;
 }
 
-// mount(anchor, {siteWorkId, getCurrentValue, onUpdate}) — anchor（Detail の chip button）
-// にクリック時 popover を出す挙動を結線する。getCurrentValue は毎クリック時に呼ばれ
-// 「良/駄/対象外/null」を返す（null=未ラベル）。onUpdate(nextValue) は optimistic UI の
-// 受け口で、Detail とサイドバー行の chip を再描画するコールバック。
+// mount(anchor, {siteWorkId, getCurrentLabels, onUpdate, onRestore}) — anchor（Detail
+// の chip button）にクリック時 popover を出す挙動を結線する。getCurrentLabels は
+// 毎クリック時に呼ばれ「現在の labels 配列全体」を返す（optimistic 更新後の値ではなく、
+// popover を開いた瞬間の値をスナップショットに使う）。onUpdate(nextValue) は optimistic
+// UI の受け口。onRestore(previousLabels) は fetch 失敗時に labels 配列を丸ごと復元する
+// 受け口で、primary 値経由の差分再計算では復元しきれない状態（quality と scope の
+// 両立、cal tag で付けた任意タグ）を含めて 1 発で戻すために別コールバックにしている。
 // 返り値は dispose 関数で、Preact useEffect の cleanup に渡すことでイベント解除できる。
-export function mount(anchor, { siteWorkId, getCurrentValue, onUpdate }) {
+export function mount(anchor, { siteWorkId, getCurrentLabels, onUpdate, onRestore }) {
   const handler = (e) => {
     e.stopPropagation();
     if (activePopover && activePopover.anchor === anchor) {
@@ -106,7 +129,12 @@ export function mount(anchor, { siteWorkId, getCurrentValue, onUpdate }) {
       return;
     }
     closeActive();
-    openPopover(anchor, { siteWorkId, currentValue: getCurrentValue(), onUpdate });
+    openPopover(anchor, {
+      siteWorkId,
+      currentLabels: getCurrentLabels(),
+      onUpdate,
+      onRestore,
+    });
   };
   anchor.addEventListener("click", handler);
   return () => {
@@ -115,8 +143,13 @@ export function mount(anchor, { siteWorkId, getCurrentValue, onUpdate }) {
   };
 }
 
-function openPopover(anchor, { siteWorkId, currentValue, onUpdate }) {
+function openPopover(anchor, { siteWorkId, currentLabels, onUpdate, onRestore }) {
   const previousFocus = document.activeElement;
+  // 開いた瞬間の labels スナップショット。fetch 失敗時はこれで labels 配列全体を戻す
+  // （popover を開いた後に別経路で labels が更新される可能性は現在の設計では無いが、
+  // スナップショットを固定しておく方が rollback の意味論として単純）。
+  const snapshotLabels = [...currentLabels];
+  const currentValue = primaryLabelValue(currentLabels);
   // popover 開閉に合わせて anchor の aria-expanded を反転する。スクリーンリーダーで
   // 「chip をクリックしたら menu が開いた/閉じた」の状態変化が読まれる。
   anchor.setAttribute("aria-expanded", "true");
@@ -125,16 +158,15 @@ function openPopover(anchor, { siteWorkId, currentValue, onUpdate }) {
   popover.setAttribute("role", "menu");
 
   const selectValue = (nextValue) => {
-    const previous = currentValue;
-    // optimistic: 先に UI を新値へ切り替える。失敗時は rollback で戻す。
-    onUpdate(nextValue);
     closeActive();
-    const req = nextValue === null
-      ? deleteLabelRequest(siteWorkId)
-      : setLabelRequest(siteWorkId, nextValue);
-    sendLabelRequest(req, {
-      rollback: () => onUpdate(previous),
-      errorMessage: "ラベル更新に失敗しました",
+    performLabelUpdate({
+      siteWorkId,
+      nextValue,
+      previousLabels: snapshotLabels,
+      fetchImpl: (url, init) => fetch(url, init),
+      onOptimisticUpdate: onUpdate,
+      onRollback: onRestore,
+      onError: (message) => showToast(message, { kind: "error" }),
     });
   };
 
