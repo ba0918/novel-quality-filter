@@ -16,7 +16,7 @@ import type { LabelRecord2, Quality } from "./labels_store.ts";
 import { joinLabels } from "./analyze_separation.ts";
 import { CANONICAL_FORMULA, evaluateRecord, EXPERIMENT_FORMULA } from "./cal_evaluate.ts";
 import { DEFAULT_LABELS, DEFAULT_OUT } from "./labels_cli.ts";
-import { DEFAULT_VIEWER_CONFIG, loadViewerConfig } from "./cal_viewer_config.ts";
+import { loadViewerConfig } from "./cal_viewer_config.ts";
 import type {
   LineMetadata,
   MetricResult,
@@ -193,7 +193,7 @@ export async function runList(
     return 1;
   }
 
-  const dir = distDir ?? (await loadViewerConfig()).distDir ?? DEFAULT_VIEWER_CONFIG.distDir;
+  const dir = distDir ?? (await loadViewerConfig()).distDir;
   await ensureDir(dir);
   const outPath = join(dir, "cal.json");
   await Deno.writeTextFile(outPath, JSON.stringify(calJson, null, 2));
