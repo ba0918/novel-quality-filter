@@ -1,10 +1,12 @@
 // 保存済みの原本（生HTML＋manifest）から、再フェッチなしで rawMetrics＋lineMetadata を計算する。
 // 二つの操作をはっきり分ける:
-//   - 再現(rederive): 凍結した manifest.decision に従って採点対象を組み立てる。selectSamplingTarget は
-//     呼ばない。サンプリング/開幕判定のロジックが後で変わっても、同じ原本から常に収集時と同じ値を
-//     返す（manifest = 採点入力の唯一の正。C2・長期再現性の要）。
+//   - 再現(rederive): 凍結した manifest.decision に従って採点対象を組み立てる。selectSamplingTarget も
+//     classifyOpeningFormat も呼ばない。素材は本文・行だけを復元する parseCapturePages で作り、開幕形式は
+//     凍結 decision.openingType をそのまま採る。サンプリング/開幕判定のロジックが後で変わっても、同じ原本
+//     から常に収集時と同じ値を返す（manifest = 採点入力の唯一の正。C2・長期再現性の要）。
 //   - 再実験(resample): 保存済み全話に selectSamplingTarget を再適用し、現在のロジックで採点対象を
-//     選び直す。オフライン実験用（全話を保存している A5 の利点をここで活かす）。再現とは別物。
+//     選び直す。開幕形式判定(classifyOpeningFormat)を呼び直すのはこちらだけ。オフライン実験用
+//     （全話を保存している A5 の利点をここで活かす）。再現とは別物。
 
 import type { LineData, LineMetadata, RawMetrics } from "../../src/domain/types.ts";
 import { buildEpisodeFromHtml } from "../../src/background/fetchers/kakuyomu.ts";
@@ -19,6 +21,13 @@ import { deriveLineMetrics, type LineMetrics } from "./line_metrics.ts";
 
 // rawMetrics 算出は tokenizer(WASM) を要するため注入する。行メタ側は純粋なので注入しない。
 export type ComputeRawMetrics = (text: string) => RawMetrics;
+
+// 再現の素材（保存HTMLから復元した本文・行）。開幕形式ラベル(format)は持たない。
+// 開幕形式は再現では凍結 decision を採り、再実験だけが SampledEpisode で持って再判定する。
+export interface ParsedEpisode {
+  text: string;
+  lines: LineData[];
+}
 
 export interface Rederived {
   targetText: string;
@@ -69,7 +78,8 @@ async function rederiveWith(
   decision: CaptureDecision,
   computeRawMetrics: ComputeRawMetrics,
 ): Promise<Rederived> {
-  const episodes = pagesToSampled(capture.pages);
+  // 再現の素材は本文・行だけを復元する（開幕形式は再判定せず decision.openingType を採る）。
+  const episodes = parseCapturePages(capture.pages);
   const slice = decision.concatOrder.map((i) => episodes[i]);
   const targetText = slice.map((e) => e.text).join("");
   const targetLines = slice.flatMap((e) => e.lines);
@@ -89,6 +99,18 @@ async function rederiveWith(
   };
 }
 
+// 再現の素材: 保存HTMLから本文・行だけを復元する。開幕形式の判定(classifyOpeningFormat)は
+// 呼ばない。再現は凍結 decision の openingType を採るため、ここで再判定してはならない
+// （再判定すると開幕判定ロジックの変更が再現値へ漏れ、C2・長期再現性が崩れる）。
+export function parseCapturePages(pages: CapturePage[]): ParsedEpisode[] {
+  return pages.map((page) => {
+    const ep = buildEpisodeFromHtml(page.entry.url, page.html);
+    return { text: ep.text, lines: ep.lines };
+  });
+}
+
+// 再実験の素材: 復元した本文・行に加えて開幕形式を判定する。selectSamplingTarget が
+// format を読んで採点対象を選び直すため、再実験経路だけで classifyOpeningFormat を呼ぶ。
 function pagesToSampled(pages: CapturePage[]): SampledEpisode[] {
   return pages.map((page) => {
     const ep = buildEpisodeFromHtml(page.entry.url, page.html);

@@ -3,7 +3,7 @@ import type { RawMetrics } from "../../src/domain/types.ts";
 import { buildEpisodeFromHtml } from "../../src/background/fetchers/kakuyomu.ts";
 import { aggregateLineMetadata } from "../../src/domain/analyzer/line_metadata.ts";
 import type { Capture, CaptureDecision, CaptureManifest, CapturePage } from "./capture_store.ts";
-import { rederive, resample } from "./rederive.ts";
+import { parseCapturePages, rederive, resample } from "./rederive.ts";
 
 function zeroMetrics(text: string): RawMetrics {
   // 実運用の analyzeAll+tokenize を注入せず、採点対象本文だけに依存する決定的な代役。
@@ -65,6 +65,22 @@ function captureOf(pages: CapturePage[], decision?: CaptureDecision): Capture {
   };
   return { manifest, pages };
 }
+
+Deno.test("parseCapturePages(再現の素材): 開幕形式を判定せず本文・行だけを保存HTMLから復元する", () => {
+  // 再現は開幕形式検知を呼び直してはならない（仕様: 再現と再実験の分離）。素材の復元は
+  // buildEpisodeFromHtml と同じ本文・行を返し、形式ラベル(format)は一切持たない。
+  const ep0 = body(40, "甲");
+  const ep1 = body(20, "乙");
+  const e0 = buildEpisodeFromHtml("u", ep0);
+  const e1 = buildEpisodeFromHtml("u", ep1);
+
+  const parsed = parseCapturePages([pageOf(0, ep0), pageOf(1, ep1)]);
+
+  assertEquals(parsed, [
+    { text: e0.text, lines: e0.lines },
+    { text: e1.text, lines: e1.lines },
+  ]);
+});
 
 Deno.test("rederive(再現): 凍結した manifest.decision に従い、再サンプリングしない（C2・長期再現性）", async () => {
   // 第0話は通常開幕（40文）なので、素の selectSamplingTarget なら第0話を採点対象に選ぶ。
