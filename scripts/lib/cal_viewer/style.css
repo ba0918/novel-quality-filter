@@ -1,0 +1,269 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 1.5rem;
+  background: #12141a;
+  color: #e4e6eb;
+}
+
+a {
+  color: #7cc0ff;
+}
+
+.cal-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.3rem;
+}
+
+.cal-muted {
+  color: #9aa0aa;
+  font-size: 0.85rem;
+}
+
+.cal-label-filter {
+  margin-top: 0.5rem;
+  background: #1a1d24;
+  color: #e4e6eb;
+  border: 1px solid #2a2f3a;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+.cal-layout {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: flex-start;
+}
+
+.cal-list {
+  border-collapse: collapse;
+  width: 60%;
+  font-size: 0.85rem;
+}
+
+.cal-list th,
+.cal-list td {
+  border: 1px solid #2a2f3a;
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+
+.cal-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.cal-num {
+  text-align: right;
+}
+
+.cal-row {
+  cursor: pointer;
+}
+
+.cal-row:hover {
+  background: #1a1d24;
+}
+
+.cal-row--selected {
+  background: #223047;
+}
+
+.cal-up {
+  color: #67c680;
+}
+
+.cal-down {
+  color: #ff9a8a;
+}
+
+.cal-detail {
+  flex: 1;
+  border: 1px solid #2a2f3a;
+  border-radius: 8px;
+  padding: 1rem;
+  min-width: 20rem;
+}
+
+.cal-detail--empty {
+  color: #9aa0aa;
+}
+
+.cal-detail-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.cal-detail-meta {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.cal-formula-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.cal-formula-block {
+  border-top: 1px solid #2a2f3a;
+  padding-top: 0.5rem;
+}
+
+.cal-formula-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.cal-formula-score {
+  font-size: 1.2rem;
+}
+
+.cal-detail-section-title {
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.cal-detail-section-title--penalty {
+  color: #ffc27a;
+}
+
+.cal-metric-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 1px 0;
+}
+
+.cal-metric-row--flagged {
+  color: #ff9a8a;
+}
+
+.cal-metric-label {
+  width: 10rem;
+}
+
+.cal-metric-raw {
+  width: 3.5rem;
+  text-align: right;
+}
+
+.cal-metric-bar-container {
+  flex: 1;
+  height: 8px;
+  background: #222733;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.cal-metric-bar {
+  display: block;
+  height: 100%;
+  background: #4a90d9;
+}
+
+.cal-metric-norm {
+  width: 3rem;
+  text-align: right;
+}
+
+.cal-penalty-row {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #ffc27a;
+}
+
+.cal-penalty-none {
+  font-size: 0.8rem;
+  color: #9aa0aa;
+}
+
+.cal-line-metadata {
+  margin-top: 0.75rem;
+  border-top: 1px solid #2a2f3a;
+  padding-top: 0.5rem;
+}
+
+.cal-lm-headline {
+  margin-bottom: 0.25rem;
+}
+
+.cal-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #222733;
+  margin-right: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.cal-chip--concern {
+  background: #4a2a2a;
+  color: #ff9a8a;
+}
+
+.cal-lm-summary {
+  color: #9aa0aa;
+  font-size: 0.8rem;
+}
+
+.cal-lm-compo {
+  display: flex;
+  height: 10px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0.35rem 0;
+}
+
+.cal-lm-seg {
+  display: block;
+  height: 100%;
+}
+
+.cal-lm-seg--narrative {
+  background: #4a90d9;
+}
+
+.cal-lm-seg--dialogue {
+  background: #67c680;
+}
+
+.cal-lm-seg--meta {
+  background: #d98cd9;
+}
+
+.cal-lm-seg--nonterm {
+  background: #d9b34a;
+}
+
+.cal-lm-seg--blank {
+  background: #3a3f4a;
+}
+
+.cal-lm-seg--sep {
+  background: #6a6f7a;
+}
+
+.cal-lm-cat {
+  margin-top: 0.25rem;
+}
+
+.cal-lm-cat-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.cal-lm-cat-body {
+  font-size: 0.8rem;
+}
+
+.cal-error {
+  color: #ff9a8a;
+}
