@@ -16,6 +16,8 @@ export const ASSET_FILES = [
   "style.css",
   "format.js",
   "raw_metrics.js",
+  "list_filter.js",
+  "line_meta.js",
 ];
 
 // scripts/lib/cal_viewer/ の絶対パス（assets のソース）。cal.json はここに含めない
