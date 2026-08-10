@@ -2,10 +2,21 @@
 // config の distDir へコピーし、Deno.serve で配信する。file:// で開くと CORS で cal.json を
 // fetch できないため、ブラウザ描画には HTTP 配信が要る。デフォルトで起動時にブラウザを自動で
 // 開く（--no-open で抑制）。Ctrl+C はプロセスの既定シグナル処理にまかせて終了する。
+//
+// Web ラベル編集のため POST /labels（品質ラベル書き込み）・DELETE /labels/:siteWorkId
+// （未ラベルに戻す）を受け付ける。localhost 限定バインドは serveOptions で維持する。
 
 import { copy, ensureDir } from "@std/fs";
 import { extname, join, resolve } from "@std/path";
 import { loadViewerConfig, type ViewerConfig } from "./cal_viewer_config.ts";
+import { DEFAULT_LABELS } from "./labels_cli.ts";
+import {
+  deleteLabel,
+  type LabelValue,
+  loadLabels2,
+  saveLabels2,
+  setLabel,
+} from "./labels_store.ts";
 
 // ブラウザに配信する assets。ここに漏れると cal serve が dist にコピーせず、app.js の
 // module import が 404 で失敗して viewer 全体が起動しない。app.js のローカル ./*.js import
@@ -61,16 +72,97 @@ export function resolveAssetPath(distDir: string, pathname: string): string | un
   return withinBoundary ? resolved : undefined;
 }
 
+// siteWorkId の形式検証。DELETE のパスセグメントに使うためパス走査（".." "/"）を
+// 含まないことも、この enum 的パターンで自動的に排除される（labels_store.resolveSiteWorkId
+// と同じ集合）。URL エンコード済みの入力はハンドラ側で decodeURIComponent した後に照合する。
+const SITE_WORK_ID_PATTERN = /^[a-z0-9_-]+:\d+$/i;
+
+const LABEL_VALUES: readonly LabelValue[] = ["良", "駄", "対象外"];
+
+function isValidLabelValue(value: unknown): value is LabelValue {
+  return typeof value === "string" && (LABEL_VALUES as readonly string[]).includes(value);
+}
+
+function isValidSiteWorkId(value: unknown): value is string {
+  return typeof value === "string" && SITE_WORK_ID_PATTERN.test(value);
+}
+
+// POST /labels の body 契約: {siteWorkId, value}。setLabel を再利用して upsert し、
+// saveLabels2 で永続化する。バリデーション違反はすべて 400 で拒否し labels を書かない。
+async function handleLabelPost(req: Request, labelsPath: string): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response("Invalid JSON body", { status: 400 });
+  }
+  if (!body || typeof body !== "object") {
+    return new Response("Invalid body", { status: 400 });
+  }
+  const { siteWorkId, value } = body as { siteWorkId?: unknown; value?: unknown };
+  if (!isValidSiteWorkId(siteWorkId)) {
+    return new Response("Invalid siteWorkId", { status: 400 });
+  }
+  if (!isValidLabelValue(value)) {
+    return new Response("Invalid value", { status: 400 });
+  }
+  const records = await loadLabels2(labelsPath);
+  const updated = setLabel(records, siteWorkId, value, new Date().toISOString());
+  await saveLabels2(labelsPath, updated);
+  return new Response(null, { status: 200 });
+}
+
+// DELETE /labels/:siteWorkId 契約: 該当行を除いた配列で labels.jsonl を再保存する。
+// 存在しない ID でも 200（べき等）。siteWorkId のパスセグメントは decode 後に enum
+// パターンへ照合し、"../" や "%2F" などの逸脱は 400 で弾く。
+async function handleLabelDelete(pathname: string, labelsPath: string): Promise<Response> {
+  const rest = pathname.replace(/^\/labels\/?/, "");
+  if (rest === "") return new Response("siteWorkId required", { status: 400 });
+  let siteWorkId: string;
+  try {
+    siteWorkId = decodeURIComponent(rest);
+  } catch {
+    return new Response("Invalid siteWorkId", { status: 400 });
+  }
+  if (!isValidSiteWorkId(siteWorkId)) {
+    return new Response("Invalid siteWorkId", { status: 400 });
+  }
+  const records = await loadLabels2(labelsPath);
+  await saveLabels2(labelsPath, deleteLabel(records, siteWorkId));
+  return new Response(null, { status: 200 });
+}
+
 // resolveAssetPath の封じ込め判定は文字列 resolve のみで symlink を辿らない。distDir 配下に
 // 外部ファイルを指す symlink を置かれると、そのままでは 200 で読み出せてしまう（実プロダクト
 // 用ではないが cal.json を含む dist を localhost に配信する以上、閉じ込めは必須）。実体パス
 // （symlink 解決後）同士で比較して初めて封じ込めが成立するため、distDir の実体パスはハンドラ
 // 生成時に一度だけ解決し、リクエストのたびに候補ファイルの実体パスと突き合わせる。
-export function createRequestHandler(distDir: string): (req: Request) => Promise<Response> {
+//
+// labelsPath は POST/DELETE /labels の永続化先。GET のみで運用する既存呼び出しから
+// 段階的に受け入れられるよう省略可（省略時は DEFAULT_LABELS）。
+export function createRequestHandler(
+  distDir: string,
+  labelsPath: string = DEFAULT_LABELS,
+): (req: Request) => Promise<Response> {
   const realDistDirPromise = Deno.realPath(resolve(distDir));
 
   return async (req: Request) => {
     const { pathname } = new URL(req.url);
+
+    // /labels* は API 側の分岐。静的配信のパス解決には落とさない（asset 名衝突の予防）。
+    if (pathname === "/labels" || pathname.startsWith("/labels/")) {
+      if (req.method === "POST" && pathname === "/labels") {
+        return await handleLabelPost(req, labelsPath);
+      }
+      if (req.method === "DELETE") {
+        return await handleLabelDelete(pathname, labelsPath);
+      }
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: { allow: "POST, DELETE" },
+      });
+    }
+
     const filePath = resolveAssetPath(distDir, pathname);
     if (!filePath) return new Response("Forbidden", { status: 403 });
 
@@ -157,7 +249,7 @@ export async function runServe(argv: string[], config?: ViewerConfig): Promise<n
   const hint = await missingCalJsonHint(cfg.distDir);
   if (hint) console.error(hint);
 
-  const handler = createRequestHandler(cfg.distDir);
+  const handler = createRequestHandler(cfg.distDir, DEFAULT_LABELS);
   const server = Deno.serve({ ...serveOptions(cfg), onListen: () => {} }, handler);
   const url = `http://localhost:${cfg.port}/`;
   console.log(`cal viewer を配信中: ${url}（Ctrl+C で終了）`);

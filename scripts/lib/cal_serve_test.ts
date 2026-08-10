@@ -1,5 +1,5 @@
-// cal serve の設定解釈・assets コピー・HTTP ハンドラ（パストラバーサル対策込み）を検証する。
-// Deno.serve 自体（実ネットワークリスン）は起動系のグルーコードなのでここでは対象にしない。
+// cal serve の設定解釈・assets コピー・HTTP ハンドラ（パストラバーサル対策・ラベル編集 API）を
+// 検証する。Deno.serve 自体（実ネットワークリスン）は起動系のグルーコードなのでここでは対象にしない。
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
@@ -16,6 +16,7 @@ import {
   shouldAutoOpen,
   unknownServeFlags,
 } from "./cal_serve.ts";
+import { loadLabels2, saveLabels2, setLabel } from "./labels_store.ts";
 
 Deno.test("copyAssets: srcDir の4ファイルを distDir へ上書きコピーする", async () => {
   const base = await Deno.makeTempDir();
@@ -162,6 +163,172 @@ Deno.test("createRequestHandler: 存在しないファイルは 404 を返す", 
   } finally {
     await Deno.remove(base, { recursive: true });
   }
+});
+
+// --- Web ラベル編集 API（POST /labels / DELETE /labels/:siteWorkId） ---
+// GET のみだった cal serve を read-write に拡張したときの API 契約。localhost 限定
+// バインド (127.0.0.1) は既存の serveOptions で保証されるため、ここではハンドラの
+// メソッド分岐・バリデーション・saveLabels2 の副作用だけを検証する。
+
+async function withServeFixture(
+  fn: (ctx: { distDir: string; labelsPath: string }) => Promise<void>,
+): Promise<void> {
+  const base = await Deno.makeTempDir();
+  try {
+    const distDir = join(base, "dist");
+    await Deno.mkdir(distDir, { recursive: true });
+    const labelsPath = join(base, "labels.jsonl");
+    await fn({ distDir, labelsPath });
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+}
+
+Deno.test("POST /labels: 品質ラベル「駄」を書き込み 200 を返す", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "駄" }),
+      }),
+    );
+    assertEquals(res.status, 200);
+    const labels = await loadLabels2(labelsPath);
+    assertEquals(labels.length, 1);
+    assertEquals(labels[0].siteWorkId, "kakuyomu:123");
+    assertEquals(labels[0].quality, "駄");
+  });
+});
+
+Deno.test("POST /labels: 「良」「対象外」も受理する（enum の 3 値）", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    for (const value of ["良", "対象外"]) {
+      const res = await handler(
+        new Request("http://localhost/labels", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ siteWorkId: "kakuyomu:456", value }),
+        }),
+      );
+      assertEquals(res.status, 200);
+    }
+    const labels = await loadLabels2(labelsPath);
+    assertEquals(labels[0].scope, "対象外");
+  });
+});
+
+Deno.test("POST /labels: 未対応の value（enum 外）は 400 で拒否し labels を書かない", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "ゴミ" }),
+      }),
+    );
+    assertEquals(res.status, 400);
+    assertEquals(await loadLabels2(labelsPath), []);
+  });
+});
+
+Deno.test("POST /labels: siteWorkId 欠損は 400 で拒否する", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ value: "良" }),
+      }),
+    );
+    assertEquals(res.status, 400);
+  });
+});
+
+Deno.test("POST /labels: siteWorkId 形式違反（site:数値ID以外）は 400 で拒否する", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "../etc/passwd", value: "良" }),
+      }),
+    );
+    assertEquals(res.status, 400);
+  });
+});
+
+Deno.test("POST /labels: JSON パース失敗は 400 で返しサーバーを落とさない", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "not-a-json",
+      }),
+    );
+    assertEquals(res.status, 400);
+  });
+});
+
+Deno.test("DELETE /labels/:siteWorkId: 該当行を削除して 200 を返す（未ラベルに戻す）", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await saveLabels2(labelsPath, setLabel([], "kakuyomu:123", "良", "t"));
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels/kakuyomu:123", { method: "DELETE" }),
+    );
+    assertEquals(res.status, 200);
+    assertEquals(await loadLabels2(labelsPath), []);
+  });
+});
+
+Deno.test("DELETE /labels/:siteWorkId: 該当なしでも 200 を返す（べき等）", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels/kakuyomu:999", { method: "DELETE" }),
+    );
+    assertEquals(res.status, 200);
+  });
+});
+
+Deno.test("DELETE /labels/:siteWorkId: siteWorkId 形式違反は 400 で拒否する", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await Deno.writeTextFile(labelsPath, "");
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels/..%2Fpasswd", { method: "DELETE" }),
+    );
+    assertEquals(res.status, 400);
+  });
+});
+
+Deno.test("DELETE /labels: siteWorkId パス欠損は 400 で拒否する", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(new Request("http://localhost/labels", { method: "DELETE" }));
+    assertEquals(res.status, 400);
+  });
+});
+
+Deno.test("createRequestHandler: /labels に対する未対応メソッド（PUT）は 405 を返す", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "PUT",
+        body: JSON.stringify({ siteWorkId: "kakuyomu:1", value: "良" }),
+      }),
+    );
+    assertEquals(res.status, 405);
+  });
 });
 
 Deno.test("serveOptions: hostname を 127.0.0.1 に固定する（Deno.serve 既定の 0.0.0.0 bind を避ける）", () => {
