@@ -117,6 +117,9 @@ export function mount(anchor, { siteWorkId, getCurrentValue, onUpdate }) {
 
 function openPopover(anchor, { siteWorkId, currentValue, onUpdate }) {
   const previousFocus = document.activeElement;
+  // popover 開閉に合わせて anchor の aria-expanded を反転する。スクリーンリーダーで
+  // 「chip をクリックしたら menu が開いた/閉じた」の状態変化が読まれる。
+  anchor.setAttribute("aria-expanded", "true");
   const popover = document.createElement("div");
   popover.className = "label-popover";
   popover.setAttribute("role", "menu");
@@ -163,6 +166,7 @@ function openPopover(anchor, { siteWorkId, currentValue, onUpdate }) {
     onCleanup: () => {
       document.removeEventListener("click", onDocumentClick, true);
       document.removeEventListener("keydown", onDocumentKeydown, true);
+      anchor.setAttribute("aria-expanded", "false");
       if (previousFocus && typeof previousFocus.focus === "function") {
         previousFocus.focus();
       }

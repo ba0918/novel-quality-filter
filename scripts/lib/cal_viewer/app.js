@@ -143,6 +143,7 @@ function EditableLabelChip({ siteWorkId, labels, onUpdate }) {
         class=${className}
         ref=${buttonRef}
         aria-haspopup="menu"
+        aria-expanded="false"
         aria-label=${`ラベル編集: 現在 ${displayLabel}`}
       >${displayLabel}<span class="chip-caret" aria-hidden="true">▾</span></button>
     </span>
