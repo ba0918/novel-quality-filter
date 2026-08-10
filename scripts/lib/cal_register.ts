@@ -8,8 +8,9 @@ import { sleep } from "../../src/shared/async.ts";
 import { initTokenizer, tokenize } from "../../src/domain/tokenizer/mod.ts";
 import { analyzeAll } from "../../src/domain/analyzer/mod.ts";
 import { parseTargetUrl } from "../../src/background/fetchers/kakuyomu.ts";
-import { loadDataset, seenWorkIds } from "./dataset.ts";
+import { type DatasetRecord, loadDataset, seenWorkIds } from "./dataset.ts";
 import { type CollectDeps, collectWork, enforceRateLimits } from "./collect.ts";
+import { CANONICAL_FORMULA, evaluateRecord } from "./cal_evaluate.ts";
 
 const DEFAULT_OUT = ".agents/runtime/dataset.jsonl";
 const DEFAULT_PAGES_DIR = ".agents/runtime";
@@ -23,6 +24,24 @@ export interface RegisterOptions {
   pagesDir: string;
   tags: string[];
   recapture: boolean;
+}
+
+export interface RegisterResult {
+  workId: string;
+  captureId: string;
+  score: number;
+  title: string;
+}
+
+// 収集直後の表示用サマリ。表示スコアは正本式で rawMetrics から再計算する。収集時に保存した
+// record.score は化石化するため使わない（評価・詳細・一覧と同じ再計算経路を通す）。
+export function registerResultOf(record: DatasetRecord, captureId: string): RegisterResult {
+  return {
+    workId: record.workId,
+    captureId,
+    score: evaluateRecord(record, CANONICAL_FORMULA).score,
+    title: record.title,
+  };
 }
 
 export function parseRegisterArgs(argv: string[]): RegisterOptions {
@@ -99,9 +118,10 @@ export async function runRegister(argv: string[]): Promise<number> {
     }
     try {
       const { record, captureId } = await collectWork(workId, opts.tags, deps);
+      const result = registerResultOf(record, captureId);
       added++;
       seen.add(workId);
-      console.log(`  ✓ ${record.score} ${record.title.slice(0, 30)} [${captureId}]`);
+      console.log(`  ✓ ${result.score} ${result.title.slice(0, 30)} [${result.captureId}]`);
     } catch (e) {
       failed++;
       console.error(`  ✗ ${workId}: ${e instanceof Error ? e.message : e}`);
