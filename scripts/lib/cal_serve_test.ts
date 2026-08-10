@@ -370,19 +370,36 @@ Deno.test("missingCalJsonHint: cal.json があれば undefined を返す", async
   }
 });
 
-Deno.test("ASSET_FILES: app.js が参照するローカル ./*.js の import 先を漏れなく含む", async () => {
+Deno.test("ASSET_FILES: app.js からの推移的なローカル ./*.js import を漏れなく含む", async () => {
   // ブラウザは cal serve が dist にコピーしたファイルしか読めないため、app.js の import 対象が
   // ASSET_FILES から漏れると起動時に module resolution が 404 で失敗し、viewer が壊れる。
   // Deno のユニットテストは実 serve 経路を通らないので、asset の整合性はここで機械的に閉じ込める。
-  const appSource = await Deno.readTextFile(`${ASSET_SRC_DIR}/app.js`);
+  // toast.js のような推移的 import（app.js → label_editor.js → toast.js）まで含めるため
+  // BFS で辿ってから ASSET_FILES との差分を検査する。
   const importRe = /from\s+["']\.\/([A-Za-z0-9_.\-/]+)["']/g;
-  const localImports = new Set<string>();
-  for (const m of appSource.matchAll(importRe)) localImports.add(m[1]);
-  assert(localImports.size > 0, "app.js からローカル import が1件も検出されないのは検査自体の不良");
-  for (const file of localImports) {
+  const discovered = new Set<string>(["app.js"]);
+  const queue: string[] = ["app.js"];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const source = await Deno.readTextFile(`${ASSET_SRC_DIR}/${current}`);
+    for (const m of source.matchAll(importRe)) {
+      const next = m[1];
+      if (!discovered.has(next)) {
+        discovered.add(next);
+        // .js ファイルだけ再帰的に辿る（.css/.json は起点にならない）。
+        if (next.endsWith(".js")) queue.push(next);
+      }
+    }
+  }
+  assert(
+    discovered.size > 1,
+    "app.js からローカル import が1件も検出されないのは検査自体の不良",
+  );
+  for (const file of discovered) {
+    if (file === "app.js") continue; // app.js 自身は起点で常に含まれる
     assert(
       ASSET_FILES.includes(file),
-      `app.js は ./${file} を import しているのに ASSET_FILES に含まれていない`,
+      `推移的に import されている ./${file} が ASSET_FILES に含まれていない`,
     );
   }
 });
