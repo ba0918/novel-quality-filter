@@ -2,11 +2,21 @@ import type {
   CategoryCount,
   LineMetadata,
   MetricResult,
-  NarrativeCount,
   PenaltyResult,
   ScoreResult,
 } from "../../domain/types.ts";
 import { formatOpeningContext } from "../../domain/analyzer/opening_format.ts";
+import {
+  averageCharsLabel,
+  averagePerLineLabel,
+  compositionSegments,
+  formatInt,
+  formatRawValue,
+  isNarrativeCount,
+  percentInt,
+  percentOne,
+  widthPercent,
+} from "../../domain/analyzer/dossier_format.ts";
 import { scoreToColor } from "./score-color.ts";
 
 const BADGE_CLASS = "nqf-work-badge";
@@ -252,11 +262,6 @@ function createPenaltySection(penalties: PenaltyResult[]): HTMLDivElement {
   return section;
 }
 
-function formatRawValue(value: number): string {
-  if (value < 1) return (value * 100).toFixed(1) + "%";
-  return value.toFixed(1);
-}
-
 // 行ベース文体メタデータ（診断用）。既存メトリクスとは別枠で、開閉式セクションとして
 // カテゴリ別の分量・短行率・1行あたり平均文字数を表示する。総合スコアには寄与しない。
 // 本文由来テキストは含まないため textContent で安全に組み立てる。カテゴリ色は modifier
@@ -376,17 +381,6 @@ function chip(label: string, value: string, concern: boolean): HTMLSpanElement {
   num.textContent = value;
   el.appendChild(num);
   return el;
-}
-
-function compositionSegments(meta: LineMetadata): Array<[string, number]> {
-  return [
-    ["narrative", meta.narrative.lineCount],
-    ["dialogue", meta.dialogue.lineCount],
-    ["meta", meta.meta.lineCount],
-    ["nonterm", meta.nonTerminal.lineCount],
-    ["blank", meta.blankCount],
-    ["sep", meta.separatorCount],
-  ];
 }
 
 function createCompositionBar(meta: LineMetadata): HTMLDivElement {
@@ -549,38 +543,4 @@ function hiValue(text: string): HTMLSpanElement {
   hi.className = "nqf-lm-hi";
   hi.textContent = text;
   return hi;
-}
-
-function isNarrativeCount(count: CategoryCount): count is NarrativeCount {
-  return "chunkCount" in count;
-}
-
-function formatInt(n: number): string {
-  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
-function percentInt(numerator: number, denominator: number): string {
-  if (denominator === 0) return "-";
-  return `${Math.round((numerator / denominator) * 100)}%`;
-}
-
-function percentOne(numerator: number, denominator: number): string {
-  if (denominator === 0) return "-";
-  return `${((numerator / denominator) * 100).toFixed(1)}%`;
-}
-
-function widthPercent(numerator: number, denominator: number): number {
-  if (denominator === 0) return 0;
-  return Math.min(100, (numerator / denominator) * 100);
-}
-
-function averagePerLineLabel(meta: LineMetadata): string {
-  const denominator = meta.totalLines - meta.blankCount;
-  if (denominator <= 0) return "-";
-  return `${(meta.totalChars / denominator).toFixed(1)}字/行`;
-}
-
-function averageCharsLabel(count: CategoryCount): string {
-  if (count.lineCount === 0) return "-";
-  return `${(count.charCount / count.lineCount).toFixed(1)}字`;
 }

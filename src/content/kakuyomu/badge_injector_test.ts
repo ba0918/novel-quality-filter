@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { parseHTML } from "linkedom";
-import type { LineMetadata, ScoreResult } from "../../domain/types.ts";
+import type { LineMetadata, MetricResult, ScoreResult } from "../../domain/types.ts";
 import { injectBadge } from "./badge-injector.ts";
 import { injectScoreButton, injectWorkBadge } from "./work-page-injector.ts";
 
@@ -119,6 +119,54 @@ Deno.test("work-page-injector: 開幕形式を detail panel に表示しネイ�
     assertEquals(badge?.title, "");
     const context = container.querySelector<HTMLElement>(".nqf-detail-context");
     assertEquals(context?.textContent, "掲示板開幕");
+  });
+});
+
+function metric(overrides: Partial<MetricResult> = {}): MetricResult {
+  return {
+    key: "k",
+    label: "指標",
+    rawValue: 0.5,
+    normalizedValue: 0.5,
+    weight: 0.1,
+    contribution: 5,
+    flagged: false,
+    reason: "",
+    ...overrides,
+  };
+}
+
+// createMetricRow の値整形（rawValue の %/実数切替・正規化%・flag 色）を DOM 出力で固定する。
+// dossier_format 抽出のリファクタで表示が変わらないことを担保する特性化テスト。
+Deno.test("work-page-injector: 指標行が生値（率/実数）と正規化%とフラグ色を表示する", () => {
+  withDocument("<div class='container'></div>", (doc) => {
+    const container = doc.querySelector<HTMLElement>(".container")!;
+    injectWorkBadge(
+      container,
+      makeResult({
+        metrics: [
+          metric({ label: "率指標", rawValue: 0.234, normalizedValue: 0.8, flagged: false }),
+          metric({ label: "実数指標", rawValue: 12.5, normalizedValue: 0.2, flagged: true }),
+        ],
+      }),
+      () => {},
+    );
+
+    const rows = container.querySelectorAll<HTMLElement>(".nqf-metric-row");
+    assertEquals(rows.length, 2);
+
+    // 1件目: rawValue<1 は百分率、正規化 0.8→80%、非フラグ
+    const first = rows[0];
+    assert((first.textContent ?? "").includes("率指標"));
+    assert((first.querySelector(".nqf-metric-raw")?.textContent ?? "").includes("23.4%"));
+    assertEquals(first.querySelector(".nqf-metric-norm")?.textContent, "80%");
+    assertEquals(first.classList.contains("nqf-metric-row--flagged"), false);
+
+    // 2件目: rawValue>=1 は実数1桁、正規化 0.2→20%、フラグ色
+    const second = rows[1];
+    assertEquals(second.querySelector(".nqf-metric-raw")?.textContent, "12.5");
+    assertEquals(second.querySelector(".nqf-metric-norm")?.textContent, "20%");
+    assertEquals(second.classList.contains("nqf-metric-row--flagged"), true);
   });
 });
 
