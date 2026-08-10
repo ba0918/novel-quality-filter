@@ -9,8 +9,8 @@ const DEFAULT_PATHS: EditPaths = { datasetPath: DEFAULT_OUT, labelsPath: DEFAULT
 
 export async function runLabel(argv: string[], paths: EditPaths = DEFAULT_PATHS): Promise<number> {
   const [target, value, note] = argv;
-  if (!target || (value !== "良" && value !== "ゴミ" && value !== "対象外")) {
-    console.error("使い方: deno task cal label <url|workId> <良|ゴミ|対象外> [note]");
+  if (!target || (value !== "良" && value !== "駄" && value !== "対象外")) {
+    console.error("使い方: deno task cal label <url|workId> <良|駄|対象外> [note]");
     return 1;
   }
   const id = await editLabelStore(

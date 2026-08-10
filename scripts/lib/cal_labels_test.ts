@@ -60,6 +60,29 @@ Deno.test("runLabel: 不正なラベル値は 1 を返し書き込まない", as
   }
 });
 
+Deno.test("runLabel: 「駄」を受理して品質ラベルを書き込む", async () => {
+  const p = await seed();
+  try {
+    const code = await runLabel(["123", "駄"], p);
+    assertEquals(code, 0);
+    const labels = await loadLabels2(p.labelsPath);
+    assertEquals(labels[0].quality, "駄");
+  } finally {
+    await Deno.remove(p.base, { recursive: true });
+  }
+});
+
+Deno.test("runLabel: 旧「ゴミ」表記は改名後は非零 exit で拒否する（過渡的受理なし）", async () => {
+  const p = await seed();
+  try {
+    const code = await runLabel(["123", "ゴミ"], p);
+    assertEquals(code, 1);
+    assertEquals(await loadLabels2(p.labelsPath), []);
+  } finally {
+    await Deno.remove(p.base, { recursive: true });
+  }
+});
+
 Deno.test("runTag: コホートタグを付与する", async () => {
   const p = await seed();
   try {

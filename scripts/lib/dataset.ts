@@ -63,7 +63,7 @@ export async function appendRecord(path: string, rec: DatasetRecord): Promise<vo
 
 export interface LabelRecord {
   workId: string;
-  label: string; // 良 / ゴミ / 対象外 など
+  label: string; // 良 / 駄 / 対象外 など（旧「ゴミ」の付いた行は labels_store.parseLabels2 が「駄」へ正規化する）
   note?: string;
 }
 

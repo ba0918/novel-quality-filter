@@ -37,14 +37,14 @@ Deno.test("editLabelStore: 収集済み作品には URL からラベルを付け
 
     const id = await editLabelStore(
       "https://kakuyomu.jp/works/123",
-      (records, siteWorkId, now) => setLabel(records, siteWorkId, "ゴミ", now),
+      (records, siteWorkId, now) => setLabel(records, siteWorkId, "駄", now),
       paths,
     );
     assertEquals(id, "kakuyomu:123");
 
     const labels = await loadLabels2(paths.labelsPath);
     assertEquals(labels.length, 1);
-    assertEquals(labels[0].quality, "ゴミ");
+    assertEquals(labels[0].quality, "駄");
   } finally {
     await Deno.remove(base, { recursive: true });
   }

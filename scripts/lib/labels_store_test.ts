@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import {
   datasetSiteWorkIds,
+  deleteLabel,
   parseLabels2,
   resolveSiteWorkId,
   setExcluded,
@@ -22,13 +23,13 @@ Deno.test("setLabel: 品質ラベルを付与し、更新は同一作品1行で�
   assertEquals(records[0].quality, "良");
   assertEquals(records[0].scope, "対象");
 
-  records = setLabel(records, "kakuyomu:123", "ゴミ", "2026-08-10T01:00:00.000Z");
+  records = setLabel(records, "kakuyomu:123", "駄", "2026-08-10T01:00:00.000Z");
   assertEquals(records.length, 1); // 1作品1行
-  assertEquals(records[0].quality, "ゴミ");
+  assertEquals(records[0].quality, "駄");
   assertEquals(records[0].updatedAt, "2026-08-10T01:00:00.000Z");
 });
 
-Deno.test("setLabel: 対象外はスコープ軸に載せ、品質の良/ゴミには混ぜない", () => {
+Deno.test("setLabel: 対象外はスコープ軸に載せ、品質の良/駄には混ぜない", () => {
   const records = setLabel([], "kakuyomu:123", "対象外", "t");
   assertEquals(records[0].scope, "対象外");
   assertEquals(records[0].quality, undefined);
@@ -48,10 +49,10 @@ Deno.test("setExcluded: 論理除外フラグを立てる（原本は消さな�
   assertEquals(records[0].excluded, true);
 });
 
-Deno.test("parseLabels2: 旧形式（label:良/ゴミ/対象外）を2軸へ正規化して読む（後方互換）", () => {
+Deno.test("parseLabels2: 旧形式（label:良/駄/対象外）を2軸へ正規化して読む（後方互換）", () => {
   const legacy = [
     JSON.stringify({ workId: "111", label: "良", note: "面白い" }),
-    JSON.stringify({ workId: "222", label: "ゴミ" }),
+    JSON.stringify({ workId: "222", label: "駄" }),
     JSON.stringify({ workId: "333", label: "対象外", note: "題材が好みでない" }),
   ].join("\n");
   const records = parseLabels2(legacy);
@@ -60,9 +61,36 @@ Deno.test("parseLabels2: 旧形式（label:良/ゴミ/対象外）を2軸へ正�
   assertEquals(byId.get("kakuyomu:111")?.quality, "良");
   assertEquals(byId.get("kakuyomu:111")?.scope, "対象");
   assertEquals(byId.get("kakuyomu:111")?.note, "面白い");
-  assertEquals(byId.get("kakuyomu:222")?.quality, "ゴミ");
+  assertEquals(byId.get("kakuyomu:222")?.quality, "駄");
   assertEquals(byId.get("kakuyomu:333")?.scope, "対象外");
   assertEquals(byId.get("kakuyomu:333")?.quality, undefined);
+});
+
+Deno.test("parseLabels2: 旧「ゴミ」表記も駄へ正規化して読む（改名前 labels.jsonl の後方互換）", () => {
+  const legacy = JSON.stringify({ workId: "999", label: "ゴミ", note: "低質" });
+  const [rec] = parseLabels2(legacy);
+  assertEquals(rec.quality, "駄");
+  assertEquals(rec.scope, "対象");
+  assertEquals(rec.note, "低質");
+});
+
+Deno.test("deleteLabel: 指定 siteWorkId の行を除外した配列を返す", () => {
+  const seeded = setLabel(
+    setLabel([], "kakuyomu:111", "良", "t"),
+    "kakuyomu:222",
+    "駄",
+    "t",
+  );
+  const after = deleteLabel(seeded, "kakuyomu:111");
+  assertEquals(after.length, 1);
+  assertEquals(after[0].siteWorkId, "kakuyomu:222");
+});
+
+Deno.test("deleteLabel: 存在しない siteWorkId なら元と同等の配列を返す（新規要素は増えない）", () => {
+  const seeded = setLabel([], "kakuyomu:111", "良", "t");
+  const after = deleteLabel(seeded, "kakuyomu:999");
+  assertEquals(after.length, 1);
+  assertEquals(after[0].siteWorkId, "kakuyomu:111");
 });
 
 Deno.test("toLabelsJsonl→parseLabels2: 新形式が往復する", () => {

@@ -1,4 +1,4 @@
-// ラベルストア（labels.jsonl）。ユーザーの主観判定を2軸（品質: 良/ゴミ、スコープ: 対象/対象外）＋
+// ラベルストア（labels.jsonl）。ユーザーの主観判定を2軸（品質: 良/駄、スコープ: 対象/対象外）＋
 // コホートタグ＋論理除外フラグで持つ。1作品1行・last-write-wins。手JSON編集を避け、label/tag/
 // exclude の各 CLI から純関数で更新する。join キーは siteWorkId（例 kakuyomu:123）。
 
@@ -8,7 +8,7 @@ import type { DatasetRecord } from "./dataset.ts";
 
 const SITE = "kakuyomu";
 
-export type Quality = "良" | "ゴミ";
+export type Quality = "良" | "駄";
 export type Scope = "対象" | "対象外";
 export type LabelValue = Quality | "対象外";
 
@@ -46,11 +46,17 @@ export function setLabel(
   const withNote = note !== undefined ? { note } : {};
   return upsert(records, siteWorkId, updatedAt, (rec) => {
     if (value === "対象外") {
-      // スコープ軸に載せる。品質の良/ゴミには混ぜない。
+      // スコープ軸に載せる。品質の良/駄には混ぜない。
       return { ...rec, scope: "対象外", ...withNote };
     }
     return { ...rec, quality: value, scope: "対象", ...withNote };
   });
+}
+
+// 「未ラベルに戻す」用: 指定 siteWorkId の行を除外した配列を返す。存在しない ID は不変。
+// upsert の逆操作として純関数のまま置く（filter 相当だが、他の編集関数と対称の入口として明示）。
+export function deleteLabel(records: LabelRecord2[], siteWorkId: string): LabelRecord2[] {
+  return records.filter((r) => r.siteWorkId !== siteWorkId);
 }
 
 // tag 引数は "+タグ"（付与）/ "-タグ"（除去）。接頭辞なしは付与扱い。
@@ -115,8 +121,11 @@ function normalizeLegacy(old: LegacyLabel): LabelRecord2 {
   };
   const withNote = old.note !== undefined ? { note: old.note } : {};
   if (old.label === "対象外") return { ...base, scope: "対象外", ...withNote };
-  if (old.label === "良" || old.label === "ゴミ") {
-    return { ...base, quality: old.label, ...withNote };
+  // 旧「ゴミ」表記は 2026-08 の改名時に「駄」へリネームされたため、読み込み時に自動移行する。
+  // 既存 labels.jsonl を破壊的に書き換えず、次回 saveLabels2 で新表記に落ちる。
+  const quality = old.label === "ゴミ" ? "駄" : old.label;
+  if (quality === "良" || quality === "駄") {
+    return { ...base, quality, ...withNote };
   }
   return { ...base, ...withNote };
 }

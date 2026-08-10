@@ -58,11 +58,11 @@ Deno.test("applyFilters: 検索クエリが空なら絞り込まない", () => {
 Deno.test("applyFilters: ラベルフィルタは複数選択でOR結合される", () => {
   const works = [
     work({ title: "良作", labels: ["良"] }),
-    work({ title: "ゴミ作", labels: ["ゴミ"] }),
+    work({ title: "駄作", labels: ["駄"] }),
     work({ title: "対象外作", labels: ["対象外"] }),
   ];
-  const result = applyFilters(works, { labels: ["良", "ゴミ"] });
-  assertEquals(result.map((w: { title: string }) => w.title).sort(), ["ゴミ作", "良作"]);
+  const result = applyFilters(works, { labels: ["良", "駄"] });
+  assertEquals(result.map((w: { title: string }) => w.title).sort(), ["良作", "駄作"]);
 });
 
 Deno.test("applyFilters: 「未」は labels が空配列の作品に絞る", () => {
@@ -164,15 +164,15 @@ Deno.test("applyFilters: sort=experiment-desc は実験スコアの降順に並�
   assertEquals(result.map((w: { title: string }) => w.title), ["B", "A"]);
 });
 
-Deno.test("applyFilters: sort=label はラベル優先度（良→ゴミ→対象外→未）順に並ぶ", () => {
+Deno.test("applyFilters: sort=label はラベル優先度（良→駄→対象外→未）順に並ぶ", () => {
   const works = [
     work({ title: "未", labels: [] }),
     work({ title: "対象外", labels: ["対象外"] }),
     work({ title: "良", labels: ["良"] }),
-    work({ title: "ゴミ", labels: ["ゴミ"] }),
+    work({ title: "駄", labels: ["駄"] }),
   ];
   const result = applyFilters(works, { sort: "label" });
-  assertEquals(result.map((w: { title: string }) => w.title), ["良", "ゴミ", "対象外", "未"]);
+  assertEquals(result.map((w: { title: string }) => w.title), ["良", "駄", "対象外", "未"]);
 });
 
 Deno.test("applyFilters: sort=title はタイトルの辞書順に並ぶ", () => {
@@ -195,7 +195,7 @@ Deno.test("labelsOf: labelsが値を持つ作品はそのまま返す", () => {
   assertEquals(labelsOf(work({ labels: ["良", "対象外"] })), ["良", "対象外"]);
 });
 
-Deno.test("applyFilters: labelsが未定義の作品を具体ラベル（良/ゴミ/対象外）で絞ってもエラーにならず除外される", () => {
+Deno.test("applyFilters: labelsが未定義の作品を具体ラベル（良/駄/対象外）で絞ってもエラーにならず除外される", () => {
   const withoutLabels = work({ title: "未定義ラベル" });
   delete withoutLabels.labels;
   const works = [withoutLabels, work({ title: "良ラベル", labels: ["良"] })];
@@ -211,13 +211,13 @@ Deno.test("applyFilters: sort=label で labels が未定義の作品はエラー
   assertEquals(result.map((w: { title: string }) => w.title), ["良ラベル", "未定義ラベル"]);
 });
 
-Deno.test("labelCounts: 良/ゴミ/対象外/未の件数を作品全体から数える", () => {
+Deno.test("labelCounts: 良/駄/対象外/未の件数を作品全体から数える", () => {
   const works = [
     work({ labels: ["良"] }),
     work({ labels: ["良"] }),
-    work({ labels: ["ゴミ"] }),
+    work({ labels: ["駄"] }),
     work({ labels: ["対象外"] }),
     work({ labels: [] }),
   ];
-  assertEquals(labelCounts(works), { "良": 2, "ゴミ": 1, "対象外": 1, "未": 1 });
+  assertEquals(labelCounts(works), { "良": 2, "駄": 1, "対象外": 1, "未": 1 });
 });

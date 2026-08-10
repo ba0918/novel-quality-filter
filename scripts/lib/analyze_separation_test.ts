@@ -33,7 +33,7 @@ function rec(workId: string, o: RecOpts = {}): DatasetRecord {
   };
 }
 
-function labelOf(workId: string, quality: "良" | "ゴミ"): LabelRecord2 {
+function labelOf(workId: string, quality: "良" | "駄"): LabelRecord2 {
   return setLabel([], `kakuyomu:${workId}`, quality, "t")[0];
 }
 

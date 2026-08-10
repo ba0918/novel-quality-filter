@@ -1,7 +1,7 @@
 // サイドバーの絞り込み・並び替えの純関数。UI（app.js）から切り離してテスタブルにする
 // （format.js / raw_metrics.js と同じ「計算は cal_viewer/*.js に集約」パターン）。
 
-export const LABEL_CHIPS = ["良", "ゴミ", "対象外", "未"];
+export const LABEL_CHIPS = ["良", "駄", "対象外", "未"];
 
 // work.labels は cal.json 上 undefined になり得る（labels_store 側の labelsFor が空配列 or
 // undefined を返す）。参照箇所を毎回 `work.labels && ...` で個別にガードすると漏れの元になる
@@ -14,7 +14,7 @@ function isUnlabeled(work) {
   return labelsOf(work).length === 0;
 }
 
-// 「未」は quality/scope/tags いずれのラベルも1件も付いていない状態を指す。良/ゴミ/対象外は
+// 「未」は quality/scope/tags いずれのラベルも1件も付いていない状態を指す。良/駄/対象外は
 // cal.json の labels 配列にそのまま含まれる文字列として判定する。
 function matchesLabel(work, label) {
   return label === "未" ? isUnlabeled(work) : labelsOf(work).includes(label);
@@ -32,7 +32,7 @@ function matchLabels(work, labels) {
 }
 
 // 「要注意」: 正本・実験いずれかの指標内訳で1つ以上 flagged が立っている作品。良ラベルなのに
-// flag が立っていればペナルティ設計を疑う材料、ゴミラベルなのに flag が無ければ検知漏れの材料。
+// flag が立っていればペナルティ設計を疑う材料、駄ラベルなのに flag が無ければ検知漏れの材料。
 export function hasFlagged(work) {
   return work.canonical.metrics.some((m) => m.flagged) ||
     work.experiment.metrics.some((m) => m.flagged);
@@ -42,12 +42,12 @@ function isBigDiff(work) {
   return Math.abs(work.diff) >= 3;
 }
 
-// ラベル順ソートの優先度。良→ゴミ→対象外→未の順（サイドバーのチップ表示順と揃える）。
-const LABEL_RANK = { "良": 0, "ゴミ": 1, "対象外": 2 };
+// ラベル順ソートの優先度。良→駄→対象外→未の順（サイドバーのチップ表示順と揃える）。
+const LABEL_RANK = { "良": 0, "駄": 1, "対象外": 2 };
 
 function labelRank(work) {
   const labels = labelsOf(work);
-  for (const label of ["良", "ゴミ", "対象外"]) {
+  for (const label of ["良", "駄", "対象外"]) {
     if (labels.includes(label)) return LABEL_RANK[label];
   }
   return 3; // 未
@@ -77,10 +77,10 @@ export function applyFilters(works, filters) {
     .sort(sorterFor(f.sort));
 }
 
-// サイドバーのラベルチップに表示する件数（良3 / ゴミ4 / 対象外2 / 未99 のような表示）。
+// サイドバーのラベルチップに表示する件数（良3 / 駄4 / 対象外2 / 未99 のような表示）。
 // 絞り込み前の全作品を対象に数える。
 export function labelCounts(works) {
-  const counts = { "良": 0, "ゴミ": 0, "対象外": 0, "未": 0 };
+  const counts = { "良": 0, "駄": 0, "対象外": 0, "未": 0 };
   for (const w of works) {
     for (const label of LABEL_CHIPS) {
       if (matchesLabel(w, label)) counts[label]++;

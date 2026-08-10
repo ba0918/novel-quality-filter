@@ -1,6 +1,6 @@
 /* 較正ビューアのスタイル。カラートークン・グリッド構成はモック
    （cal_viewer_mockup.html、Artifact URLはidea memoに記載）準拠。warm off-white +
-   深いインディゴaccent + 良/ゴミ/flagの3セマンティック色。dark theme対応。 */
+   深いインディゴaccent + 良/駄/flagの3セマンティック色。dark theme対応。 */
 
 :root {
   --ground: #FBF8F2;

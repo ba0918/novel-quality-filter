@@ -74,11 +74,11 @@ function diffClassName(diff) {
   return "";
 }
 
-// ラベル文字列 → chipのCSSクラス。良/ゴミ/対象外は専用色、それ以外（cal tagで付けた任意タグ）は
+// ラベル文字列 → chipのCSSクラス。良/駄/対象外は専用色、それ以外（cal tagで付けた任意タグ）は
 // 対象外と同じ中立色（out）を流用する（専用スタイルの用意が無いため）。
 function labelChipClass(label) {
   if (label === "良") return "chip good";
-  if (label === "ゴミ") return "chip bad";
+  if (label === "駄") return "chip bad";
   return "chip out";
 }
 
@@ -96,7 +96,7 @@ function toggleInArray(arr, value) {
 function filterChipClass(label, active) {
   if (!active) return "filter-chip";
   if (label === "良") return "filter-chip active good";
-  if (label === "ゴミ") return "filter-chip active bad";
+  if (label === "駄") return "filter-chip active bad";
   return "filter-chip active";
 }
 
