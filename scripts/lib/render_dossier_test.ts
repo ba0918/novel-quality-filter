@@ -86,6 +86,12 @@ Deno.test("renderDossierCard: タイトル・作者の本文由来文字列を H
   assertStringIncludes(html, "a&amp;&quot;b");
 });
 
+Deno.test("renderDossierCard: 危険なスキームの URL を href として無害化する（XSS防止）", () => {
+  const html = renderDossierCard({ ...META, url: "javascript:alert(1)" }, result());
+  assertEquals(html.includes(`href="javascript:`), false);
+  assertStringIncludes(html, `href="#"`);
+});
+
 Deno.test("renderDossierCard: ペナルティが無ければ「なし」を表示する", () => {
   const html = renderDossierCard(META, result({ penalties: [] }));
   assertStringIncludes(html, "なし");

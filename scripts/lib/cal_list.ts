@@ -63,7 +63,7 @@ export function renderListHtml(rows: ComparisonRow[]): string {
     const r = row.record;
     return `<tr>` +
       `<td><a href="#${escapeHtml(r.workId)}">${escapeHtml(r.title)}</a></td>` +
-      `<td>${row.quality ?? "-"}</td>` +
+      `<td>${escapeHtml(row.quality ?? "-")}</td>` +
       `<td>${row.canonicalScore}</td>` +
       `<td>${row.experimentScore}</td>` +
       diffCell(row.diff) +

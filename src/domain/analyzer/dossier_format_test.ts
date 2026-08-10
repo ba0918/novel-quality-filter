@@ -9,8 +9,27 @@ import {
   isNarrativeCount,
   percentInt,
   percentOne,
+  safeHref,
   widthPercent,
 } from "./dossier_format.ts";
+
+Deno.test("safeHref: http/https はエスケープして通す", () => {
+  assertEquals(safeHref("https://kakuyomu.jp/works/1"), "https://kakuyomu.jp/works/1");
+  assertEquals(safeHref("http://example.com/a?b=1&c=2"), "http://example.com/a?b=1&amp;c=2");
+});
+
+Deno.test("safeHref: スキーム無し（相対・アンカー）はエスケープして通す", () => {
+  assertEquals(safeHref("#anchor"), "#anchor");
+  assertEquals(safeHref("/works/1"), "/works/1");
+});
+
+Deno.test("safeHref: javascript: など http/https 以外のスキームを無害化する", () => {
+  assertEquals(safeHref("javascript:alert(1)"), "#");
+  assertEquals(safeHref("JavaScript:alert(1)"), "#"); // 大文字小文字を無視
+  assertEquals(safeHref("data:text/html,<script>alert(1)</script>"), "#");
+  assertEquals(safeHref("  javascript:alert(1)"), "#"); // 先頭空白での回避
+  assertEquals(safeHref("java\tscript:alert(1)"), "#"); // 制御文字での分断回避
+});
 
 Deno.test("formatRawValue: 1未満は百分率1桁、1以上は実数1桁", () => {
   assertEquals(formatRawValue(0.234), "23.4%");

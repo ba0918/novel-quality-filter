@@ -19,6 +19,7 @@ import {
   isNarrativeCount,
   percentInt,
   percentOne,
+  safeHref,
   widthPercent,
 } from "../../src/domain/analyzer/dossier_format.ts";
 
@@ -54,7 +55,7 @@ function context(result: ScoreResult): string {
 function renderCardHeader(meta: DossierMeta, result: ScoreResult): string {
   return [
     `<div class="nqf-card-head">`,
-    `<a class="nqf-card-title" href="${escapeHtml(meta.url)}">${escapeHtml(meta.title)}</a>`,
+    `<a class="nqf-card-title" href="${safeHref(meta.url)}">${escapeHtml(meta.title)}</a>`,
     `<span class="nqf-card-author">${escapeHtml(meta.author)}</span>`,
     `<span class="nqf-card-score">${result.score}</span>`,
     `</div>`,

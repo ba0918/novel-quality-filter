@@ -3,9 +3,16 @@ import { join } from "@std/path";
 import type { RawMetrics } from "../../src/domain/types.ts";
 import { appendRecord, type DatasetRecord } from "./dataset.ts";
 import { saveLabels2, setLabel } from "./labels_store.ts";
+import type { Quality } from "./labels_store.ts";
 import { calculateScore } from "../../src/domain/scoring/mod.ts";
 import { CANONICAL_FORMULA, EXPERIMENT_FORMULA, scoreResultFromMetrics } from "./cal_evaluate.ts";
-import { buildComparisonRows, renderListHtml, runEvaluate, runList } from "./cal_list.ts";
+import {
+  buildComparisonRows,
+  type ComparisonRow,
+  renderListHtml,
+  runEvaluate,
+  runList,
+} from "./cal_list.ts";
 
 function raw(overrides: Partial<RawMetrics> = {}): RawMetrics {
   return {
@@ -80,6 +87,20 @@ Deno.test("renderListHtml: 良/悪ラベル・正本・実験式・差分の列�
   assertStringIncludes(html, "差分");
   assertStringIncludes(html, "作品1");
   assertStringIncludes(html, "良");
+});
+
+Deno.test("renderListHtml: ラベルセルの文字列を HTML エスケープする（XSS防止）", () => {
+  const row: ComparisonRow = {
+    record: record("1", 0, raw()),
+    quality: "<img src=x onerror=alert(1)>" as Quality,
+    scope: "対象",
+    canonicalScore: 10,
+    experimentScore: 10,
+    diff: 0,
+  };
+  const html = renderListHtml([row]);
+  assertEquals(html.includes("<img src=x"), false);
+  assertStringIncludes(html, "&lt;img src=x");
 });
 
 async function seed(): Promise<{ base: string; datasetPath: string; labelsPath: string }> {
