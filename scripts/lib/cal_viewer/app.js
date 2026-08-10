@@ -6,10 +6,11 @@
 import { h, render } from "https://esm.sh/preact@10.28.3";
 import { useEffect, useMemo, useState } from "https://esm.sh/preact@10.28.3/hooks";
 import htm from "https://esm.sh/htm@3.1.1";
-import { formatInt, formatRawValue, safeHref } from "./format.js";
+import { formatInt, safeHref } from "./format.js";
 import { rawMetricsRows } from "./raw_metrics.js";
 import { applyFilters, LABEL_CHIPS, labelCounts } from "./list_filter.js";
 import { bandSegments, categoryBreakdown, summarize } from "./line_meta.js";
+import { joinMetrics, joinPenalties } from "./detail_join.js";
 
 const html = htm.bind(h);
 
@@ -266,25 +267,15 @@ function ScoreSection({ work }) {
   `;
 }
 
-// canonical/experimentの指標をkeyでjoinする。実験式は正本と同じ指標キー集合を過不足なく持つ
-// （weights_experiment_test.tsで担保済み）ため、Mapルックアップは必ずヒットする前提でよい。
-function joinMetrics(canonicalMetrics, experimentMetrics) {
-  const experimentByKey = new Map(experimentMetrics.map((m) => [m.key, m]));
-  return canonicalMetrics.map((canonical) => {
-    const experiment = experimentByKey.get(canonical.key);
-    return {
-      key: canonical.key,
-      label: canonical.label,
-      canonical,
-      experiment,
-      differ: canonical.contribution !== experiment.contribution,
-      delta: experiment.contribution - canonical.contribution,
-    };
-  });
+// raw値・normalized値の表示。mockupは常に生の小数（%変換しない）で示す方針のため、既存の
+// formatRawValue（値<1を%表示に変換する、rawMetricsセクション向けの整形規則）は流用しない
+// （format.jsは今iterateで変更しない対象のため、専用の整形関数をここに置く）。
+function rawLabel(value) {
+  return value.toFixed(3);
 }
 
-function normPercent(metric) {
-  return `${Math.round(metric.normalizedValue * 100)}%`;
+function normLabel(metric) {
+  return metric.normalizedValue.toFixed(3);
 }
 
 function MetricsTable({ work }) {
@@ -292,8 +283,9 @@ function MetricsTable({ work }) {
   return html`
     <div class="section">
       <h3>指標内訳 <span class="raw-note">正本 vs 実験式（${rows.length}指標）</span></h3>
-      <div
-        class="section-note">差分がある行は淡いインディゴ背景。normalized / weight / contribution / flagを並列</div>
+      <div class="section-note">
+        差分がある行は淡いインディゴ背景。normalized / weight / contribution / flag を並列
+      </div>
       <div class="metrics-table-wrap">
         <table class="metrics-table">
           <thead>
@@ -320,11 +312,11 @@ function MetricsTable({ work }) {
                     <br />
                     <span class="metric-key">${row.key}</span>
                   </td>
-                  <td>${formatRawValue(row.canonical.rawValue)}</td>
-                  <td class="group">${normPercent(row.canonical)}</td>
+                  <td>${rawLabel(row.canonical.rawValue)}</td>
+                  <td class="group">${normLabel(row.canonical)}</td>
                   <td>${row.canonical.weight.toFixed(2)}</td>
                   <td>${row.canonical.contribution.toFixed(2)}</td>
-                  <td class="group">${normPercent(row.experiment)}</td>
+                  <td class="group">${normLabel(row.experiment)}</td>
                   <td>${row.experiment.weight.toFixed(2)}</td>
                   <td>${row.experiment.contribution.toFixed(2)}</td>
                   <td class=${`metric-diff ${
@@ -340,21 +332,6 @@ function MetricsTable({ work }) {
       </div>
     </div>
   `;
-}
-
-// canonical/experimentのpenaltiesはいずれも「発火した規則のみ」の配列（src/domain/scoring/mod.ts
-// がPENALTY_RULESをループし条件成立時だけpushする）。並列表示は両側の発火ラベルの和集合で行を作り、
-// 非発火側は multiplier 欄に "—" を出す（×1.00は「ルールのカタログ乗率」を意味してしまい
-// 実際に掛かった値と誤認されるため使わない）。
-function joinPenalties(canonicalPenalties, experimentPenalties) {
-  const canonicalByLabel = new Map(canonicalPenalties.map((p) => [p.label, p]));
-  const experimentByLabel = new Map(experimentPenalties.map((p) => [p.label, p]));
-  const labels = [...new Set([...canonicalByLabel.keys(), ...experimentByLabel.keys()])];
-  return labels.map((label) => ({
-    label,
-    canonical: canonicalByLabel.get(label),
-    experiment: experimentByLabel.get(label),
-  }));
 }
 
 function PenaltyMultiplier({ penalty, side }) {
@@ -398,7 +375,7 @@ function RawMetricsView({ rawMetrics, scoredMetrics }) {
       <h3>rawMetrics（本文由来） <span class="raw-note">正本/実験で不変・${rows
         .length}項目</span></h3>
       <div class="section-note">
-        <strong>採点対象</strong>（${scoredMetrics.length}）と<strong>非採点rawのみ</strong>
+        <strong>採点対象</strong>（${scoredMetrics.length}）と <strong>非採点 raw のみ</strong>
         （${rows.length - scoredMetrics.length}）を含む
       </div>
       <div class="raw-grid">
@@ -474,8 +451,9 @@ function LineMetaSection({ lineMetadata }) {
   return html`
     <div class="section">
       <h3>行メタデータ <span class="raw-note">Chrome拡張準拠・正本/実験で不変</span></h3>
-      <div
-        class="section-note">新指標（例: 平均字/行、地の文短行率）をweights_experimentに足すか判断する材料</div>
+      <div class="section-note">
+        新指標（例: 平均字/行、地の文短行率）を weights_experiment に足すか判断する材料
+      </div>
       <div class="line-meta">
         <div class="line-summary">
           <div class="stats">
