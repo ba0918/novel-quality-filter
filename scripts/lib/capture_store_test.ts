@@ -188,6 +188,54 @@ Deno.test("loadCapture: manifest の file 名がキャプチャ外を指す場�
   }
 });
 
+// pages 側の検証だけでは manifest.fetched に混入した不正 file を素通しするため、
+// 双方を独立に検証する。この message で「manifest.fetched 由来の拒否」を固定する。
+const MISMATCH = "Manifest fetched entries do not match pages";
+
+Deno.test("saveCapture: manifest.fetched の file がキャプチャ外を指す場合は保存しない（pages 側が安全でも）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const cap: Capture = {
+      manifest: manifest({
+        fetched: [{ episodeId: "1", url: "u1", order: 0, file: "../../evil" }],
+      }),
+      pages: [{ entry: { episodeId: "1", url: "u1", order: 0, file: "000_1.html" }, html: BODY }],
+    };
+    await assertRejects(() => saveCapture(base, cap), Error, UNSAFE);
+    await assertRejects(() => Deno.stat(join(base, "pages", "kakuyomu_123", "evil")));
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("saveCapture: pages と manifest.fetched が食い違う場合は保存しない（順序の正の一貫性）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    // file 値の不一致（双方とも安全なファイル名だが、順序の正が二重化して食い違う）。
+    const fileMismatch: Capture = {
+      manifest: manifest({
+        fetched: [{ episodeId: "1", url: "u1", order: 0, file: "000_1.html" }],
+      }),
+      pages: [{ entry: { episodeId: "1", url: "u1", order: 0, file: "999_x.html" }, html: BODY }],
+    };
+    await assertRejects(() => saveCapture(base, fileMismatch), Error, MISMATCH);
+
+    // 件数の不一致。
+    const countMismatch: Capture = {
+      manifest: manifest({
+        fetched: [{ episodeId: "1", url: "u1", order: 0, file: "000_1.html" }],
+      }),
+      pages: [
+        { entry: { episodeId: "1", url: "u1", order: 0, file: "000_1.html" }, html: BODY },
+        { entry: { episodeId: "2", url: "u2", order: 1, file: "001_2.html" }, html: BODY },
+      ],
+    };
+    await assertRejects(() => saveCapture(base, countMismatch), Error, MISMATCH);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
 Deno.test("makeCaptureId: 取得日時から決定的にファイル名安全なIDを作る", () => {
   const id = makeCaptureId(new Date("2026-08-10T07:47:15.123Z"));
   assertEquals(id, "2026-08-10T07-47-15-123Z");

@@ -95,6 +95,27 @@ function resolveCaptureFile(dir: string, file: string): string {
   return target;
 }
 
+// pages と manifest.fetched が同じ取得事実を指していることを検証する。順序の正は
+// manifest.fetched 一箇所に持たせるが、pages と食い違ったまま保存すると、読み戻し時に
+// manifest 順で参照する原本が pages とずれる。件数・並び・各エントリの一致を保存前に固定する。
+function assertPagesMatchFetched(capture: Capture): void {
+  const { pages, manifest } = capture;
+  const mismatch = (reason: string) =>
+    new Error(`Manifest fetched entries do not match pages: ${reason}`);
+  if (pages.length !== manifest.fetched.length) {
+    throw mismatch(`count ${pages.length} vs ${manifest.fetched.length}`);
+  }
+  for (let i = 0; i < pages.length; i++) {
+    const p = pages[i].entry;
+    const f = manifest.fetched[i];
+    if (
+      p.file !== f.file || p.episodeId !== f.episodeId || p.url !== f.url || p.order !== f.order
+    ) {
+      throw mismatch(`entry ${i}`);
+    }
+  }
+}
+
 // 不良HTML（エラー/年齢確認ページ等）を原本として保存しないための門番。全ページの健全性を
 // 検証してから初めて書き込む（部分保存で壊れた原本を残さない、C5）。
 export async function saveCapture(
@@ -113,6 +134,12 @@ export async function saveCapture(
     }
     resolveCaptureFile(dir, page.entry.file);
   }
+  // manifest.fetched は manifest.json へそのまま書き出すため、pages とは独立に file を検証する。
+  // pages 側だけ安全でも、manifest.fetched に混入した不正 file を素通しさせない（F2）。
+  for (const entry of capture.manifest.fetched) {
+    resolveCaptureFile(dir, entry.file);
+  }
+  assertPagesMatchFetched(capture);
 
   await Deno.mkdir(dir, { recursive: true });
   for (const page of capture.pages) {
