@@ -18,3 +18,14 @@ export function computeNextLabels(currentLabels, nextValue) {
   }
   return [nextValue, ...tags];
 }
+
+// Detail の meta-header に表示する primary chip の選定。scope 軸を優先し、scope="対象外"
+// なら「対象外」、対象なら quality（良/駄）、両方 undefined なら null（未表示）。
+// labels 配列の並びに依存しない（labels_store.labelsFor の順序が変わっても壊れない）。
+export function primaryLabelValue(labels) {
+  if (labels.includes("対象外")) return "対象外";
+  for (const l of labels) {
+    if (QUALITY_VALUES.has(l)) return l;
+  }
+  return null;
+}

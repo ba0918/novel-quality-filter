@@ -13,7 +13,7 @@ import { bandSegments, categoryBreakdown, shortBarRatio, summarize } from "./lin
 import { joinMetrics, joinPenalties } from "./detail_join.js";
 import { contributionTier, deficit, maxContribution } from "./metric_display.js";
 import { mount as mountLabelEditor } from "./label_editor.js";
-import { computeNextLabels } from "./label_update.js";
+import { computeNextLabels, primaryLabelValue } from "./label_update.js";
 
 const html = htm.bind(h);
 
@@ -94,12 +94,8 @@ function LabelChips({ labels }) {
 // Detail の meta-labels に置く編集可能 chip。labels のうち品質軸（良/駄）または
 // スコープ軸（対象外）を表す 1 要素だけがクリック可能ボタンで、残り（cal tag で付けた
 // 任意タグ）は既存の <span> 表示のまま。ボタンは label_editor.mount で popover を持つ。
-function primaryLabelValue(labels) {
-  for (const l of labels) {
-    if (l === "良" || l === "駄" || l === "対象外") return l;
-  }
-  return null;
-}
+// primary chip の選定規則は label_update.primaryLabelValue に集約（scope 優先、
+// docs/spec/calibration-loop-tool.md「primary chip 選定規則」参照）。
 
 function EditableLabelChip({ siteWorkId, labels, onUpdate }) {
   const primary = primaryLabelValue(labels);
@@ -120,7 +116,12 @@ function EditableLabelChip({ siteWorkId, labels, onUpdate }) {
   const className = primary
     ? `${labelChipClass(primary)} chip-clickable`
     : "chip unlabeled chip-clickable";
-  const others = labels.filter((l) => l !== primary);
+  // primary="対象外" のとき保持されている quality (良/駄) は secondary chip として出さない。
+  // 「対象外を選んだのに『良』も見えている」と誤認されるのを避けるため（quality 保持は
+  // 内部的な扱いで、labels.jsonl と再判定復元の機構としてだけ生き、表示は scope 優先）。
+  const others = labels.filter((l) =>
+    l !== primary && !(primary === "対象外" && (l === "良" || l === "駄"))
+  );
 
   return html`
     <span class="label-slot">

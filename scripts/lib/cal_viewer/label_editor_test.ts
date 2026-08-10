@@ -5,7 +5,7 @@
 
 import { assertEquals } from "@std/assert";
 import { deleteLabelRequest, setLabelRequest } from "./label_editor.js";
-import { computeNextLabels } from "./label_update.js";
+import { computeNextLabels, primaryLabelValue } from "./label_update.js";
 
 Deno.test("setLabelRequest: POST /labels 用の url/method/body を組み立てる（「駄」）", () => {
   const req = setLabelRequest("kakuyomu:123", "駄");
@@ -65,4 +65,22 @@ Deno.test("computeNextLabels: null は空配列（未ラベルに戻す＝行削
 
 Deno.test("computeNextLabels: 未ラベル（空配列）から品質を付ける", () => {
   assertEquals(computeNextLabels([], "良"), ["良"]);
+});
+
+Deno.test("primaryLabelValue: scope 軸を quality より優先し、「対象外」が含まれれば「対象外」を返す", () => {
+  // labels_store.labelsFor が ["良", "対象外", ...tags] を返しても、chip は「対象外」を表示する。
+  // labels 配列の並びに依存しない（先頭が「良」でも scope 優先）。
+  assertEquals(primaryLabelValue(["良", "対象外", "すり抜け"]), "対象外");
+  assertEquals(primaryLabelValue(["駄", "対象外"]), "対象外");
+  assertEquals(primaryLabelValue(["対象外"]), "対象外");
+});
+
+Deno.test("primaryLabelValue: 対象外を含まなければ quality（良/駄）を返す", () => {
+  assertEquals(primaryLabelValue(["良"]), "良");
+  assertEquals(primaryLabelValue(["駄", "ハードネガティブ"]), "駄");
+});
+
+Deno.test("primaryLabelValue: 品質もスコープも無ければ null（未ラベル）", () => {
+  assertEquals(primaryLabelValue([]), null);
+  assertEquals(primaryLabelValue(["すり抜け"]), null); // タグだけ
 });
