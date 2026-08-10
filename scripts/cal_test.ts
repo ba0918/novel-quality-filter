@@ -39,6 +39,11 @@ Deno.test("route: サブコマンド未指定はエラー終了する", async ()
   assertEquals(code, 1);
 });
 
+Deno.test("route: 廃止済み detail は本物の HANDLERS に対しても未知サブコマンドとしてエラー終了する", async () => {
+  const code = await route(["detail"], HANDLERS);
+  assertEquals(code, 1);
+});
+
 Deno.test("route: ハンドラの返すコードをそのまま伝播する", async () => {
   const handlers = { list: () => Promise.resolve(3) };
   assertEquals(await route(["list"], handlers), 3);
