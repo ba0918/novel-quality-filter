@@ -1,4 +1,4 @@
-import { assertEquals, assertNotEquals } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import type { RawMetrics } from "../types.ts";
 import { METRIC_CONFIGS, PENALTY_RULES } from "./weights.ts";
 import { EXPERIMENT_METRIC_CONFIGS, EXPERIMENT_PENALTY_RULES } from "./weights_experiment.ts";
@@ -32,33 +32,31 @@ Deno.test("weights_experiment: 実験式は正本と同じ指標キー集合を�
   );
 });
 
-Deno.test("weights_experiment: 実験式の採点は正本と差が出る（一覧の差分が識別力を持つ C2/C8）", () => {
-  // 高比率×低SD＝一文一段落ペナルティ帯。実験式はここで正本と異なる点数を返す必要がある。
-  const r = raw({ singleSentParaRatio: 0.85, sentenceLengthSD: 12 });
-  const canonicalNorm = (key: string) => {
-    const c = METRIC_CONFIGS.find((x) => x.key === key)!;
-    const n = c.normalize(r[key as keyof RawMetrics] as number);
-    return c.invert ? 1 - n : n;
-  };
-  const experimentNorm = (key: string) => {
-    const c = EXPERIMENT_METRIC_CONFIGS.find((x) => x.key === key)!;
-    const n = c.normalize(r[key as keyof RawMetrics] as number);
-    return c.invert ? 1 - n : n;
-  };
-  // 一文一段落の寄与または合成ペナルティのいずれかで、正本と実験式は異なる挙動を示す。
-  const contribDiffers = canonicalNorm("singleSentParaRatio") *
-      METRIC_CONFIGS.find((c) => c.key === "singleSentParaRatio")!.weight !==
-    experimentNorm("singleSentParaRatio") *
-      EXPERIMENT_METRIC_CONFIGS.find((c) => c.key === "singleSentParaRatio")!.weight;
-  const penaltyDiffers = assertHasDifferentCompositePenalty();
-  assertEquals(contribDiffers || penaltyDiffers, true);
+// 較正ループの初期状態は「差分ゼロ」がベースライン ── 実験式は正本と同一値でスタートし、
+// 実験デルタは brainstorm で仮説と根拠を議論してから明示的に入れる方針（weights_experiment.ts
+// のコメント参照）。デルタを入れるとこの2本のテストが赤くなるので、その瞬間に「同時に
+// テスト側の期待も更新する＝デルタ導入が可視化される」よう固定する。
+Deno.test("weights_experiment: 初期状態は指標重み・normalize・flag・invert が正本と一致する（差分ゼロ）", () => {
+  const shape = (cs: MetricConfig[]) =>
+    cs.map((c) => ({
+      key: c.key,
+      label: c.label,
+      weight: c.weight,
+      invert: c.invert,
+      flagThreshold: c.flagThreshold,
+      // normalize 関数の同一性は 6 点サンプリングで代替（0/境界/中央/大値/負/整数）。
+      normalizeSamples: [0, 0.01, 0.3, 0.7, 1, 12].map((x) => c.normalize(x)),
+    }));
+  assertEquals(shape(EXPERIMENT_METRIC_CONFIGS), shape(METRIC_CONFIGS));
 });
+type MetricConfig = typeof METRIC_CONFIGS[number];
 
-function assertHasDifferentCompositePenalty(): boolean {
-  const canon = PENALTY_RULES.find((p) => p.label === "一文一段落の過多");
-  const exp = EXPERIMENT_PENALTY_RULES.find((p) => p.label === "一文一段落の過多");
-  return canon?.penaltyMultiplier !== exp?.penaltyMultiplier;
-}
+Deno.test("weights_experiment: 初期状態はペナルティ規則が正本と一致する（差分ゼロ）", () => {
+  assertEquals(
+    JSON.stringify(EXPERIMENT_PENALTY_RULES),
+    JSON.stringify(PENALTY_RULES),
+  );
+});
 
 Deno.test("weights_experiment: 実験式を採点で使っても正本 weights.ts の値は不変（C1）", () => {
   const snapshot = (configs: typeof METRIC_CONFIGS) =>
@@ -82,9 +80,4 @@ Deno.test("weights_experiment: 実験式を採点で使っても正本 weights.t
 
   assertEquals(snapshot(METRIC_CONFIGS), canonicalSnapshot);
   assertEquals(JSON.stringify(PENALTY_RULES), penaltySnapshot);
-  // 実験式は正本の M1 重みをそのまま流用していない（試行の器として機能している）。
-  assertNotEquals(
-    EXPERIMENT_METRIC_CONFIGS.find((c) => c.key === "singleSentParaRatio")!.weight,
-    METRIC_CONFIGS.find((c) => c.key === "singleSentParaRatio")!.weight,
-  );
 });

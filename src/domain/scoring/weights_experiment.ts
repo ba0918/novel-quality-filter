@@ -2,10 +2,10 @@
 // 設定は独立した literal として持つ。正本の METRIC_CONFIGS / PENALTY_RULES は import 参照
 // しない（値を再利用すると同じ配列を触ってしまい正本を汚す危険があるため、丸ごと複製する）。
 //
-// ここを書き換えて式を試す。良作が「一文一段落の過多」ペナルティと M1 の重さで不当に沈む、
-// という開発者の仮説を検証するのが初期の狙い。初期デルタ:
-//   - singleSentParaRatio の重み 0.30 → 0.18（会話主体の作品への締めすぎを緩める）
-//   - 合成ペナルティ「一文一段落の過多」の乗算 0.65 → 0.80（減点を浅くする）
+// 運用方針: 初期状態は正本と完全同一の値（差分ゼロ）で始める。実験デルタを入れるときは、
+// 事前に brainstorm で仮説と根拠を議論してから、その決定を反映する形でここを書き換える。
+// weights_experiment_test.ts の「初期状態は差分ゼロ」テストが赤くなるので、デルタ導入時は
+// テスト側の期待も同時に更新する（＝デルタ導入が可視化される）。
 // 新しい評価軸を足すときも、正本には触れずこの配列へ追記する（拡張は追加で行う）。
 
 import type { MetricConfig, PenaltyRule } from "./weights.ts";
@@ -14,7 +14,7 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "singleSentParaRatio",
     label: "一文一段落比率",
-    weight: 0.18,
+    weight: 0.30,
     normalize: (raw: number) => Math.min(raw, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -119,11 +119,13 @@ export const EXPERIMENT_PENALTY_RULES: PenaltyRule[] = [
     penaltyMultiplier: 0.55,
   },
   {
+    // 一文一段落が多くても、文の長短が豊かなら紋切りではない（人気長編に多い）。
+    // 文長のばらつきが小さい（単調な）ときに限って紋切り型として減点する。
     label: "一文一段落の過多",
     conditions: [
       { key: "singleSentParaRatio", criticalThreshold: 0.30 },
       { key: "sentenceLengthSD", criticalThreshold: 0.60 },
     ],
-    penaltyMultiplier: 0.80,
+    penaltyMultiplier: 0.65,
   },
 ];

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import type { RawMetrics } from "../../src/domain/types.ts";
 import { appendRecord, type DatasetRecord } from "./dataset.ts";
@@ -63,11 +63,16 @@ Deno.test("buildComparisonRows: 保存 score でなく正本・実験式の再�
   assertEquals(row.canonicalScore === 999, false);
 });
 
-Deno.test("buildComparisonRows: 実験式で良ラベルのスコアが動く（差分が識別力を持つ）", () => {
+Deno.test("buildComparisonRows: 初期状態（差分ゼロ）では正本と実験式のスコアが一致する", () => {
+  // 較正の運用方針: weights_experiment の初期状態は正本と完全一致（差分ゼロ）で始める。
+  // 実験デルタは brainstorm で議論してから明示的に入れる（weights_experiment.ts 参照）。
+  // デルタを入れたらこのテストは赤くなり、テスト側の期待も同時に更新することで
+  // 「差分が入ったこと」が可視化される。
   const rec = record("1", 0, raw({ singleSentParaRatio: 0.85, sentenceLengthSD: 12 }));
   const labels = setLabel([], "kakuyomu:1", "良", "2026-08-10T00:00:00.000Z");
   const [row] = buildComparisonRows([rec], labels);
-  assert(row.diff !== 0, "実験式の初期デルタで良作のスコアが正本から動く");
+  assertEquals(row.canonicalScore, row.experimentScore);
+  assertEquals(row.diff, 0);
 });
 
 Deno.test("labelsFor: ラベル未設定は空配列", () => {
