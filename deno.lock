@@ -348,6 +348,14 @@
       "integrity": "sha512-qz3o9CHXmJJPGBdqzab7qAYuW8kQGKNEuoHFYrBwV6hWIMcpAmxDLXojcHfFr9US1Pe6zUswEIJIbLI610fuqA=="
     }
   },
+  "remote": {
+    "https://esm.sh/htm@3.1.1": "563658bc68f6b699f6d19d8fa5ef628c19acb8fc6ce7a0858415dba6b2069ff0",
+    "https://esm.sh/htm@3.1.1/denonext/htm.mjs": "9216e59d4cbaf50b94aaf50540e58a498bc8fc4b865c67ae807b483ed62b2a7d",
+    "https://esm.sh/preact@10.28.3": "a2c15b55777ab14eb596d23f371c6a361e7308d29cdf13af3567b75f2e2aa535",
+    "https://esm.sh/preact@10.28.3/denonext/hooks.mjs": "ab86466f54d3ee8ec5e0efa0b5144b19375ba1fc614b4d98839ab6bd6f360ce2",
+    "https://esm.sh/preact@10.28.3/denonext/preact.mjs": "9e8eb03f04b90584e0498fee88376c733efa13d8b78f039655de5d82c8367619",
+    "https://esm.sh/preact@10.28.3/hooks": "ebd9af88c0eaaa97c7a9b6504586f67e2e144835cdcfe87c0783a4eb55a96785"
+  },
   "workspace": {
     "dependencies": [
       "jsr:@luca/esbuild-deno-loader@~0.11.1",

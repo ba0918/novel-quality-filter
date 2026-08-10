@@ -31,6 +31,9 @@ export const ASSET_FILES = [
   "line_meta.js",
   "detail_join.js",
   "metric_display.js",
+  "label_editor.js",
+  "label_update.js",
+  "toast.js",
 ];
 
 // scripts/lib/cal_viewer/ の絶対パス（assets のソース）。cal.json はここに含めない

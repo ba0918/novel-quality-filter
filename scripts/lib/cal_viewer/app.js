@@ -4,7 +4,7 @@
 // 値整形は ./format.js（dossier_format.ts と同期テスト済み）。
 
 import { h, render } from "https://esm.sh/preact@10.28.3";
-import { useEffect, useMemo, useState } from "https://esm.sh/preact@10.28.3/hooks";
+import { useEffect, useMemo, useRef, useState } from "https://esm.sh/preact@10.28.3/hooks";
 import htm from "https://esm.sh/htm@3.1.1";
 import { formatInt, safeHref } from "./format.js";
 import { rawMetricsRows } from "./raw_metrics.js";
@@ -12,6 +12,8 @@ import { applyFilters, LABEL_CHIPS, labelCounts, labelsOf } from "./list_filter.
 import { bandSegments, categoryBreakdown, shortBarRatio, summarize } from "./line_meta.js";
 import { joinMetrics, joinPenalties } from "./detail_join.js";
 import { contributionTier, deficit, maxContribution } from "./metric_display.js";
+import { mount as mountLabelEditor } from "./label_editor.js";
+import { computeNextLabels } from "./label_update.js";
 
 const html = htm.bind(h);
 
@@ -87,6 +89,53 @@ function LabelChips({ labels }) {
   return labels.map((label) =>
     html`<span class=${labelChipClass(label)} key=${label}>${label}</span>`
   );
+}
+
+// Detail の meta-labels に置く編集可能 chip。labels のうち品質軸（良/駄）または
+// スコープ軸（対象外）を表す 1 要素だけがクリック可能ボタンで、残り（cal tag で付けた
+// 任意タグ）は既存の <span> 表示のまま。ボタンは label_editor.mount で popover を持つ。
+function primaryLabelValue(labels) {
+  for (const l of labels) {
+    if (l === "良" || l === "駄" || l === "対象外") return l;
+  }
+  return null;
+}
+
+function EditableLabelChip({ siteWorkId, labels, onUpdate }) {
+  const primary = primaryLabelValue(labels);
+  const buttonRef = useRef(null);
+  const primaryRef = useRef(primary);
+  primaryRef.current = primary;
+
+  useEffect(() => {
+    if (!buttonRef.current) return;
+    return mountLabelEditor(buttonRef.current, {
+      siteWorkId,
+      getCurrentValue: () => primaryRef.current,
+      onUpdate,
+    });
+  }, [siteWorkId, onUpdate]);
+
+  const displayLabel = primary ?? "未";
+  const className = primary
+    ? `${labelChipClass(primary)} chip-clickable`
+    : "chip unlabeled chip-clickable";
+  const others = labels.filter((l) => l !== primary);
+
+  return html`
+    <span class="label-slot">
+      <button
+        type="button"
+        class=${className}
+        ref=${buttonRef}
+        aria-haspopup="menu"
+        aria-label=${`ラベル編集: 現在 ${displayLabel}`}
+      >${displayLabel}<span class="chip-caret" aria-hidden="true">▾</span></button>
+    </span>
+    ${others.map((label) =>
+      html`<span class=${labelChipClass(label)} key=${label}>${label}</span>`
+    )}
+  `;
 }
 
 function toggleInArray(arr, value) {
@@ -209,7 +258,7 @@ function Sidebar(
   `;
 }
 
-function MetaHeader({ work }) {
+function MetaHeader({ work, onLabelUpdate }) {
   const href = safeHref(work.url);
   return html`
     <div class="meta-header">
@@ -217,7 +266,11 @@ function MetaHeader({ work }) {
       <h1>${work.title}</h1>
       <div class="meta-author">${work.author}</div>
       <div class="meta-labels">
-        <${LabelChips} labels=${labelsOf(work)} />
+        <${EditableLabelChip}
+          siteWorkId=${work.siteWorkId}
+          labels=${labelsOf(work)}
+          onUpdate=${(next) => onLabelUpdate(work.siteWorkId, next)}
+        />
       </div>
       <a class="meta-url" href=${href} target="_blank" rel="noopener noreferrer">${work.url} ↗</a>
       <div class="meta-grid">
@@ -573,13 +626,13 @@ function LineMetaSection({ lineMetadata }) {
   `;
 }
 
-function DetailPanel({ work }) {
+function DetailPanel({ work, onLabelUpdate }) {
   if (!work) {
     return html`<div class="detail detail--empty">一覧から作品を選んでください</div>`;
   }
   return html`
     <div class="detail">
-      <${MetaHeader} work=${work} />
+      <${MetaHeader} work=${work} onLabelUpdate=${onLabelUpdate} />
       <${ScoreSection} work=${work} />
       <${MetricsTable} work=${work} />
       <${PenaltyList} work=${work} />
@@ -620,6 +673,23 @@ function App() {
 
   const updateFilters = (patch) => setFilters((f) => ({ ...f, ...patch }));
 
+  // ラベル更新の受け口。EditableLabelChip の optimistic UI から呼ばれ、data.works
+  // 内の該当作品の labels を新値へ差し替える（Detail と サイドバー行 両方の chip が
+  // 同一 state を参照しているため 1 回の setState で同期する）。
+  const updateWorkLabel = (siteWorkId, nextValue) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        works: prev.works.map((w) =>
+          w.siteWorkId === siteWorkId
+            ? { ...w, labels: computeNextLabels(labelsOf(w), nextValue) }
+            : w
+        ),
+      };
+    });
+  };
+
   if (error) return html`<p class="error">${error}</p>`;
   if (!data) return html`<p>読み込み中...</p>`;
 
@@ -636,7 +706,7 @@ function App() {
         onToggle=${toggleSidebar}
       />
       <main class="main">
-        <${DetailPanel} work=${selected} />
+        <${DetailPanel} work=${selected} onLabelUpdate=${updateWorkLabel} />
       </main>
     </div>
   `;
