@@ -5,6 +5,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import {
   ASSET_FILES,
+  ASSET_SRC_DIR,
   contentTypeFor,
   copyAssets,
   createRequestHandler,
@@ -13,6 +14,7 @@ import {
   resolveAssetPath,
   serveOptions,
   shouldAutoOpen,
+  unknownServeFlags,
 } from "./cal_serve.ts";
 
 Deno.test("copyAssets: srcDir の4ファイルを distDir へ上書きコピーする", async () => {
@@ -199,6 +201,30 @@ Deno.test("missingCalJsonHint: cal.json があれば undefined を返す", async
   } finally {
     await Deno.remove(base, { recursive: true });
   }
+});
+
+Deno.test("ASSET_FILES: app.js が参照するローカル ./*.js の import 先を漏れなく含む", async () => {
+  // ブラウザは cal serve が dist にコピーしたファイルしか読めないため、app.js の import 対象が
+  // ASSET_FILES から漏れると起動時に module resolution が 404 で失敗し、viewer が壊れる。
+  // Deno のユニットテストは実 serve 経路を通らないので、asset の整合性はここで機械的に閉じ込める。
+  const appSource = await Deno.readTextFile(`${ASSET_SRC_DIR}/app.js`);
+  const importRe = /from\s+["']\.\/([A-Za-z0-9_.\-/]+)["']/g;
+  const localImports = new Set<string>();
+  for (const m of appSource.matchAll(importRe)) localImports.add(m[1]);
+  assert(localImports.size > 0, "app.js からローカル import が1件も検出されないのは検査自体の不良");
+  for (const file of localImports) {
+    assert(
+      ASSET_FILES.includes(file),
+      `app.js は ./${file} を import しているのに ASSET_FILES に含まれていない`,
+    );
+  }
+});
+
+Deno.test("unknownServeFlags: --no-open は既知、他は未知扱い", () => {
+  assertEquals(unknownServeFlags([]), []);
+  assertEquals(unknownServeFlags(["--no-open"]), []);
+  assertEquals(unknownServeFlags(["--bogus"]), ["--bogus"]);
+  assertEquals(unknownServeFlags(["--no-open", "--extra"]), ["--extra"]);
 });
 
 Deno.test("openBrowserCommand: OS ごとに正しいコマンドを選ぶ", () => {

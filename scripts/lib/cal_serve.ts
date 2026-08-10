@@ -7,7 +7,16 @@ import { copy, ensureDir } from "@std/fs";
 import { extname, join, resolve } from "@std/path";
 import { loadViewerConfig, type ViewerConfig } from "./cal_viewer_config.ts";
 
-export const ASSET_FILES = ["index.html", "app.js", "style.css", "format.js"];
+// ブラウザに配信する assets。ここに漏れると cal serve が dist にコピーせず、app.js の
+// module import が 404 で失敗して viewer 全体が起動しない。app.js のローカル ./*.js import
+// との整合は cal_serve_test.ts で機械的に検査する（追加/削除時はテストが赤くなる）。
+export const ASSET_FILES = [
+  "index.html",
+  "app.js",
+  "style.css",
+  "format.js",
+  "raw_metrics.js",
+];
 
 // scripts/lib/cal_viewer/ の絶対パス（assets のソース）。cal.json はここに含めない
 // （cal list が別途 distDir に直接書く）。
@@ -98,6 +107,14 @@ export function shouldAutoOpen(argv: string[]): boolean {
   return !argv.includes("--no-open");
 }
 
+// serve 用の既知フラグ以外は typo として即座に返し、意図せず素通りするのを防ぐ。
+// list/evaluate と揃えて、未知フラグは非零 exit で運用者に気づかせる。
+const KNOWN_SERVE_FLAGS = new Set(["--no-open"]);
+
+export function unknownServeFlags(argv: string[]): string[] {
+  return argv.filter((a) => !KNOWN_SERVE_FLAGS.has(a));
+}
+
 export function openBrowserCommand(
   url: string,
   os: typeof Deno.build.os = Deno.build.os,
@@ -124,6 +141,12 @@ export function serveOptions(cfg: ViewerConfig): { hostname: string; port: numbe
 }
 
 export async function runServe(argv: string[], config?: ViewerConfig): Promise<number> {
+  const unknown = unknownServeFlags(argv);
+  if (unknown.length > 0) {
+    console.error(`未知のフラグ: ${unknown.join(" ")}`);
+    console.error("使い方: deno task cal serve [--no-open]");
+    return 1;
+  }
   const cfg = config ?? await loadViewerConfig();
   await copyAssets(ASSET_SRC_DIR, cfg.distDir);
 
