@@ -380,7 +380,7 @@ a {
 /* === Main / Detail === */
 .main {
   padding: 28px 36px 64px;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
   width: 100%;
 }
@@ -650,6 +650,78 @@ a {
 
 .metrics-table tr.differ td {
   background: var(--accent-soft);
+}
+
+/* 寄与セル: 数値 + マイナス寄与を可視化する細いバー（バー幅=達成率、色=4段階） */
+.contrib-cell {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.contrib-num {
+  display: block;
+}
+
+.contrib-bar {
+  height: 3px;
+  background: var(--line);
+  border-radius: 1px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.contrib-bar-fill {
+  height: 100%;
+  border-radius: 1px;
+}
+
+.contrib-bar-fill.tier-good {
+  background: var(--good);
+}
+
+.contrib-bar-fill.tier-neutral {
+  background: var(--ink-mute);
+}
+
+.contrib-bar-fill.tier-caution {
+  background: var(--flag);
+}
+
+.contrib-bar-fill.tier-bad {
+  background: var(--bad);
+}
+
+/* 「マイナス寄与 (-pt)」セル: 数値 + 100pt スケールの横バー。全指標同じスケールなので
+   バー長で「影響大きい項目」がパッ見で浮き上がる */
+.deficit-cell {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  min-width: 76px;
+}
+
+.deficit-num {
+  display: block;
+  color: var(--bad);
+  font-weight: 500;
+}
+
+.deficit-num.zero {
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+.deficit-bar {
+  height: 3px;
+  background: var(--line);
+  border-radius: 1px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.deficit-bar-fill {
+  height: 100%;
+  background: var(--bad);
+  border-radius: 1px;
 }
 
 /* Penalties */
