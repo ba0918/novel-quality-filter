@@ -2,8 +2,8 @@ import { assertEquals, assertNotEquals } from "@std/assert";
 import type { RawMetrics } from "../../src/domain/types.ts";
 import { buildEpisodeFromHtml } from "../../src/background/fetchers/kakuyomu.ts";
 import { aggregateLineMetadata } from "../../src/domain/analyzer/line_metadata.ts";
-import type { Capture, CaptureManifest, CapturePage } from "./capture_store.ts";
-import { rederive } from "./rederive.ts";
+import type { Capture, CaptureDecision, CaptureManifest, CapturePage } from "./capture_store.ts";
+import { rederive, resample } from "./rederive.ts";
 
 function zeroMetrics(text: string): RawMetrics {
   // 実運用の analyzeAll+tokenize を注入せず、採点対象本文だけに依存する決定的な代役。
@@ -46,14 +46,14 @@ function pageOf(order: number, html: string): CapturePage {
   };
 }
 
-function captureOf(pages: CapturePage[]): Capture {
+function captureOf(pages: CapturePage[], decision?: CaptureDecision): Capture {
   const manifest: CaptureManifest = {
     captureId: "cap",
     site: "kakuyomu",
     workId: "123",
     siteWorkId: "kakuyomu:123",
     fetched: pages.map((p) => p.entry),
-    decision: {
+    decision: decision ?? {
       sampledCount: pages.length,
       targetEpisodeIndex: 0,
       openingType: "normal",
@@ -66,52 +66,90 @@ function captureOf(pages: CapturePage[]): Capture {
   return { manifest, pages };
 }
 
-Deno.test("rederive: 保存HTMLからの再計算値が収集時の rawMetrics＋lineMetadata に一致する（C2）", async () => {
-  const html = body(40); // 通常開幕（30文以上）→ 第1話を単独採点
-  const capture = captureOf([pageOf(0, html)]);
+Deno.test("rederive(再現): 凍結した manifest.decision に従い、再サンプリングしない（C2・長期再現性）", async () => {
+  // 第0話は通常開幕（40文）なので、素の selectSamplingTarget なら第0話を採点対象に選ぶ。
+  const ep0 = body(40, "甲");
+  const ep1 = body(40, "乙");
+  const t1 = buildEpisodeFromHtml("u", ep1).text;
+
+  // 凍結 decision はあえて素のサンプリングと異なる選択（第1話・character-intro）にする。
+  // 再現はこの凍結値をそのまま返すべきで、selectSamplingTarget を呼び直してはならない。
+  const capture = captureOf([pageOf(0, ep0), pageOf(1, ep1)], {
+    sampledCount: 2,
+    targetEpisodeIndex: 1,
+    openingType: "character-intro",
+    concatOrder: [1],
+  });
 
   const r = await rederive(capture, zeroMetrics);
 
-  // 採点対象本文は buildEpisodeFromHtml と同じ抽出であること。
-  const expectedText = buildEpisodeFromHtml("u", html).text;
-  assertEquals(r.targetText, expectedText);
-  // rawMetrics は採点対象本文から算出される。
-  assertEquals(r.rawMetrics.charCount, expectedText.length);
-  // lineMetadata は採点対象話の行から集計される。
-  const expectedLines = buildEpisodeFromHtml("u", html).lines;
-  assertEquals(r.lineMetadata, aggregateLineMetadata(expectedLines));
+  assertEquals(r.targetText, t1);
+  assertEquals(r.targetEpisodeIndex, 1);
+  assertEquals(r.concatOrder, [1]);
+  assertEquals(r.openingType, "character-intro"); // 再判定せず凍結値を返す
+  assertEquals(r.sampledCount, 2);
+  assertEquals(r.rawMetrics.charCount, t1.length);
+  assertEquals(r.lineMetadata, aggregateLineMetadata(buildEpisodeFromHtml("u", ep1).lines));
+});
+
+Deno.test("rederive(再現): concatOrder に従って複数話を連結する", async () => {
+  const ep0 = body(20, "甲");
+  const ep1 = body(20, "乙");
+  const t0 = buildEpisodeFromHtml("u", ep0).text;
+  const t1 = buildEpisodeFromHtml("u", ep1).text;
+  const capture = captureOf([pageOf(0, ep0), pageOf(1, ep1)], {
+    sampledCount: 2,
+    targetEpisodeIndex: 0,
+    openingType: "too-short",
+    concatOrder: [0, 1],
+  });
+
+  const r = await rederive(capture, zeroMetrics);
+
+  assertEquals(r.targetText, t0 + t1);
+  assertEquals(r.concatOrder, [0, 1]);
+  assertEquals(r.rawMetrics.charCount, (t0 + t1).length);
+});
+
+Deno.test("resample(再実験): 保存済み全話に selectSamplingTarget を再適用する", async () => {
+  const html = body(40); // 通常開幕（30文以上）→ 第1話を単独採点
+  const capture = captureOf([pageOf(0, html)]);
+
+  const r = await resample(capture, zeroMetrics);
+
+  const expected = buildEpisodeFromHtml("u", html);
+  assertEquals(r.targetText, expected.text);
+  assertEquals(r.rawMetrics.charCount, expected.text.length);
+  assertEquals(r.lineMetadata, aggregateLineMetadata(expected.lines));
   assertEquals(r.openingType, "normal");
   assertEquals(r.concatOrder, [0]);
 });
 
-Deno.test("rederive: +n連結を manifest 順で再現し、単話と連結で採点対象本文が変わる", async () => {
+Deno.test("resample(再実験): +n連結を再現し、順序の正はHTML並び（単話と連結で採点対象が変わる）", async () => {
   // 各話は30文未満（too-short）で、連結して初めて30文に達する。
-  // ep0/ep1 は内容を変えて、順序が本文に効くこと（順序の正は manifest）を検証できるようにする。
   const ep0 = body(20, "甲");
   const ep1 = body(20, "乙");
-  const text0 = buildEpisodeFromHtml("u", ep0).text;
-  const text1 = buildEpisodeFromHtml("u", ep1).text;
+  const t0 = buildEpisodeFromHtml("u", ep0).text;
+  const t1 = buildEpisodeFromHtml("u", ep1).text;
 
-  const single = await rederive(captureOf([pageOf(0, ep0)]), zeroMetrics);
-  const concat = await rederive(captureOf([pageOf(0, ep0), pageOf(1, ep1)]), zeroMetrics);
+  const single = await resample(captureOf([pageOf(0, ep0)]), zeroMetrics);
+  const concat = await resample(captureOf([pageOf(0, ep0), pageOf(1, ep1)]), zeroMetrics);
 
-  // 連結採点では manifest 順で ep0+ep1 が採点対象になる。
-  assertEquals(concat.targetText, text0 + text1);
+  assertEquals(concat.targetText, t0 + t1);
   assertEquals(concat.concatOrder, [0, 1]);
-  // 単話採点では ep0 だけが対象で、連結とは本文が変わる。
-  assertEquals(single.targetText, text0);
+  assertEquals(single.targetText, t0);
   assertNotEquals(single.targetText, concat.targetText);
 
-  // 順序を入れ替えると採点対象本文も入れ替わる（順序の正は manifest）。
-  const reversed = await rederive(captureOf([pageOf(0, ep1), pageOf(1, ep0)]), zeroMetrics);
-  assertEquals(reversed.targetText, text1 + text0);
+  // 順序を入れ替えると採点対象本文も入れ替わる（順序の正は保存HTMLの並び）。
+  const reversed = await resample(captureOf([pageOf(0, ep1), pageOf(1, ep0)]), zeroMetrics);
+  assertEquals(reversed.targetText, t1 + t0);
   assertNotEquals(reversed.targetText, concat.targetText);
 });
 
-Deno.test("rederive: bodyHash は採点対象本文が同じなら一致し、異なれば異なる（転載重複検出の土台）", async () => {
-  const a = await rederive(captureOf([pageOf(0, body(40))]), zeroMetrics);
-  const b = await rederive(captureOf([pageOf(0, body(40))]), zeroMetrics);
-  const c = await rederive(captureOf([pageOf(0, body(41))]), zeroMetrics);
+Deno.test("bodyHash: 採点対象本文が同じなら一致し、異なれば異なる（転載重複検出の土台）", async () => {
+  const a = await resample(captureOf([pageOf(0, body(40))]), zeroMetrics);
+  const b = await resample(captureOf([pageOf(0, body(40))]), zeroMetrics);
+  const c = await resample(captureOf([pageOf(0, body(41))]), zeroMetrics);
   assertEquals(a.bodyHash, b.bodyHash);
   assertNotEquals(a.bodyHash, c.bodyHash);
 });

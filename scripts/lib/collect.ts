@@ -19,6 +19,7 @@ import {
 import { type FetchNextEpisode, sampleEpisodes } from "../../src/background/sampling.ts";
 import {
   type Capture,
+  type CaptureDecision,
   type CaptureManifest,
   type CapturePage,
   type FetchedEntry,
@@ -28,7 +29,7 @@ import {
   siteWorkId,
 } from "./capture_store.ts";
 import { appendRecord, type DatasetRecord } from "./dataset.ts";
-import { type ComputeRawMetrics, rederive } from "./rederive.ts";
+import { type ComputeRawMetrics, deriveDecision, rederive } from "./rederive.ts";
 
 const SITE = "kakuyomu";
 const KAKUYOMU_BASE = "https://kakuyomu.jp";
@@ -78,20 +79,15 @@ export async function collectWork(
 
   const captureId = makeCaptureId(deps.now());
   const pages = toPages(fetched);
-  const prelim = buildManifest(workId, captureId, deps.now(), pages);
-  const capture: Capture = { manifest: prelim, pages };
+  // 採点入力(decision)は収集時に selectSamplingTarget を一度だけ走らせて確定し、manifest に凍結する。
+  // 保存値は凍結 decision を読む再現(rederive)で算出するため、後でサンプリングロジックが変わっても
+  // 保存値と再現値は構造的に一致する（C2）。
+  const decision = deriveDecision(pages);
+  const manifest = buildManifest(workId, captureId, deps.now(), pages, decision);
+  const capture: Capture = { manifest, pages };
 
   const red = await rederive(capture, deps.computeRawMetrics);
-  const manifest: CaptureManifest = {
-    ...prelim,
-    decision: {
-      sampledCount: red.sampledCount,
-      targetEpisodeIndex: red.targetEpisodeIndex,
-      openingType: red.openingType,
-      concatOrder: red.concatOrder,
-    },
-  };
-  await saveCapture(deps.baseDir, { manifest, pages });
+  await saveCapture(deps.baseDir, capture);
 
   const record: DatasetRecord = {
     workId,
@@ -169,6 +165,7 @@ function buildManifest(
   captureId: string,
   now: Date,
   pages: CapturePage[],
+  decision: CaptureDecision,
 ): CaptureManifest {
   return {
     captureId,
@@ -176,13 +173,7 @@ function buildManifest(
     workId,
     siteWorkId: siteWorkId(SITE, workId),
     fetched: pages.map((p) => p.entry),
-    // decision は rederive の結果で確定させるための placeholder。
-    decision: {
-      sampledCount: pages.length,
-      targetEpisodeIndex: 0,
-      openingType: "normal",
-      concatOrder: [0],
-    },
+    decision,
     pipelineVersion: PIPELINE_VERSION,
     capturedAt: now.toISOString(),
     health: { healthy: true },
