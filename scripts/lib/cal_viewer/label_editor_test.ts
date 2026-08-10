@@ -5,7 +5,7 @@
 
 import { assertEquals } from "@std/assert";
 import { deleteLabelRequest, performLabelUpdate, setLabelRequest } from "./label_editor.js";
-import { computeNextLabels, primaryLabelValue } from "./label_update.js";
+import { computeNextLabels, primaryChipLabels, primaryLabelValue } from "./label_update.js";
 
 Deno.test("setLabelRequest: POST /labels 用の url/method/body を組み立てる（「駄」）", () => {
   const req = setLabelRequest("kakuyomu:123", "駄");
@@ -83,6 +83,26 @@ Deno.test("primaryLabelValue: 対象外を含まなければ quality（良/駄�
 Deno.test("primaryLabelValue: 品質もスコープも無ければ null（未ラベル）", () => {
   assertEquals(primaryLabelValue([]), null);
   assertEquals(primaryLabelValue(["すり抜け"]), null); // タグだけ
+});
+
+// サイドバー行 chip は Detail の primary chip と同じ選定規則に揃える
+// (docs/spec/calibration-loop-tool.md「サイドバー行の chip も同じ選定規則を適用する」)。
+// primaryChipLabels は「サイドバーに描く chip 列」の純関数で、primary が null なら
+// 空配列（LabelChips 側で「未」を出す）、そうでなければ [primary] を 1 個だけ返す。
+
+Deno.test("primaryChipLabels: [良+対象外] は scope 優先で「対象外」1 個だけを返す（Detail の primary と一致）", () => {
+  assertEquals(primaryChipLabels(["良", "対象外"]), ["対象外"]);
+  assertEquals(primaryChipLabels(["良", "対象外", "ハードネガティブ"]), ["対象外"]);
+});
+
+Deno.test("primaryChipLabels: 対象外を含まなければ quality（良/駄）を 1 個だけ返し、cal tag タグは含めない", () => {
+  assertEquals(primaryChipLabels(["良"]), ["良"]);
+  assertEquals(primaryChipLabels(["駄", "すり抜け"]), ["駄"]);
+});
+
+Deno.test("primaryChipLabels: primary が無ければ空配列（LabelChips 側で「未」を描く）", () => {
+  assertEquals(primaryChipLabels([]), []);
+  assertEquals(primaryChipLabels(["すり抜け"]), []); // タグだけは「未」扱い
 });
 
 // rollback の正しさ: primary 値だけを持ち回ると、optimistic 更新後の labels 配列を

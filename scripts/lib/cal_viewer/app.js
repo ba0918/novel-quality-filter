@@ -19,7 +19,7 @@ import { bandSegments, categoryBreakdown, shortBarRatio, summarize } from "./lin
 import { joinMetrics, joinPenalties } from "./detail_join.js";
 import { contributionTier, deficit, maxContribution } from "./metric_display.js";
 import { mount as mountLabelEditor } from "./label_editor.js";
-import { computeNextLabels, primaryLabelValue } from "./label_update.js";
+import { computeNextLabels, primaryChipLabels, primaryLabelValue } from "./label_update.js";
 
 const html = htm.bind(h);
 
@@ -183,7 +183,7 @@ function ListRow({ work, selected, onSelect }) {
         <span class=${diffClassName(work.diff)}>${formatSigned(work.diff, 1)}</span>
       </div>
       <div class="list-row-meta">
-        <${LabelChips} labels=${labelsOf(work)} />
+        <${LabelChips} labels=${primaryChipLabels(labelsOf(work))} />
         <span class="author">${work.author}</span>
       </div>
     </div>

@@ -29,3 +29,13 @@ export function primaryLabelValue(labels) {
   }
   return null;
 }
+
+// サイドバー行の chip 列。docs/spec/calibration-loop-tool.md「サイドバー行の chip も同じ
+// 選定規則を適用する」に従い、Detail の primary chip と同じ scope 優先ルールで 1 個だけ
+// 描く（[良+対象外] の作品は「対象外」1 個だけ）。primary が無ければ空配列を返し、
+// LabelChips 側で unlabeled の「未」チップを出す。cal tag で付けた任意タグはサイドバーには
+// 出さない（情報密度優先、Detail のみで secondary として見える）。
+export function primaryChipLabels(labels) {
+  const primary = primaryLabelValue(labels);
+  return primary === null ? [] : [primary];
+}
