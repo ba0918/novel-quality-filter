@@ -48,7 +48,50 @@ Deno.test("joinMetrics: contributionが異なる行はdiffer=true・deltaが実�
   const experiment = [metric({ key: "a", contribution: 8.35 })];
   const [row] = joinMetrics(canonical, experiment);
   assertEquals(row.differ, true);
-  assertEquals(Number(row.delta.toFixed(2)), -1.28);
+  assertEquals(Number(row.delta?.toFixed(2)), -1.28);
+});
+
+Deno.test("joinMetrics: 実験式のみに存在する指標はcanonicalがundefined・differ=false・delta=undefinedになる", () => {
+  const canonical = [metric({ key: "a", label: "A" })];
+  const experiment = [
+    metric({ key: "a", label: "A" }),
+    metric({ key: "new", label: "新指標", contribution: 3 }),
+  ];
+  const rows = joinMetrics(canonical, experiment);
+  const row = rows.find((r: { key: string }) => r.key === "new");
+  if (row === undefined) throw new Error("row not found");
+  assertEquals(row.label, "新指標");
+  assertEquals(row.canonical, undefined);
+  assertEquals(row.experiment, experiment[1]);
+  assertEquals(row.differ, false);
+  assertEquals(row.delta, undefined);
+});
+
+Deno.test("joinMetrics: 正本のみに存在する指標（レガシー互換）はexperimentがundefined・differ=false・delta=undefinedになる", () => {
+  const canonical = [
+    metric({ key: "a", label: "A" }),
+    metric({ key: "legacy", label: "廃止指標", contribution: 2 }),
+  ];
+  const experiment = [metric({ key: "a", label: "A" })];
+  const rows = joinMetrics(canonical, experiment);
+  const row = rows.find((r: { key: string }) => r.key === "legacy");
+  if (row === undefined) throw new Error("row not found");
+  assertEquals(row.label, "廃止指標");
+  assertEquals(row.canonical, canonical[1]);
+  assertEquals(row.experiment, undefined);
+  assertEquals(row.differ, false);
+  assertEquals(row.delta, undefined);
+});
+
+Deno.test("joinMetrics: 全キーがcanonical順→実験のみキーの順で並ぶ和集合になる", () => {
+  const canonical = [metric({ key: "a" }), metric({ key: "b" })];
+  const experiment = [
+    metric({ key: "b" }),
+    metric({ key: "c" }),
+    metric({ key: "a" }),
+  ];
+  const rows = joinMetrics(canonical, experiment);
+  assertEquals(rows.map((r: { key: string }) => r.key), ["a", "b", "c"]);
 });
 
 function penalty(label: string, multiplier: number) {

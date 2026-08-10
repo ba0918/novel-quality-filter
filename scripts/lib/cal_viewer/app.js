@@ -274,8 +274,28 @@ function rawLabel(value) {
   return value.toFixed(3);
 }
 
+// normalized/weight/contributionはcanonical・experimentいずれかがundefined（片側のみに
+// 存在する指標）のとき'-'を表示する（joinMetricsのunion joinに伴う表示規則）。
 function normLabel(metric) {
-  return metric.normalizedValue.toFixed(3);
+  return metric === undefined ? "-" : metric.normalizedValue.toFixed(3);
+}
+
+function weightLabel(metric) {
+  return metric === undefined ? "-" : metric.weight.toFixed(2);
+}
+
+function contributionLabel(metric) {
+  return metric === undefined ? "-" : metric.contribution.toFixed(2);
+}
+
+// Δ寄与は両側が揃っているときだけ算出される（joinMetrics参照）。片側のみの指標は'-'。
+function deltaLabel(delta) {
+  return delta === undefined ? "-" : formatSigned(delta, 2);
+}
+
+function deltaClassName(delta) {
+  if (delta === undefined || delta === 0) return "zero";
+  return delta > 0 ? "pos" : "neg";
 }
 
 function MetricsTable({ work }) {
@@ -306,23 +326,21 @@ function MetricsTable({ work }) {
               html`
                 <tr key=${row.key} class=${row.differ ? "differ" : ""}>
                   <td class="metric-label">
-                    ${row.label}${(row.canonical.flagged || row.experiment.flagged)
+                    ${row.label}${(row.canonical?.flagged || row.experiment?.flagged)
                       ? html`<span class="metric-flag">FLAG</span>`
                       : ""}
                     <br />
                     <span class="metric-key">${row.key}</span>
                   </td>
-                  <td>${rawLabel(row.canonical.rawValue)}</td>
+                  <td>${rawLabel((row.canonical ?? row.experiment).rawValue)}</td>
                   <td class="group">${normLabel(row.canonical)}</td>
-                  <td>${row.canonical.weight.toFixed(2)}</td>
-                  <td>${row.canonical.contribution.toFixed(2)}</td>
+                  <td>${weightLabel(row.canonical)}</td>
+                  <td>${contributionLabel(row.canonical)}</td>
                   <td class="group">${normLabel(row.experiment)}</td>
-                  <td>${row.experiment.weight.toFixed(2)}</td>
-                  <td>${row.experiment.contribution.toFixed(2)}</td>
-                  <td class=${`metric-diff ${
-                    row.delta > 0 ? "pos" : row.delta < 0 ? "neg" : "zero"
-                  }`}>
-                    ${formatSigned(row.delta, 2)}
+                  <td>${weightLabel(row.experiment)}</td>
+                  <td>${contributionLabel(row.experiment)}</td>
+                  <td class=${`metric-diff ${deltaClassName(row.delta)}`}>
+                    ${deltaLabel(row.delta)}
                   </td>
                 </tr>
               `

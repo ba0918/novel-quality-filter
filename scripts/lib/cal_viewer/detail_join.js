@@ -1,19 +1,29 @@
 // Detail パネルの正本×実験並列表示のためのjoinロジック。app.js（Preactグルー層）から切り出し、
 // list_filter.js/line_meta.jsと同じくテスタブルな純関数として扱う。
 
-// canonical/experimentの指標をkeyでjoinする。実験式は正本と同じ指標キー集合を過不足なく持つ
-// （weights_experiment_test.tsで担保済み）ため、Mapルックアップは必ずヒットする前提でよい。
+// canonical/experimentの指標をkeyでjoinする。現状は実験式が正本と同じ指標キー集合を過不足なく
+// 持つ（weights_experiment_test.tsで担保済み）が、cal_viewerの主目的が「weights_experimentへの
+// 新指標追加を較正データで判断する」ことにあるため、片側にしか存在しないキー（実験のみの新指標・
+// 正本のみのレガシー指標）も表示できるよう、両配列のkey和集合でjoinする。canonical側の並びを
+// 優先し、実験のみのキーはその後ろに追加順で並ぶ。
 export function joinMetrics(canonicalMetrics, experimentMetrics) {
+  const canonicalByKey = new Map(canonicalMetrics.map((m) => [m.key, m]));
   const experimentByKey = new Map(experimentMetrics.map((m) => [m.key, m]));
-  return canonicalMetrics.map((canonical) => {
-    const experiment = experimentByKey.get(canonical.key);
+  const keys = [...new Set([...canonicalByKey.keys(), ...experimentByKey.keys()])];
+  return keys.map((key) => {
+    const canonical = canonicalByKey.get(key);
+    const experiment = experimentByKey.get(key);
+    const bothPresent = canonical !== undefined && experiment !== undefined;
     return {
-      key: canonical.key,
-      label: canonical.label,
+      key,
+      label: canonical?.label ?? experiment?.label,
       canonical,
       experiment,
-      differ: canonical.contribution !== experiment.contribution,
-      delta: experiment.contribution - canonical.contribution,
+      // 片方しか存在しないキーは差分ゼロ状態と紛れないよう「差分なし」に倒す（Δ寄与も
+      // 算出しない）。呼び出し側（app.js）は canonical/experiment いずれかがundefinedのセルを
+      // 「-」表示にする。
+      differ: bothPresent && canonical.contribution !== experiment.contribution,
+      delta: bothPresent ? experiment.contribution - canonical.contribution : undefined,
     };
   });
 }
