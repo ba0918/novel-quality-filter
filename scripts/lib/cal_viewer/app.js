@@ -15,6 +15,7 @@ import {
   safeHref,
   widthPercent,
 } from "./format.js";
+import { averageCharCountLabel, rawMetricsRows } from "./raw_metrics.js";
 
 const html = htm.bind(h);
 
@@ -73,6 +74,7 @@ function ListTable({ works, selectedId, onSelect, sortKey, sortDir, onSort }) {
             onSort=${onSort} />
           <${SortHeader} label="差分" column="diff" sortKey=${sortKey} sortDir=${sortDir}
             onSort=${onSort} />
+          <th>平均文字数</th>
           <th>文長SD</th>
           <th>地の文短行30</th>
         </tr>
@@ -96,6 +98,7 @@ function ListTable({ works, selectedId, onSelect, sortKey, sortDir, onSort }) {
                 : "cal-num"}>
                 ${w.diff > 0 ? `+${w.diff}` : w.diff}
               </td>
+              <td class="cal-num">${averageCharCountLabel(w.rawMetrics)}</td>
               <td class="cal-num">${formatRawValue(metricByKey(w, "sentenceLengthSD"))}</td>
               <td class="cal-num">
                 ${w.lineMetadata
@@ -219,6 +222,24 @@ function FormulaBlock({ title, result }) {
   `;
 }
 
+function RawMetricsView({ rawMetrics, scoredMetrics }) {
+  if (!rawMetrics) return null;
+  const rows = rawMetricsRows(rawMetrics, scoredMetrics);
+  return html`
+    <div class="cal-raw-metrics">
+      <div class="cal-detail-section-title">rawMetrics（全指標）</div>
+      ${rows.map(([key, label, display]) =>
+        html`
+          <div class="cal-raw-metric-row" key=${key}>
+            <span class="cal-raw-metric-label">${label}</span>
+            <span class="cal-raw-metric-value">${display}</span>
+          </div>
+        `
+      )}
+    </div>
+  `;
+}
+
 function DetailPanel({ work }) {
   if (!work) {
     return html`<div class="cal-detail cal-detail--empty">一覧から作品を選んでください</div>`;
@@ -241,6 +262,7 @@ function DetailPanel({ work }) {
         <${FormulaBlock} title="実験" result=${work.experiment} />
       </div>
       <${LineMetadataView} meta=${work.lineMetadata} />
+      <${RawMetricsView} rawMetrics=${work.rawMetrics} scoredMetrics=${work.canonical.metrics} />
     </div>
   `;
 }

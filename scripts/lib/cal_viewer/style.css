@@ -267,3 +267,25 @@ a {
 .cal-error {
   color: #ff9a8a;
 }
+
+.cal-raw-metrics {
+  margin-top: 0.75rem;
+  border-top: 1px solid #2a2f3a;
+  padding-top: 0.5rem;
+}
+
+.cal-raw-metric-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  padding: 1px 0;
+}
+
+.cal-raw-metric-label {
+  color: #9aa0aa;
+}
+
+.cal-raw-metric-value {
+  text-align: right;
+}
