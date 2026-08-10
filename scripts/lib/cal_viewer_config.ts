@@ -37,9 +37,36 @@ export async function loadViewerConfig(
   return fillDefaults(parsed);
 }
 
+function isValidDistDir(value: unknown): value is string {
+  return typeof value === "string" && value !== "";
+}
+
+// Deno.serve は範囲外・非整数の port に対して RangeError を同期的に投げる。fillDefaults の
+// 型チェックだけでは {port: 70000} のような値を弾けず、「壊れた config は警告 + デフォルト
+// 継続」という契約より先に serve が落ちてしまうため、レンジと整数性まで検証する。
+function isValidPort(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65535;
+}
+
 function fillDefaults(parsed: unknown): ViewerConfig {
   const obj = (parsed && typeof parsed === "object") ? parsed as Record<string, unknown> : {};
-  const distDir = typeof obj.distDir === "string" ? obj.distDir : DEFAULT_VIEWER_CONFIG.distDir;
-  const port = typeof obj.port === "number" ? obj.port : DEFAULT_VIEWER_CONFIG.port;
+
+  if ("distDir" in obj && !isValidDistDir(obj.distDir)) {
+    console.error(
+      `cal-viewer config の distDir が不正です。デフォルト値で続行します: ${
+        JSON.stringify(obj.distDir)
+      }`,
+    );
+  }
+  if ("port" in obj && !isValidPort(obj.port)) {
+    console.error(
+      `cal-viewer config の port が不正です（1-65535 の整数を指定）。デフォルト値で続行します: ${
+        JSON.stringify(obj.port)
+      }`,
+    );
+  }
+
+  const distDir = isValidDistDir(obj.distDir) ? obj.distDir : DEFAULT_VIEWER_CONFIG.distDir;
+  const port = isValidPort(obj.port) ? obj.port : DEFAULT_VIEWER_CONFIG.port;
   return { distDir, port };
 }
