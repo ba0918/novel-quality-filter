@@ -1,13 +1,14 @@
 // cal serve の設定解釈・assets コピー・HTTP ハンドラ（パストラバーサル対策込み）を検証する。
 // Deno.serve 自体（実ネットワークリスン）は起動系のグルーコードなのでここでは対象にしない。
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import {
   ASSET_FILES,
   contentTypeFor,
   copyAssets,
   createRequestHandler,
+  missingCalJsonHint,
   openBrowserCommand,
   resolveAssetPath,
   serveOptions,
@@ -158,6 +159,29 @@ Deno.test("serveOptions: config の port をそのまま使う", () => {
 Deno.test("shouldAutoOpen: --no-open が無ければ true、あれば false", () => {
   assertEquals(shouldAutoOpen([]), true);
   assertEquals(shouldAutoOpen(["--no-open"]), false);
+});
+
+Deno.test("missingCalJsonHint: cal.json がなければヒント文字列を返す", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const hint = await missingCalJsonHint(base);
+    assert(hint !== undefined);
+    assertStringIncludes(hint, "cal.json");
+    assertStringIncludes(hint, "deno task cal list");
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("missingCalJsonHint: cal.json があれば undefined を返す", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    await Deno.writeTextFile(join(base, "cal.json"), '{"works":[]}');
+    const hint = await missingCalJsonHint(base);
+    assertEquals(hint, undefined);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
 });
 
 Deno.test("openBrowserCommand: OS ごとに正しいコマンドを選ぶ", () => {

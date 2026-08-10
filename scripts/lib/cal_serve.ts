@@ -4,7 +4,7 @@
 // 開く（--no-open で抑制）。Ctrl+C はプロセスの既定シグナル処理にまかせて終了する。
 
 import { copy, ensureDir } from "@std/fs";
-import { extname, resolve } from "@std/path";
+import { extname, join, resolve } from "@std/path";
 import { loadViewerConfig, type ViewerConfig } from "./cal_viewer_config.ts";
 
 export const ASSET_FILES = ["index.html", "app.js", "style.css", "format.js"];
@@ -63,6 +63,21 @@ export function createRequestHandler(distDir: string): (req: Request) => Promise
   };
 }
 
+// cal.json が未生成のまま cal serve すると、ブラウザ側は fetch 失敗のエラーメッセージしか
+// 出さず「先に cal list を実行する」という手順に気づきにくい。起動時に一度だけ確認し、
+// 欠けていればヒントを返す（存在すれば undefined ＝非致命的、配信は続ける）。
+export async function missingCalJsonHint(distDir: string): Promise<string | undefined> {
+  try {
+    await Deno.stat(join(distDir, "cal.json"));
+    return undefined;
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) {
+      return "ℹ️ cal.json が見つかりません。先に `deno task cal list` を実行してください。";
+    }
+    throw e;
+  }
+}
+
 export function shouldAutoOpen(argv: string[]): boolean {
   return !argv.includes("--no-open");
 }
@@ -95,6 +110,9 @@ export function serveOptions(cfg: ViewerConfig): { hostname: string; port: numbe
 export async function runServe(argv: string[], config?: ViewerConfig): Promise<number> {
   const cfg = config ?? await loadViewerConfig();
   await copyAssets(ASSET_SRC_DIR, cfg.distDir);
+
+  const hint = await missingCalJsonHint(cfg.distDir);
+  if (hint) console.error(hint);
 
   const handler = createRequestHandler(cfg.distDir);
   const server = Deno.serve({ ...serveOptions(cfg), onListen: () => {} }, handler);
