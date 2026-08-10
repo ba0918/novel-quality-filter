@@ -270,10 +270,13 @@ rawMetrics（16 項目）は本文由来で正本／実験式のどちらでも�
   「文字（数・比率）」「短行 20/30（率）」を並べ、地の文カードには「短チャンク 20/30」も
   含める。短行率が閾値を超えるとカード内で色で警告する
 
-行データの数値整形（率・平均字/行・カテゴリラベル・色帯の区分名など）は
-`scripts/lib/cal_viewer/format.js` に必要関数を追加する形で実装する。Deno 側
-`src/domain/analyzer/dossier_format.ts` と同じ入力に対して同じ出力を返すことを、既存の
-`format_test.ts` の同期テストパターンで担保する。
+行データの集計・数値整形（総サマリ・色帯の区分幅・カテゴリ別内訳・短行/短チャンク比率の warn
+判定など）は新設 `scripts/lib/cal_viewer/line_meta.js` に実装する（`format.js` は
+既存の低レベル整形関数の置き場のまま変更しない）。line_meta.js は Deno 側
+`src/domain/analyzer/dossier_format.ts` の対応関数（`averagePerLineLabel` / `averageCharsLabel` /
+`compositionSegments` / `percentInt` / `percentOne` /
+`widthPercent`）と同じ入力に対して同じ出力を返すことを、`format_test.ts` と同じ方式の
+同期テスト（`line_meta_test.ts`）で担保する。
 
 ### 見え味の基準（パレット・タイポグラフィ）
 
