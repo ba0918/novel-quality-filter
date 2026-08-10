@@ -31,6 +31,13 @@ Deno.test("safeHref: javascript: など http/https 以外のスキームを無�
   assertEquals(safeHref("java\tscript:alert(1)"), "#"); // 制御文字での分断回避
 });
 
+Deno.test("safeHref: protocol-relative（//host）は現在ページのスキームを引き継ぐため無害化する", () => {
+  // http(s) 上の較正ツール HTML から //evil.example/x を踏むと http(s)://evil.example/x に化ける。
+  // 相対パス（/works/1）は許可したいので、// で始まる場合のみ弾く。
+  assertEquals(safeHref("//evil.example/x"), "#");
+  assertEquals(safeHref("  //evil.example/x"), "#"); // 先頭空白での回避
+});
+
 Deno.test("formatRawValue: 1未満は百分率1桁、1以上は実数1桁", () => {
   assertEquals(formatRawValue(0.234), "23.4%");
   assertEquals(formatRawValue(0), "0.0%");

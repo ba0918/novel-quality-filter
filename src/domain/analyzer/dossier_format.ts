@@ -68,9 +68,11 @@ export function escapeHtml(value: string): string {
 // href 属性用に URL のスキームを検証する。http/https 以外（javascript: data: 等）は無害化する。
 // escapeHtml は属性値の引用符崩れは防ぐが、javascript: 自体は素通しするため別途スキーム検査が要る。
 // ブラウザはスキーム判定時に制御文字・空白を無視するため、判定前に除去してから照合する
-// （java\tscript: のような分断による回避を防ぐ）。相対URL・アンカー（スキーム無し）は許可する。
+// （java\tscript: のような分断による回避を防ぐ）。相対URL・アンカー（スキーム無し）は許可するが、
+// protocol-relative（//host/path）は現在ページのスキームを引き継いで外部ホストへ抜けるため弾く。
 export function safeHref(url: string): string {
   const stripped = [...url].filter((ch) => ch.charCodeAt(0) > 0x20).join("");
+  if (stripped.startsWith("//")) return "#";
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(stripped);
   if (scheme && !["http", "https"].includes(scheme[1].toLowerCase())) {
     return "#";
