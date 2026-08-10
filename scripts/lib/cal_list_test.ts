@@ -206,6 +206,11 @@ Deno.test("runList: cal.json を指定 distDir に書き、再計算スコア（
   }
 });
 
+Deno.test("runList: 未知フラグを渡すと使い方を出してエラー終了する", async () => {
+  const code = await runList(["--out", "foo/"]);
+  assertEquals(code === 0, false);
+});
+
 Deno.test("runList: データセットが空ならエラー終了しファイルを書かない", async () => {
   const base = await Deno.makeTempDir();
   const distDir = join(base, "dist");
@@ -225,6 +230,11 @@ Deno.test("runList: データセットが空ならエラー終了しファイル
   } finally {
     await Deno.remove(base, { recursive: true });
   }
+});
+
+Deno.test("runEvaluate: 未知フラグを渡すと使い方を出してエラー終了する", async () => {
+  const code = await runEvaluate(["--bogus"]);
+  assertEquals(code === 0, false);
 });
 
 Deno.test("runEvaluate: 再計算スコアをテキスト出力し、保存 score を使わない（C3）", async () => {

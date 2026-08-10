@@ -181,7 +181,10 @@ export async function runList(
   paths: ViewPaths = DEFAULT_PATHS,
   distDir?: string,
 ): Promise<number> {
-  const _ = argv; // list は現状フラグを取らない（出力先は config 経由の distDir）
+  if (argv.length > 0) {
+    console.error("使い方: deno task cal list");
+    return 1;
+  }
   const records = await loadDataset(paths.datasetPath);
   const labels = await loadLabels2(paths.labelsPath);
   const calJson = buildCalJson(records, labels);
@@ -202,7 +205,10 @@ export async function runEvaluate(
   argv: string[],
   paths: ViewPaths = DEFAULT_PATHS,
 ): Promise<number> {
-  const _ = argv; // evaluate は現状フラグを取らない
+  if (argv.length > 0) {
+    console.error("使い方: deno task cal evaluate");
+    return 1;
+  }
   const rows = await loadRows(paths);
   if (rows.length === 0) {
     console.error("データセットが空です（先に deno task cal register してください）");
