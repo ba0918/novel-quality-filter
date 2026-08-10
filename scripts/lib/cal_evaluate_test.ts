@@ -4,7 +4,13 @@ import { calculateScore } from "../../src/domain/scoring/mod.ts";
 import { METRIC_CONFIGS, PENALTY_RULES } from "../../src/domain/scoring/weights.ts";
 import { scoreWithConfig } from "./score_experiment.ts";
 import type { DatasetRecord } from "./dataset.ts";
-import { CANONICAL_FORMULA, evaluateRecord, scoreResultFromMetrics } from "./cal_evaluate.ts";
+import {
+  CANONICAL_FORMULA,
+  evaluateRecord,
+  EXPERIMENT_FORMULA,
+  pickFormula,
+  scoreResultFromMetrics,
+} from "./cal_evaluate.ts";
 
 function raw(overrides: Partial<RawMetrics> = {}): RawMetrics {
   return {
@@ -83,6 +89,11 @@ function record(score: number, rawMetrics: RawMetrics): DatasetRecord {
     crawledAt: "2026-01-01T00:00:00.000Z",
   };
 }
+
+Deno.test("pickFormula: 名前で正本/実験式を選び分ける", () => {
+  assertEquals(pickFormula("canonical"), CANONICAL_FORMULA);
+  assertEquals(pickFormula("experiment"), EXPERIMENT_FORMULA);
+});
 
 Deno.test("evaluateRecord: 保存済み score を無視し rawMetrics から式で再計算する（化石化防止 C3）", () => {
   const r = raw();

@@ -20,6 +20,10 @@ import {
   PENALTY_RULES,
   type PenaltyRule,
 } from "../../src/domain/scoring/weights.ts";
+import {
+  EXPERIMENT_METRIC_CONFIGS,
+  EXPERIMENT_PENALTY_RULES,
+} from "../../src/domain/scoring/weights_experiment.ts";
 import type { DatasetRecord } from "./dataset.ts";
 
 export interface Formula {
@@ -31,6 +35,17 @@ export const CANONICAL_FORMULA: Formula = {
   metricConfigs: METRIC_CONFIGS,
   penaltyRules: PENALTY_RULES,
 };
+
+export const EXPERIMENT_FORMULA: Formula = {
+  metricConfigs: EXPERIMENT_METRIC_CONFIGS,
+  penaltyRules: EXPERIMENT_PENALTY_RULES,
+};
+
+export type FormulaName = "canonical" | "experiment";
+
+export function pickFormula(name: FormulaName): Formula {
+  return name === "experiment" ? EXPERIMENT_FORMULA : CANONICAL_FORMULA;
+}
 
 // normalizer.ts の reason 文面と一致させる（ScoreResult 全体の一致テストが要求する）。
 const CUSTOM_REASONS: Record<string, (rawValue: number) => string> = {
