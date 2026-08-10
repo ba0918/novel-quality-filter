@@ -85,6 +85,15 @@ function shortEntry(value, numerator, denominator) {
   };
 }
 
+// 短行/短チャンクのバー幅として使う比率。Chrome拡張（work-page-injector.tsのshortMetricRow、
+// widthPercent(short30, denominator)）はentry20/entry30を両方テキスト表示しつつ、バーは常に
+// short30側の比率で描く（30側が20側を包含し重篤度の上限を示すため）。ShortRowもこれに合わせる。
+// entry20は「20側の値と混同していないこと」をテストで示すためだけに残す（呼び出し側の意図が
+// 読み取れるようシグネチャは両方受け取る）。使わないため _entry20 と命名する。
+export function shortBarRatio(_entry20, entry30) {
+  return entry30.ratio;
+}
+
 // カテゴリ別カード（地の文/セリフ/メタ/非文末）の内訳。地の文（chunkCountを持つ
 // NarrativeCount）のときだけ短チャンク20/30を持つ（それ以外はundefined）。呼び出し側が
 // 一貫した形のオブジェクトを扱えるよう、常に同じキー集合を持つ1つのオブジェクトリテラルを返す

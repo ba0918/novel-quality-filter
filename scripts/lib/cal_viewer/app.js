@@ -9,7 +9,7 @@ import htm from "https://esm.sh/htm@3.1.1";
 import { formatInt, safeHref } from "./format.js";
 import { rawMetricsRows } from "./raw_metrics.js";
 import { applyFilters, LABEL_CHIPS, labelCounts } from "./list_filter.js";
-import { bandSegments, categoryBreakdown, summarize } from "./line_meta.js";
+import { bandSegments, categoryBreakdown, shortBarRatio, summarize } from "./line_meta.js";
 import { joinMetrics, joinPenalties } from "./detail_join.js";
 
 const html = htm.bind(h);
@@ -410,7 +410,7 @@ function ShortRow({ label, entry20, entry30 }) {
     <div class=${warn ? "cat-metric warn" : "cat-metric"}>
       <span class="cm-k">${label}</span>
       <div class="cm-bar">
-        <div style=${`width:${entry20.ratio * 100}%;background:var(--bad)`}></div>
+        <div style=${`width:${shortBarRatio(entry20, entry30) * 100}%;background:var(--bad)`}></div>
       </div>
       <span class="cm-v">20:${entry20.ratioLabel} / 30:${entry30.ratioLabel}</span>
     </div>

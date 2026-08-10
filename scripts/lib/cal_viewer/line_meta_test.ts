@@ -8,7 +8,13 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import type { CategoryCount, LineMetadata, NarrativeCount } from "../../../src/domain/types.ts";
 import * as denoFormat from "../../../src/domain/analyzer/dossier_format.ts";
-import { bandSegments, categoryBreakdown, isShortRatioWarn, summarize } from "./line_meta.js";
+import {
+  bandSegments,
+  categoryBreakdown,
+  isShortRatioWarn,
+  shortBarRatio,
+  summarize,
+} from "./line_meta.js";
 
 // format_test.ts と同じ最小フィクスチャ（再現性のため同じ値を使う）。
 const LINE_META: LineMetadata = {
@@ -145,4 +151,10 @@ Deno.test("categoryBreakdown: 文字数比率は分母がtotalCharsであり、�
 
 Deno.test("categoryBreakdown: 未知のカテゴリキーを渡すとエラーになる", () => {
   assertThrows(() => categoryBreakdown(LINE_META, "bogus"));
+});
+
+Deno.test("shortBarRatio: short30側のratioを返す（short20側の値と混同しない）", () => {
+  const entry20 = { value: 1, ratio: 0.5, ratioLabel: "50%", warn: false };
+  const entry30 = { value: 2, ratio: 0.9, ratioLabel: "90%", warn: true };
+  assertEquals(shortBarRatio(entry20, entry30), 0.9);
 });
