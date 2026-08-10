@@ -10,6 +10,7 @@ import {
   createRequestHandler,
   openBrowserCommand,
   resolveAssetPath,
+  serveOptions,
   shouldAutoOpen,
 } from "./cal_serve.ts";
 
@@ -141,6 +142,17 @@ Deno.test("createRequestHandler: 存在しないファイルは 404 を返す", 
   } finally {
     await Deno.remove(base, { recursive: true });
   }
+});
+
+Deno.test("serveOptions: hostname を 127.0.0.1 に固定する（Deno.serve 既定の 0.0.0.0 bind を避ける）", () => {
+  assertEquals(serveOptions({ distDir: "/dist", port: 8000 }), {
+    hostname: "127.0.0.1",
+    port: 8000,
+  });
+});
+
+Deno.test("serveOptions: config の port をそのまま使う", () => {
+  assertEquals(serveOptions({ distDir: "/dist", port: 9999 }).port, 9999);
 });
 
 Deno.test("shouldAutoOpen: --no-open が無ければ true、あれば false", () => {

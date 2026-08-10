@@ -49,11 +49,14 @@ export function compositionSegments(meta) {
   ];
 }
 
-// href 属性用のスキーム検証（dossier_format.safeHref と同じ判定ロジック）。ただし Preact/htm は
-// href をプロパティとして設定するため HTML エスケープは不要かつ有害（& が文字通り &amp; に化ける）。
-// このため危険なら "#" を返し、許可するときは trim 済みの生 URL をそのまま返す
-// （denoFormat.safeHref は HTML 文字列埋め込み用に末尾で escapeHtml するため戻り値そのものは
-// 一致しない。一致させるのは「許可/拒否の判定」であって出力文字列ではない）。
+// href 属性用のスキーム検証（dossier_format.safeHref と同じ判定ロジック）。ただし Preact は
+// href を diff 時に n.setAttribute("href", value) 経由で設定する（width/height/href/list/...
+// は JS プロパティ代入の対象から明示的に除外され、常に setAttribute 側に落ちる。Preact 本体の
+// 属性設定処理で確認済み）。setAttribute は値を HTML として再パースしないため escapeHtml は
+// 不要かつ有害（& が文字通り &amp; という文字列に化けて URL が壊れる）。危険なら "#" を返し、
+// 許可するときは trim 済みの生 URL をそのまま返す（denoFormat.safeHref は HTML 文字列埋め込み
+// 用に末尾で escapeHtml するため戻り値そのものは一致しない。一致させるのは「許可/拒否の判定」
+// であって出力文字列ではない）。
 export function safeHref(url) {
   const stripped = [...url].filter((ch) => ch.charCodeAt(0) > 0x20).join("");
   if (stripped.startsWith("//")) return "#";

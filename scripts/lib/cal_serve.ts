@@ -85,12 +85,19 @@ function openBrowser(url: string): void {
   }
 }
 
+// hostname を明示しないと Deno.serve の既定値 0.0.0.0 で全インターフェースへ bind される。
+// cal.json は作品本文由来のメタを含み著作権上 git 管理外にしている（cal_viewer_config の
+// デフォルト distDir 参照）以上、LAN 越しに露出させるのは事故なので localhost 限定にする。
+export function serveOptions(cfg: ViewerConfig): { hostname: string; port: number } {
+  return { hostname: "127.0.0.1", port: cfg.port };
+}
+
 export async function runServe(argv: string[], config?: ViewerConfig): Promise<number> {
   const cfg = config ?? await loadViewerConfig();
   await copyAssets(ASSET_SRC_DIR, cfg.distDir);
 
   const handler = createRequestHandler(cfg.distDir);
-  const server = Deno.serve({ port: cfg.port, onListen: () => {} }, handler);
+  const server = Deno.serve({ ...serveOptions(cfg), onListen: () => {} }, handler);
   const url = `http://localhost:${cfg.port}/`;
   console.log(`cal viewer を配信中: ${url}（Ctrl+C で終了）`);
 
