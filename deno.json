@@ -10,6 +10,7 @@
     "spike:realdata": "deno run --allow-all spike/realdata_spike.ts",
     "build": "deno run --allow-all scripts/build.ts",
     "build:clean": "rm -rf dist && deno task build",
+    "cal": "deno run --allow-all scripts/cal.ts",
     "analyze": "deno run --allow-all scripts/analyze_url.ts",
     "crawl": "deno run --allow-all scripts/crawl_tags.ts",
     "collect": "deno run --allow-all scripts/fetch_and_store.ts",
