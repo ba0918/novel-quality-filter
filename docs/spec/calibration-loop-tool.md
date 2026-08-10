@@ -223,11 +223,11 @@ port=8000）で動くように設計する。
 サイドバー上部に、較正ループの実運用で必要な絞り込みを配置する。
 
 - **検索**: タイトルまたは作者の部分一致で絞る
-- **ラベルフィルタ**: 良／ゴミ／対象外／未 の 4 チップ。複数選択（OR）で作動し、選択状態は
-  ラベルのセマンティック色（良＝forest、ゴミ＝terracotta、それ以外＝accent）で表示する
+- **ラベルフィルタ**: 良／駄／対象外／未 の 4 チップ。複数選択（OR）で作動し、選択状態は
+  ラベルのセマンティック色（良＝forest、駄＝terracotta、それ以外＝accent）で表示する
 - **用途特化フィルタ**: 較正で頻用する複合条件のプリセット
   - **要注意**: canonical または experiment のいずれかで 1 つ以上の指標が flagged になって
-    いる作品。良ラベルなのに flag が立っていれば「ペナルティ設計を疑う材料」、ゴミラベル なのに flag
+    いる作品。良ラベルなのに flag が立っていれば「ペナルティ設計を疑う材料」、駄ラベル なのに flag
     が無ければ「検知漏れの材料」になる
   - **実験影響大**: `|experiment.score − canonical.score| ≥ 3` の作品。実験デルタを
     弄ったときに「大きく動いた作品」を先に確認する使い方を想定
@@ -282,7 +282,7 @@ rawMetrics（16 項目）は本文由来で正本／実験式のどちらでも�
 
 配色は warm off-white を ground（`#FBF8F2` / dark: `#16181C`）に、深いインディゴを唯一の
 accent（`#3A4F87` / dark: `#7C8FCD`）にする。データセマンティックとして良（forest
-`#3F7C55`）／ゴミ（terracotta `#B0533A`）／flag（amber `#C88A2B`）の 3 色を、それぞれの
+`#3F7C55`）／駄（terracotta `#B0533A`）／flag（amber `#C88A2B`）の 3 色を、それぞれの
 用途にだけ使う。dark theme もパレットセットで揃える。
 
 書体は日本語含めて system sans に統一し、数値表示は `font-variant-numeric: tabular-nums`
@@ -306,3 +306,76 @@ accent（`#3A4F87` / dark: `#7C8FCD`）にする。データセマンティッ�
 - rawMetrics は現状（単一表示・全 16 項目）を維持し、正本/実験の並列化はしない。
 - スコア差分ゼロ状態でも UI が破綻せず、差分カラムが 0、実験カードが正本と同じ数字を表示し、
   差分行の背景着色は発生しない。
+
+## viewer の Web ラベル編集
+
+較正ビューアの DetailPanel から、ブラウザだけでラベル（良／駄／対象外／未ラベルに戻す）を
+編集できるようにする。CLI (`cal label`) は残すが、実運用では Web 編集が主動線になる。 CLI
+の摩擦は「作品を Web で確認 → ID をコピー → ターミナルへ貼り付け → コマンドを打つ」
+という往復コストであり、Web 化はその一手を消すことに絞る。
+
+### UI パターン: chip をクリック → その場に popover 展開
+
+Detail の meta-header にあるラベル chip をクリック可能ボタン化する。押下すると chip の 直下に小さな
+popover が浮き、中身は 良／駄／対象外／未ラベルに戻す の 4 択を縦に並べる。 選択 = 即 API 呼び出し +
+optimistic UI + auto-close で、編集は 2 手（chip をクリック → 値を選ぶ）で完結する。
+
+「常時 Edit 表示」（Detail に操作パネルを固定表示する案）は、読み時の視覚ノイズが常に
+居座って落ち着かないため採らない。モーダル + 確定ボタン方式（オーバーレイ表示 → 選択 → 確定クリック
+→ ローディング → API → 閉じる）も検討したが、3 値単純上書きに対して重すぎるため 今回は採らない。将来
+tags / note の複合編集を統合するときにモーダルへ格上げする道は残す。
+
+### Detail の chip はサイドバーよりひと回り大きく
+
+Detail の chip はクリック可能な操作対象なので、サイドバー行の chip（font 10px / padding 1px 6px /
+border-radius 3px）よりひと回り大きい font 13px / padding 4px 10px / border-radius 4px
+にし、右端に小さな `▾` caret を添えてクリック可能を示唆する。サイドバー の chip
+は既存サイズを維持する（一覧の情報密度を優先）。
+
+### 未ラベルに戻す = labels.jsonl から行削除
+
+ラベルは「その作品を分析に使うかどうかのマーカー」であり、サンプルとして不適だと後から
+判断したら外せる必要がある。「未ラベルに戻す」は `labels.jsonl` から該当行を削除する
+アクションで、chip 表示は unlabeled 状態（点線 dashed）に戻る。
+
+### サーバー側: cal serve を read-only から read-write へ拡張
+
+`cal serve` に POST エンドポイントを追加し、`labels_store.setLabel` を再利用してラベル
+更新を受ける。「未ラベルに戻す」用の行削除ヘルパを `labels_store` に新設する。localhost 限定バインド
+(127.0.0.1) は維持する。
+
+同一プロセス内で CLI と Web が併走する運用は許容する（labels.jsonl は追記ではなく既存 レコードの
+upsert / delete で書き換えるため、CLI と Web の同時操作は last-write-wins に
+なる。個人用途で並走頻度は低い前提）。
+
+### 失敗時の挙動
+
+POST が失敗した場合は toast で通知し、chip 表示を操作前の状態にロールバックする。 optimistic UI
+で先に UI を更新している以上、失敗が静かにズレを残すのが一番怖いシナリオ
+なので、失敗ハンドリングを省略しない。
+
+### 操作の詳細（popover の閉じ方など）
+
+popover は外側クリック / ESC キー / 値選択 のいずれでも閉じる。focus は popover 内へ
+移動し、閉じたら元の chip に戻す（キーボードアクセス性）。同時に複数の popover を開かない （1 作品 1
+popover）。
+
+### 参照実装
+
+具体的な見た目・レイアウト・色使いは wrap 時のモック v8.2 を参照する（Artifact URL は idea memo
+に記載）。
+
+## 受け入れ条件（Web ラベル編集について追加）
+
+- Detail の meta-header に表示されているラベル chip がクリック可能ボタンで、押下すると popover
+  が展開される。
+- popover 内の 良／駄／対象外 を選択すると即座に POST が飛び、labels.jsonl が更新され、 popover
+  が閉じて chip の色と文言が新値に切り替わる。
+- popover 内の「未ラベルに戻す」を選択すると labels.jsonl から該当行が削除され、chip が unlabeled
+  表示（点線 dashed）に戻る。
+- POST が失敗した場合は toast で通知され、chip 表示が操作前の状態にロールバックされる。
+- popover の外側クリック / ESC キーで popover が閉じ、focus が元の chip に戻る。
+- Detail chip のサイズが font 13px / padding 4px 10px / border-radius 4px、サイドバー chip は既存の
+  font 10px / padding 1px 6px / border-radius 3px のまま。
+- `cal serve` が POST を受け付け、localhost 限定バインド (127.0.0.1) が維持される。
+- `cal label` CLI が引き続き動作し、`駄` 値を受理する。
