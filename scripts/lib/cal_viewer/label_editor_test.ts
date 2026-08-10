@@ -35,12 +35,28 @@ Deno.test("deleteLabelRequest: siteWorkId を encodeURIComponent した DELETE U
   assertEquals(req.body, undefined);
 });
 
-Deno.test("computeNextLabels: 良/駄/対象外 の付け替えは既存タグを保持する", () => {
+Deno.test("computeNextLabels: 良/駄 選択は quality を上書きし、scope を「対象」へ戻して既存タグを保持する", () => {
   assertEquals(computeNextLabels(["良", "すり抜け"], "駄"), ["駄", "すり抜け"]);
+  // 「対象外」から「良」に戻すと scope も戻るので、labelsFor 順序と一致する ["良", ...tags]
+  assertEquals(computeNextLabels(["駄", "対象外", "ハードネガティブ"], "良"), [
+    "良",
+    "ハードネガティブ",
+  ]);
+});
+
+Deno.test("computeNextLabels: 「対象外」選択は既存 quality を保持する（労力ゼロで再判定に戻せる）", () => {
+  // labelsFor が返す並び ["quality?", "対象外"?, ...tags] に合わせて、既存 quality があれば
+  // 先頭に残す（labels_store.setLabel の「品質を対象外に混ぜず、quality は保持する」に合わせる）。
+  assertEquals(computeNextLabels(["良", "すり抜け"], "対象外"), ["良", "対象外", "すり抜け"]);
   assertEquals(computeNextLabels(["駄", "ハードネガティブ"], "対象外"), [
+    "駄",
     "対象外",
     "ハードネガティブ",
   ]);
+  // 未ラベルから「対象外」だけ付けるケースは quality なしのまま対象外へ。
+  assertEquals(computeNextLabels(["すり抜け"], "対象外"), ["対象外", "すり抜け"]);
+  // すでに「対象外」だけの状態からもう一度「対象外」を選んでも同じ結果。
+  assertEquals(computeNextLabels(["対象外"], "対象外"), ["対象外"]);
 });
 
 Deno.test("computeNextLabels: null は空配列（未ラベルに戻す＝行削除）", () => {
