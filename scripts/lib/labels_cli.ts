@@ -33,7 +33,7 @@ export async function editLabelStore(
   const siteWorkId = resolveSiteWorkId(target);
   const known = datasetSiteWorkIds(await loadDataset(paths.datasetPath));
   if (!known.has(siteWorkId)) {
-    throw new Error(`未収集の作品: ${siteWorkId}（先に deno task collect してください）`);
+    throw new Error(`未収集の作品: ${siteWorkId}（先に deno task cal register してください）`);
   }
   const labels = await loadLabels2(paths.labelsPath);
   const updated = mutate(labels, siteWorkId, new Date().toISOString());

@@ -66,8 +66,8 @@ deno task build
 # 品質ゲート（lint + fmt + test）
 deno task check
 
-# テキストファイルのスコアリング（デバッグ用）
-deno run --allow-all scripts/score_text.ts <file>
+# 較正データセットの収集・スコアリング（デバッグ用）
+deno task cal register <URL または作品ID>...
 ```
 
 ## Chrome への読み込み

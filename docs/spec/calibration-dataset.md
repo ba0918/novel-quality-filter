@@ -230,6 +230,7 @@ deno task cal label    <URL または作品ID> <良|ゴミ|対象外> [note]  # 
 deno task cal tag      <URL または作品ID> <+タグ|-タグ>   # タグを付ける／外す
 deno task cal exclude  <URL または作品ID> [--undo]        # 分析対象から論理除外する／解除する
 deno task cal evaluate                                  # 正本式×実験式のスコアと差分を出力する
+deno task cal detail   <URL または作品ID> [--experiment]  # 1作品の分析票を本番同体裁の HTML で出力する
 deno task cal list                                     # ラベル・正本/実験スコア・差分を HTML 一覧に出力する
 ```
 
