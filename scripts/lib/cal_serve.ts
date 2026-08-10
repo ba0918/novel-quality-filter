@@ -48,18 +48,34 @@ export function resolveAssetPath(distDir: string, pathname: string): string | un
   return withinBoundary ? resolved : undefined;
 }
 
+// resolveAssetPath の封じ込め判定は文字列 resolve のみで symlink を辿らない。distDir 配下に
+// 外部ファイルを指す symlink を置かれると、そのままでは 200 で読み出せてしまう（実プロダクト
+// 用ではないが cal.json を含む dist を localhost に配信する以上、閉じ込めは必須）。実体パス
+// （symlink 解決後）同士で比較して初めて封じ込めが成立するため、distDir の実体パスはハンドラ
+// 生成時に一度だけ解決し、リクエストのたびに候補ファイルの実体パスと突き合わせる。
 export function createRequestHandler(distDir: string): (req: Request) => Promise<Response> {
+  const realDistDirPromise = Deno.realPath(resolve(distDir));
+
   return async (req: Request) => {
     const { pathname } = new URL(req.url);
     const filePath = resolveAssetPath(distDir, pathname);
     if (!filePath) return new Response("Forbidden", { status: 403 });
+
+    let realFilePath: string;
     try {
-      const body = await Deno.readFile(filePath);
-      return new Response(body, { headers: { "content-type": contentTypeFor(filePath) } });
+      realFilePath = await Deno.realPath(filePath);
     } catch (e) {
       if (e instanceof Deno.errors.NotFound) return new Response("Not Found", { status: 404 });
       throw e;
     }
+
+    const realDistDir = await realDistDirPromise;
+    const withinBoundary = realFilePath === realDistDir ||
+      realFilePath.startsWith(realDistDir + "/");
+    if (!withinBoundary) return new Response("Forbidden", { status: 403 });
+
+    const body = await Deno.readFile(realFilePath);
+    return new Response(body, { headers: { "content-type": contentTypeFor(realFilePath) } });
   };
 }
 

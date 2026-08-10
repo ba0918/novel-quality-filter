@@ -134,6 +134,23 @@ Deno.test("createRequestHandler: パストラバーサルは 403 で拒否する
   }
 });
 
+Deno.test("createRequestHandler: distDir 内の symlink が外部ファイルを指す場合は403で拒否する（symlink 封じ込め）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const distDir = join(base, "dist");
+    await Deno.mkdir(distDir, { recursive: true });
+    const secretPath = join(base, "secret.txt");
+    await Deno.writeTextFile(secretPath, "secret");
+    await Deno.symlink(secretPath, join(distDir, "leak.txt"));
+
+    const handler = createRequestHandler(distDir);
+    const res = await handler(new Request("http://localhost/leak.txt"));
+    assertEquals(res.status, 403);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
 Deno.test("createRequestHandler: 存在しないファイルは 404 を返す", async () => {
   const base = await Deno.makeTempDir();
   try {
