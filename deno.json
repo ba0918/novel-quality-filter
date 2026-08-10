@@ -10,7 +10,8 @@
     "spike:realdata": "deno run --allow-all spike/realdata_spike.ts",
     "build": "deno run --allow-all scripts/build.ts",
     "build:clean": "rm -rf dist && deno task build",
-    "cal": "deno run --allow-all scripts/cal.ts"
+    "cal": "deno run --allow-all scripts/cal.ts",
+    "cal:serve": "deno run --allow-all scripts/cal.ts serve"
   },
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "deno.ns"],
