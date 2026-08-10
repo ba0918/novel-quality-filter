@@ -3,6 +3,8 @@
 
 import { runRegister } from "./lib/cal_register.ts";
 import { runExclude, runLabel, runTag } from "./lib/cal_labels.ts";
+import { runEvaluate, runList } from "./lib/cal_list.ts";
+import { runDetail } from "./lib/cal_detail.ts";
 
 export type Handler = (args: string[]) => Promise<number>;
 
@@ -11,6 +13,9 @@ export const HANDLERS: Record<string, Handler> = {
   label: runLabel,
   tag: runTag,
   exclude: runExclude,
+  evaluate: runEvaluate,
+  detail: runDetail,
+  list: runList,
 };
 
 export async function route(

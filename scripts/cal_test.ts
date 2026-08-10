@@ -1,5 +1,12 @@
 import { assertEquals } from "@std/assert";
-import { type Handler, route } from "./cal.ts";
+import { type Handler, HANDLERS, route } from "./cal.ts";
+
+Deno.test("HANDLERS: 4機能＋ラベル操作の全サブコマンドを公開する", () => {
+  assertEquals(
+    Object.keys(HANDLERS).sort(),
+    ["detail", "evaluate", "exclude", "label", "list", "register", "tag"],
+  );
+});
 
 Deno.test("route: 既知サブコマンドへ残り引数を渡して委譲し、返り値のコードを返す", async () => {
   const calls: Array<{ name: string; args: string[] }> = [];
