@@ -149,9 +149,9 @@ manifest が持つ情報（実装で確定したフィールド名）：
 - `capturedAt`：取得日時（ISO8601）
 - `health`：健全性検証の結果 `{ healthy, reason? }`
 
-数値（12指標・行メタ）は原本から `deno task separation` 等が再計算するキャッシュであり、 manifest
-には持たせない。原本と manifest から `sampledCount` 等の採点入力を再現し、
-再フェッチなしで数値を作り直せる。
+数値（12指標・行メタ）は原本から較正ツール（`deno task cal evaluate` / `list` 等）が再計算する
+キャッシュであり、manifest には持たせない。原本と manifest から `sampledCount` 等の採点入力を
+再現し、再フェッチなしで数値を作り直せる。
 
 ### 再現と再実験を分ける（凍結 decision の扱い）
 
@@ -225,11 +225,12 @@ manifest が持つ情報（実装で確定したフィールド名）：
 ことを必須要件とする。JSONファイルを手で直接編集させない。イメージ：
 
 ```
-deno task collect  <URL または作品ID>...            # 冒頭数話を取得し原本＋数値を収集する
-deno task label    <URL または作品ID> <良|ゴミ|対象外> [note]  # 品質/スコープのラベルを付ける
-deno task tag      <URL または作品ID> <+タグ|-タグ>   # タグを付ける／外す
-deno task exclude  <URL または作品ID> [--undo]        # 分析対象から論理除外する／解除する
-deno task separation                                 # 分離度と食い違いを出力する
+deno task cal register <URL または作品ID>...            # 冒頭数話を取得し原本＋数値を収集する
+deno task cal label    <URL または作品ID> <良|ゴミ|対象外> [note]  # 品質/スコープのラベルを付ける
+deno task cal tag      <URL または作品ID> <+タグ|-タグ>   # タグを付ける／外す
+deno task cal exclude  <URL または作品ID> [--undo]        # 分析対象から論理除外する／解除する
+deno task cal evaluate                                  # 正本式×実験式のスコアと差分を出力する
+deno task cal list                                     # ラベル・正本/実験スコア・差分を HTML 一覧に出力する
 ```
 
 `label` は品質軸（良／ゴミ）とスコープ軸（対象外）を1コマンドで受ける。良／ゴミは `scope=対象`
