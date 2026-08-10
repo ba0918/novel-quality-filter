@@ -1,0 +1,4 @@
+{
+  "distDir": ".agents/runtime/cal-viewer/dist",
+  "port": 8000
+}
