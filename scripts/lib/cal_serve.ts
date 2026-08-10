@@ -19,6 +19,7 @@ export const ASSET_FILES = [
   "list_filter.js",
   "line_meta.js",
   "detail_join.js",
+  "metric_display.js",
 ];
 
 // scripts/lib/cal_viewer/ の絶対パス（assets のソース）。cal.json はここに含めない

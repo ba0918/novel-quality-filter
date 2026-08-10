@@ -11,6 +11,7 @@ import { rawMetricsRows } from "./raw_metrics.js";
 import { applyFilters, LABEL_CHIPS, labelCounts, labelsOf } from "./list_filter.js";
 import { bandSegments, categoryBreakdown, shortBarRatio, summarize } from "./line_meta.js";
 import { joinMetrics, joinPenalties } from "./detail_join.js";
+import { contributionTier, deficit, maxContribution } from "./metric_display.js";
 
 const html = htm.bind(h);
 
@@ -280,12 +281,50 @@ function normLabel(metric) {
   return metric === undefined ? "-" : metric.normalizedValue.toFixed(3);
 }
 
-function weightLabel(metric) {
-  return metric === undefined ? "-" : metric.weight.toFixed(2);
+// 満点なら取れるpt（weight×100）。canonical/experimentいずれかが欠けている指標は'-'。
+function maxLabel(metric) {
+  return metric === undefined ? "-" : maxContribution(metric.weight).toFixed(1);
 }
 
-function contributionLabel(metric) {
-  return metric === undefined ? "-" : metric.contribution.toFixed(2);
+// 「正 寄与」「実 寄与」セル: 数値 + 達成率バー（幅=contribution/maxContribution、色=4段階tier）。
+// 指標が片側にしか存在しない行はバーなしの'-'のみ表示する（joinMetricsのunion join参照）。
+function ContributionCell({ metric }) {
+  if (metric === undefined) return html`<td class="contrib-cell">-</td>`;
+  const max = maxContribution(metric.weight);
+  const tier = contributionTier(metric.contribution, max);
+  const widthPercent = max === 0 ? 0 : Math.min(100, (metric.contribution / max) * 100);
+  return html`
+    <td class="contrib-cell">
+      <span class="contrib-num">${metric.contribution.toFixed(2)}</span>
+      <div class="contrib-bar">
+        <div class=${`contrib-bar-fill tier-${tier}`} style=${`width:${widthPercent}%`}></div>
+      </div>
+    </td>
+  `;
+}
+
+// 「正 -pt」「実 -pt」セル: 直接減点額（maxContribution − contribution）。全指標が同じ0-100ptスケール
+// なのでバー長を横比較するとボトルネック指標が浮き上がる。0（達成済み）はグレーの数値のみでバー無し。
+function DeficitCell({ metric }) {
+  if (metric === undefined) return html`<td class="deficit-cell">-</td>`;
+  const max = maxContribution(metric.weight);
+  const d = deficit(metric.contribution, max);
+  if (d < 0.01) {
+    return html`
+      <td class="deficit-cell">
+        <span class="deficit-num zero">0</span>
+        <div class="deficit-bar"></div>
+      </td>
+    `;
+  }
+  return html`
+    <td class="deficit-cell">
+      <span class="deficit-num">−${d.toFixed(2)}</span>
+      <div class="deficit-bar">
+        <div class="deficit-bar-fill" style=${`width:${d}%`}></div>
+      </div>
+    </td>
+  `;
 }
 
 // Δ寄与は両側が揃っているときだけ算出される（joinMetrics参照）。片側のみの指標は'-'。
@@ -304,7 +343,14 @@ function MetricsTable({ work }) {
     <div class="section">
       <h3>指標内訳 <span class="raw-note">正本 vs 実験式（${rows.length}指標）</span></h3>
       <div class="section-note">
-        差分がある行は淡いインディゴ背景。normalized / weight / contribution / flag を並列
+        読み方 ─
+        <b>max</b>: 影響力（満点なら取れる pt = weight × 100）／
+        <b>寄与</b>: 実際に取れてる pt、バー幅=達成率、色4段階
+        (<span style="color:var(--good);font-weight:600">≥80%</span> ／
+        <span style="color:var(--ink-mute);font-weight:600">60-79%</span> ／
+        <span style="color:var(--flag);font-weight:600">40-59%</span> ／
+        <span style="color:var(--bad);font-weight:600">${"<"}40%</span>) ／
+        <b>-pt</b>: 直接減点額、バーは 100pt スケール（全指標横比較でボトルネックが浮き上がる）
       </div>
       <div class="metrics-table-wrap">
         <table class="metrics-table">
@@ -313,11 +359,13 @@ function MetricsTable({ work }) {
               <th>指標</th>
               <th>raw</th>
               <th class="group">正 norm</th>
-              <th>正 wt</th>
+              <th>正 max</th>
               <th>正 寄与</th>
+              <th>正 -pt</th>
               <th class="group experiment-group">実 norm</th>
-              <th class="experiment-group">実 wt</th>
+              <th class="experiment-group">実 max</th>
               <th class="experiment-group">実 寄与</th>
+              <th class="experiment-group">実 -pt</th>
               <th>Δ寄与</th>
             </tr>
           </thead>
@@ -334,11 +382,13 @@ function MetricsTable({ work }) {
                   </td>
                   <td>${rawLabel((row.canonical ?? row.experiment).rawValue)}</td>
                   <td class="group">${normLabel(row.canonical)}</td>
-                  <td>${weightLabel(row.canonical)}</td>
-                  <td>${contributionLabel(row.canonical)}</td>
+                  <td>${maxLabel(row.canonical)}</td>
+                  <${ContributionCell} metric=${row.canonical} />
+                  <${DeficitCell} metric=${row.canonical} />
                   <td class="group">${normLabel(row.experiment)}</td>
-                  <td>${weightLabel(row.experiment)}</td>
-                  <td>${contributionLabel(row.experiment)}</td>
+                  <td>${maxLabel(row.experiment)}</td>
+                  <${ContributionCell} metric=${row.experiment} />
+                  <${DeficitCell} metric=${row.experiment} />
                   <td class=${`metric-diff ${deltaClassName(row.delta)}`}>
                     ${deltaLabel(row.delta)}
                   </td>
