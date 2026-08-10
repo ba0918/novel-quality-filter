@@ -34,6 +34,27 @@ import { type ComputeRawMetrics, deriveDecision, rederive } from "./rederive.ts"
 const SITE = "kakuyomu";
 const KAKUYOMU_BASE = "https://kakuyomu.jp";
 
+// レート制限の下限・上限。カクヨムへの過剰アクセスを防ぐため、呼び出し側が渡した値に
+// 関わらず収集境界でここへ矯正する。話ページの取得は1作品あたり最大2話（作品ページ1回を
+// 加えて最大3 HTTPリクエスト）、話ページ間の間隔は1000ms未満に短縮しない。
+export const MIN_FETCH_INTERVAL_MS = 1000;
+export const MAX_EPISODE_FETCH_PER_WORK = 2;
+
+// 呼び出し側の入力に関わらずレート制限を強制する純関数。間隔は下限へ、話数上限は 1..2 へ
+// 収め、非有限値（NaN・Infinity）は既定へ倒す。
+export function enforceRateLimits(
+  intervalMs: number,
+  maxEpisodeFetch: number,
+): { intervalMs: number; maxEpisodeFetch: number } {
+  const interval = Number.isFinite(intervalMs)
+    ? Math.max(intervalMs, MIN_FETCH_INTERVAL_MS)
+    : MIN_FETCH_INTERVAL_MS;
+  const maxEp = Number.isFinite(maxEpisodeFetch)
+    ? Math.min(Math.max(Math.trunc(maxEpisodeFetch), 1), MAX_EPISODE_FETCH_PER_WORK)
+    : MAX_EPISODE_FETCH_PER_WORK;
+  return { intervalMs: interval, maxEpisodeFetch: maxEp };
+}
+
 export interface CollectDeps {
   httpGet: (url: string) => Promise<{ status: number; text: string }>;
   sleep: (ms: number) => Promise<void>;
@@ -58,8 +79,13 @@ interface FetchedRaw {
 export async function collectWork(
   workId: string,
   tags: string[],
-  deps: CollectDeps,
+  rawDeps: CollectDeps,
 ): Promise<CollectResult> {
+  // 呼び出し側が渡した間隔・話数上限を収集境界で矯正してから以降のI/Oに使う。
+  const deps: CollectDeps = {
+    ...rawDeps,
+    ...enforceRateLimits(rawDeps.intervalMs, rawDeps.maxEpisodeFetch),
+  };
   const workUrl = `${KAKUYOMU_BASE}/works/${workId}`;
   const workHtml = await getHealthyPage(deps, workUrl, false);
   const meta = extractWorkMetadata(workHtml);

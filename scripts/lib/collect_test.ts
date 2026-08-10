@@ -1,7 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import type { RawMetrics } from "../../src/domain/types.ts";
-import { type CollectDeps, collectWork } from "./collect.ts";
+import { type CollectDeps, collectWork, enforceRateLimits } from "./collect.ts";
 import { captureDir, loadCapture } from "./capture_store.ts";
 import { loadDataset } from "./dataset.ts";
 
@@ -122,6 +122,40 @@ Deno.test("collectWork: 作品あたりの取得話数の上限を守る（レ�
     // 3話目の URL は一度も fetch していない（過剰アクセスしない）。
     const sleeps = (d as unknown as { _sleeps: number[] })._sleeps;
     assertEquals(sleeps.every((ms) => ms === 1000), true);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("enforceRateLimits: 間隔は1000ms以上へ、話数上限は1〜2へ矯正し、非有限値は既定へ倒す", () => {
+  // --interval 0 --max-episodes 100 のような境界回避を無効化する。
+  assertEquals(enforceRateLimits(0, 100), { intervalMs: 1000, maxEpisodeFetch: 2 });
+  assertEquals(enforceRateLimits(Number.NaN, Number.NaN), { intervalMs: 1000, maxEpisodeFetch: 2 });
+  // 上限内の妥当な値はそのまま通す。
+  assertEquals(enforceRateLimits(5000, 1), { intervalMs: 5000, maxEpisodeFetch: 1 });
+  // 0話は本文が取れないので下限1へ。
+  assertEquals(enforceRateLimits(2000, 0), { intervalMs: 2000, maxEpisodeFetch: 1 });
+});
+
+Deno.test("collectWork: 呼び出し側が緩い値を渡してもレート制限を境界で強制する", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const datasetPath = join(base, "dataset.jsonl");
+    // 3話まで next リンクがあるが、上限矯正により2話で打ち切られるべき。
+    const pages = {
+      "https://kakuyomu.jp/works/123": workPage("123"),
+      "https://kakuyomu.jp/works/123/episodes/1": episode("123", 1, 10, 2),
+      "https://kakuyomu.jp/works/123/episodes/2": episode("123", 2, 10, 3),
+      "https://kakuyomu.jp/works/123/episodes/3": episode("123", 3, 10),
+    };
+    const d = deps({ pages, baseDir: base, datasetPath, intervalMs: 0, maxEpisodeFetch: 100 });
+    const { captureId } = await collectWork("123", [], d);
+
+    const cap = await loadCapture(captureDir(base, "kakuyomu", "123", captureId));
+    assertEquals(cap.pages.length, 2); // 上限2に矯正され3話目は取得しない
+    const sleeps = (d as unknown as { _sleeps: number[] })._sleeps;
+    assertEquals(sleeps.length > 0, true);
+    assertEquals(sleeps.every((ms) => ms >= 1000), true); // 0ms は 1000ms へ矯正
   } finally {
     await Deno.remove(base, { recursive: true });
   }

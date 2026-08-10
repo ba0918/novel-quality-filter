@@ -12,7 +12,7 @@ import { initTokenizer, tokenize } from "../src/domain/tokenizer/mod.ts";
 import { analyzeAll } from "../src/domain/analyzer/mod.ts";
 import { parseTargetUrl } from "../src/background/fetchers/kakuyomu.ts";
 import { loadDataset, seenWorkIds } from "./lib/dataset.ts";
-import { type CollectDeps, collectWork } from "./lib/collect.ts";
+import { type CollectDeps, collectWork, enforceRateLimits } from "./lib/collect.ts";
 
 const DEFAULT_OUT = ".agents/runtime/dataset.jsonl";
 const DEFAULT_PAGES_DIR = ".agents/runtime";
@@ -71,6 +71,10 @@ async function main(): Promise<void> {
   }
 
   await initTokenizer();
+  // 作品ページ取得〜作品間スリープまで含め、すべてのレート制限を境界で矯正した値に統一する。
+  // collectWork も内部で同じ矯正を行うが、作品間スリープ(下の sleep)は別の呼び出し口のため
+  // ここでも矯正した間隔を使う（--interval 0 で作品をまたいで連打するのを防ぐ）。
+  const bounds = enforceRateLimits(opts.interval, opts.maxEpisodes);
   const deps: CollectDeps = {
     httpGet,
     sleep,
@@ -78,8 +82,8 @@ async function main(): Promise<void> {
     computeRawMetrics: (text) => analyzeAll(text, tokenize(text), tokenize),
     baseDir: opts.pagesDir,
     datasetPath: opts.out,
-    intervalMs: opts.interval,
-    maxEpisodeFetch: opts.maxEpisodes,
+    intervalMs: bounds.intervalMs,
+    maxEpisodeFetch: bounds.maxEpisodeFetch,
   };
 
   const seen = seenWorkIds(await loadDataset(opts.out));
@@ -107,7 +111,7 @@ async function main(): Promise<void> {
       failed++;
       console.error(`  ✗ ${workId}: ${e instanceof Error ? e.message : e}`);
     }
-    await sleep(opts.interval);
+    await sleep(bounds.intervalMs);
   }
   console.log(`\n完了: 新規${added}件 / スキップ${skipped}件 / 失敗${failed}件`);
 }
