@@ -2,7 +2,7 @@
 // 再フェッチなしで再導出できるようにする。順序の正は manifest.fetched 一箇所だけに持たせ、
 // ファイル名の連番は人間向けの飾りにとどめる。
 
-import { join } from "@std/path";
+import { isAbsolute, join, relative, resolve } from "@std/path";
 import { type EpisodeHealth, validateEpisodeHtml } from "../../src/background/fetchers/kakuyomu.ts";
 
 // 数え方ロジック（行分割・文字カウント）に依存する数値を、どのバージョンで算出したか記録する。
@@ -48,6 +48,9 @@ export interface Capture {
 
 const MANIFEST_FILE = "manifest.json";
 const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/;
+// 原本ファイル名は「単一の安全なファイル名」に限る。ドットは連番+拡張子のために許すが、
+// パス区切り（/ \）や絶対パスは許さない。`.`/`..` はディレクトリ参照なので明示的に弾く。
+const SAFE_FILE = /^[A-Za-z0-9._-]+$/;
 
 export function siteWorkId(site: string, workId: string): string {
   return `${site}:${workId}`;
@@ -76,6 +79,22 @@ function safe(segment: string): string {
   return segment;
 }
 
+// 原本ファイルの読み書き先を、キャプチャディレクトリ内の安全な単一ファイルに限定する。
+// manifest の file 値は外部由来（保存済み manifest.json）でありうるため、書き込み・読み込みの
+// 双方でここを通し、正規化後の解決パスがキャプチャディレクトリ内に留まることを検証する。
+function resolveCaptureFile(dir: string, file: string): string {
+  if (file === "." || file === ".." || isAbsolute(file) || !SAFE_FILE.test(file)) {
+    throw new Error(`Unsafe capture file name: ${file}`);
+  }
+  const root = resolve(dir);
+  const target = resolve(root, file);
+  const rel = relative(root, target);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(`Unsafe capture file escapes directory: ${file}`);
+  }
+  return target;
+}
+
 // 不良HTML（エラー/年齢確認ページ等）を原本として保存しないための門番。全ページの健全性を
 // 検証してから初めて書き込む（部分保存で壊れた原本を残さない、C5）。
 export async function saveCapture(
@@ -83,18 +102,21 @@ export async function saveCapture(
   capture: Capture,
   validate: (html: string) => EpisodeHealth = (html) => validateEpisodeHtml(200, html),
 ): Promise<void> {
+  const { site, workId, captureId } = capture.manifest;
+  const dir = captureDir(baseDir, site, workId, captureId);
+  // 健全性・ファイル名の検証はすべて書き込み前に済ませる（不良を含むキャプチャで
+  // 原本を部分的に書き残さない、C5・パストラバーサル防止 F2）。
   for (const page of capture.pages) {
     const health = validate(page.html);
     if (!health.healthy) {
       throw new Error(`Refusing to store unhealthy page ${page.entry.episodeId}: ${health.reason}`);
     }
+    resolveCaptureFile(dir, page.entry.file);
   }
 
-  const { site, workId, captureId } = capture.manifest;
-  const dir = captureDir(baseDir, site, workId, captureId);
   await Deno.mkdir(dir, { recursive: true });
   for (const page of capture.pages) {
-    await Deno.writeTextFile(join(dir, page.entry.file), page.html);
+    await Deno.writeTextFile(resolveCaptureFile(dir, page.entry.file), page.html);
   }
   await Deno.writeTextFile(
     join(dir, MANIFEST_FILE),
@@ -107,7 +129,7 @@ export async function loadCapture(dir: string): Promise<Capture> {
   const manifest = JSON.parse(await Deno.readTextFile(join(dir, MANIFEST_FILE))) as CaptureManifest;
   const pages: CapturePage[] = [];
   for (const entry of manifest.fetched) {
-    pages.push({ entry, html: await Deno.readTextFile(join(dir, entry.file)) });
+    pages.push({ entry, html: await Deno.readTextFile(resolveCaptureFile(dir, entry.file)) });
   }
   return { manifest, pages };
 }

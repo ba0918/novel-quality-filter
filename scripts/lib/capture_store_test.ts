@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
+import { join } from "@std/path";
 import {
   type Capture,
   captureDir,
@@ -126,6 +127,65 @@ Deno.test("saveCapture: 同一作品の再取得は上書きでなく別 capture
 
 Deno.test("captureDir: workId のパストラバーサルを拒否する", () => {
   assertThrows(() => captureDir("/tmp/base", "kakuyomu", "../../etc", "cap"));
+});
+
+// assertRejects の message 引数で、拒否が「我々の検証」由来であることを固定する。
+// 存在しないディレクトリ等の副次的な FS エラーで偶然 reject するのを合格と誤認しないため。
+const UNSAFE = "Unsafe capture file";
+
+Deno.test("saveCapture: file 名にパス区切りを含む原本を書き込まない（キャプチャ外への書き込み防止）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const m = manifest({
+      fetched: [{ episodeId: "1", url: "u1", order: 0, file: "sub/000_1.html" }],
+    });
+    await assertRejects(() => saveCapture(base, capture(m)), Error, UNSAFE);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("saveCapture: file 名の .. トラバーサルを拒否する", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const m = manifest({
+      fetched: [{ episodeId: "1", url: "u1", order: 0, file: "../escape.html" }],
+    });
+    await assertRejects(() => saveCapture(base, capture(m)), Error, UNSAFE);
+    // キャプチャ親ディレクトリ側へ書き出していないこと。
+    await assertRejects(() => Deno.stat(join(base, "pages", "kakuyomu_123", "escape.html")));
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("saveCapture: file 名の絶対パスを拒否する", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const m = manifest({
+      fetched: [{ episodeId: "1", url: "u1", order: 0, file: "/etc/passwd" }],
+    });
+    await assertRejects(() => saveCapture(base, capture(m)), Error, UNSAFE);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("loadCapture: manifest の file 名がキャプチャ外を指す場合は読み込みを拒否する", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const dir = captureDir(base, "kakuyomu", "123", "cap");
+    await Deno.mkdir(dir, { recursive: true });
+    // saveCapture を通さず、悪意ある file 名を持つ manifest を直に書き込む。
+    const m = manifest({
+      captureId: "cap",
+      fetched: [{ episodeId: "1", url: "u1", order: 0, file: "../../../../etc/passwd" }],
+    });
+    await Deno.writeTextFile(join(dir, "manifest.json"), JSON.stringify(m));
+    await assertRejects(() => loadCapture(dir), Error, UNSAFE);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
 });
 
 Deno.test("makeCaptureId: 取得日時から決定的にファイル名安全なIDを作る", () => {
