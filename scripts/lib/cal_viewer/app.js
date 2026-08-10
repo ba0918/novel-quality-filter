@@ -4,7 +4,13 @@
 // 値整形は ./format.js（dossier_format.ts と同期テスト済み）。
 
 import { h, render } from "https://esm.sh/preact@10.28.3";
-import { useEffect, useMemo, useRef, useState } from "https://esm.sh/preact@10.28.3/hooks";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "https://esm.sh/preact@10.28.3/hooks";
 import htm from "https://esm.sh/htm@3.1.1";
 import { formatInt, safeHref } from "./format.js";
 import { rawMetricsRows } from "./raw_metrics.js";
@@ -102,15 +108,22 @@ function EditableLabelChip({ siteWorkId, labels, onUpdate }) {
   const buttonRef = useRef(null);
   const primaryRef = useRef(primary);
   primaryRef.current = primary;
+  // onUpdate は親側で inline arrow ((next) => onLabelUpdate(id, next)) として作られる
+  // ため、親を useCallback で memoize しても呼び出し側 arrow の identity が毎レンダ変わる。
+  // 依存に onUpdate を入れると mountLabelEditor が dispose→再 mount を繰り返し、popover
+  // クリック直後の re-render で activePopover の cleanup が走って瞬時に閉じる race を
+  // 招く。ref 経由で常に最新版を呼び、effect は siteWorkId だけを見張る。
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
 
   useEffect(() => {
     if (!buttonRef.current) return;
     return mountLabelEditor(buttonRef.current, {
       siteWorkId,
       getCurrentValue: () => primaryRef.current,
-      onUpdate,
+      onUpdate: (next) => onUpdateRef.current(next),
     });
-  }, [siteWorkId, onUpdate]);
+  }, [siteWorkId]);
 
   const displayLabel = primary ?? "未";
   const className = primary
@@ -677,7 +690,11 @@ function App() {
   // ラベル更新の受け口。EditableLabelChip の optimistic UI から呼ばれ、data.works
   // 内の該当作品の labels を新値へ差し替える（Detail と サイドバー行 両方の chip が
   // 同一 state を参照しているため 1 回の setState で同期する）。
-  const updateWorkLabel = (siteWorkId, nextValue) => {
+  // useCallback で stable にしておかないと、EditableLabelChip の useEffect(deps=[onUpdate])
+  // が App の再レンダごとに走り、mountLabelEditor の dispose→再 mount が連続する。
+  // popover が開いている最中に再 mount が挟まると cleanup が activePopover を閉じてしまい、
+  // クリック直後に瞬時に閉じる race を招く。
+  const updateWorkLabel = useCallback((siteWorkId, nextValue) => {
     setData((prev) => {
       if (!prev) return prev;
       return {
@@ -689,7 +706,7 @@ function App() {
         ),
       };
     });
-  };
+  }, []);
 
   if (error) return html`<p class="error">${error}</p>`;
   if (!data) return html`<p>読み込み中...</p>`;
