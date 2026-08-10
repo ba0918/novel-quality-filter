@@ -3,15 +3,21 @@
 
 export const LABEL_CHIPS = ["良", "ゴミ", "対象外", "未"];
 
-function isUnlabeled(work) {
-  return !(work.labels && work.labels.length > 0);
+// work.labels は cal.json 上 undefined になり得る（labels_store 側の labelsFor が空配列 or
+// undefined を返す）。参照箇所を毎回 `work.labels && ...` で個別にガードすると漏れの元になる
+// ため、この関数を唯一の入口にする（app.js のレンダリング側もこれ経由で読む）。
+export function labelsOf(work) {
+  return work.labels ?? [];
 }
 
-// 「未」は quality/scope/tags いずれのラベルも1件も付いていない状態（labels_store 側の
-// labelsFor が返す空配列 or undefined）を指す。良/ゴミ/対象外は cal.json の labels 配列に
-// そのまま含まれる文字列として判定する。
+function isUnlabeled(work) {
+  return labelsOf(work).length === 0;
+}
+
+// 「未」は quality/scope/tags いずれのラベルも1件も付いていない状態を指す。良/ゴミ/対象外は
+// cal.json の labels 配列にそのまま含まれる文字列として判定する。
 function matchesLabel(work, label) {
-  return label === "未" ? isUnlabeled(work) : work.labels.includes(label);
+  return label === "未" ? isUnlabeled(work) : labelsOf(work).includes(label);
 }
 
 function matchSearch(work, query) {
@@ -40,8 +46,9 @@ function isBigDiff(work) {
 const LABEL_RANK = { "良": 0, "ゴミ": 1, "対象外": 2 };
 
 function labelRank(work) {
+  const labels = labelsOf(work);
   for (const label of ["良", "ゴミ", "対象外"]) {
-    if (work.labels.includes(label)) return LABEL_RANK[label];
+    if (labels.includes(label)) return LABEL_RANK[label];
   }
   return 3; // 未
 }

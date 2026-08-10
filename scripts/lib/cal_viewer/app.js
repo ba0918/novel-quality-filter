@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "https://esm.sh/preact@10.28.3/hook
 import htm from "https://esm.sh/htm@3.1.1";
 import { formatInt, safeHref } from "./format.js";
 import { rawMetricsRows } from "./raw_metrics.js";
-import { applyFilters, LABEL_CHIPS, labelCounts } from "./list_filter.js";
+import { applyFilters, LABEL_CHIPS, labelCounts, labelsOf } from "./list_filter.js";
 import { bandSegments, categoryBreakdown, shortBarRatio, summarize } from "./line_meta.js";
 import { joinMetrics, joinPenalties } from "./detail_join.js";
 
@@ -112,7 +112,7 @@ function ListRow({ work, selected, onSelect }) {
         <span class=${diffClassName(work.diff)}>${formatSigned(work.diff, 1)}</span>
       </div>
       <div class="list-row-meta">
-        <${LabelChips} labels=${work.labels} />
+        <${LabelChips} labels=${labelsOf(work)} />
         <span class="author">${work.author}</span>
       </div>
     </div>
@@ -216,7 +216,7 @@ function MetaHeader({ work }) {
       <h1>${work.title}</h1>
       <div class="meta-author">${work.author}</div>
       <div class="meta-labels">
-        <${LabelChips} labels=${work.labels} />
+        <${LabelChips} labels=${labelsOf(work)} />
       </div>
       <a class="meta-url" href=${href} target="_blank" rel="noopener noreferrer">${work.url} ↗</a>
       <div class="meta-grid">

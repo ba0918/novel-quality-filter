@@ -2,7 +2,7 @@
 // cal.json の work オブジェクトを模した最小フィクスチャで純関数の振る舞いを検証する。
 
 import { assertEquals } from "@std/assert";
-import { applyFilters, hasFlagged, labelCounts } from "./list_filter.js";
+import { applyFilters, hasFlagged, labelCounts, labelsOf } from "./list_filter.js";
 
 // deno-lint-ignore no-explicit-any
 function work(overrides: Record<string, any>): any {
@@ -179,6 +179,36 @@ Deno.test("applyFilters: sort=title はタイトルの辞書順に並ぶ", () =>
   const works = [work({ title: "ろ" }), work({ title: "あ" }), work({ title: "い" })];
   const result = applyFilters(works, { sort: "title" });
   assertEquals(result.map((w: { title: string }) => w.title), ["あ", "い", "ろ"]);
+});
+
+Deno.test("labelsOf: labels未定義の作品は空配列を返す", () => {
+  const withoutLabels = work({ title: "未定義ラベル" });
+  delete withoutLabels.labels;
+  assertEquals(labelsOf(withoutLabels), []);
+});
+
+Deno.test("labelsOf: labelsが空配列の作品はそのまま空配列を返す", () => {
+  assertEquals(labelsOf(work({ labels: [] })), []);
+});
+
+Deno.test("labelsOf: labelsが値を持つ作品はそのまま返す", () => {
+  assertEquals(labelsOf(work({ labels: ["良", "対象外"] })), ["良", "対象外"]);
+});
+
+Deno.test("applyFilters: labelsが未定義の作品を具体ラベル（良/ゴミ/対象外）で絞ってもエラーにならず除外される", () => {
+  const withoutLabels = work({ title: "未定義ラベル" });
+  delete withoutLabels.labels;
+  const works = [withoutLabels, work({ title: "良ラベル", labels: ["良"] })];
+  const result = applyFilters(works, { labels: ["良"] });
+  assertEquals(result.map((w: { title: string }) => w.title), ["良ラベル"]);
+});
+
+Deno.test("applyFilters: sort=label で labels が未定義の作品はエラーにならず「未」扱い（末尾）になる", () => {
+  const withoutLabels = work({ title: "未定義ラベル" });
+  delete withoutLabels.labels;
+  const works = [withoutLabels, work({ title: "良ラベル", labels: ["良"] })];
+  const result = applyFilters(works, { sort: "label" });
+  assertEquals(result.map((w: { title: string }) => w.title), ["良ラベル", "未定義ラベル"]);
 });
 
 Deno.test("labelCounts: 良/ゴミ/対象外/未の件数を作品全体から数える", () => {
