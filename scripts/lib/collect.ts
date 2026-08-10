@@ -76,6 +76,13 @@ interface FetchedRaw {
   html: string;
 }
 
+// 収集中の取得状態。後続話フェッチのエラーは sampleEpisodes に握り潰されるため（live 採点経路では
+// 削除済み・非公開を自然な終端として扱う仕様）、ここに記録して収集側で中止判断に使う。
+interface FetchState {
+  fetched: FetchedRaw[];
+  error: Error | null;
+}
+
 export async function collectWork(
   workId: string,
   tags: string[],
@@ -97,14 +104,17 @@ export async function collectWork(
   await deps.sleep(deps.intervalMs);
   const firstHtml = await getHealthyPage(deps, firstUrl, true);
 
-  const fetched: FetchedRaw[] = [{
-    episode: buildEpisodeFromHtml(firstUrl, firstHtml),
-    html: firstHtml,
-  }];
-  await sampleEpisodes(fetched[0].episode, recordingFetchNext(deps, fetched));
+  const state: FetchState = {
+    fetched: [{ episode: buildEpisodeFromHtml(firstUrl, firstHtml), html: firstHtml }],
+    error: null,
+  };
+  await sampleEpisodes(state.fetched[0].episode, recordingFetchNext(deps, state));
+  // 後続話フェッチが非200等で失敗した場合、収集を丸ごと中止する（自然な終端とは区別する）。
+  // 途中打ち切りのキャプチャは、保存済み全話へのサンプリング再実験にとって不正な入力になるため。
+  if (state.error) throw state.error;
 
   const captureId = makeCaptureId(deps.now());
-  const pages = toPages(fetched);
+  const pages = toPages(state.fetched);
   // 採点入力(decision)は収集時に selectSamplingTarget を一度だけ走らせて確定し、manifest に凍結する。
   // 保存値は凍結 decision を読む再現(rederive)で算出するため、後でサンプリングロジックが変わっても
   // 保存値と再現値は構造的に一致する（C2）。
@@ -158,18 +168,26 @@ async function getHealthyPage(
 }
 
 // サンプリングの次話取得をラップし、生HTMLを記録しつつ取得話数上限とレート間隔を守る。
-// 上限到達・不良ページ・次話なしは null を返し、sampleEpisodes に終端させる。
-function recordingFetchNext(deps: CollectDeps, fetched: FetchedRaw[]): FetchNextEpisode {
+// 話数上限到達・次話なしは「自然な終端」として null を返す。一方、取得を試みた後続話が
+// 非200・本文抽出失敗・ネットワークエラーで失敗した場合は state.error に記録して終端し、
+// 収集側で収集全体を中止させる（自然な終端と区別する。C5）。
+function recordingFetchNext(deps: CollectDeps, state: FetchState): FetchNextEpisode {
   return async (prev) => {
-    if (fetched.length >= deps.maxEpisodeFetch) return null;
+    if (state.fetched.length >= deps.maxEpisodeFetch) return null;
     if (!prev.nextEpisodeUrl) return null;
-    const url = resolveEpisodeUrl(prev.nextEpisodeUrl).href;
-    await deps.sleep(deps.intervalMs);
-    const { status, text } = await deps.httpGet(url);
-    if (!validateEpisodeHtml(status, text).healthy) return null;
-    const episode = buildEpisodeFromHtml(url, text);
-    fetched.push({ episode, html: text });
-    return episode;
+    try {
+      const url = resolveEpisodeUrl(prev.nextEpisodeUrl).href;
+      await deps.sleep(deps.intervalMs);
+      const { status, text } = await deps.httpGet(url);
+      const health = validateEpisodeHtml(status, text);
+      if (!health.healthy) throw new Error(`Unhealthy next episode ${url}: ${health.reason}`);
+      const episode = buildEpisodeFromHtml(url, text);
+      state.fetched.push({ episode, html: text });
+      return episode;
+    } catch (err) {
+      state.error = err instanceof Error ? err : new Error(String(err));
+      return null;
+    }
   };
 }
 

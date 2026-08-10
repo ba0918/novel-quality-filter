@@ -44,14 +44,20 @@ function episode(workId: string, n: number, sentences: number, next?: number): s
   return `<h1 class="widget-episodeTitle">第${n}話</h1><div class="widget-episodeBody">${ps}</div>${nextLink}`;
 }
 
-function deps(overrides: Partial<CollectDeps> & { pages: Record<string, string> }): CollectDeps {
+// ページは本文文字列（status 200 とみなす）か、{ status, text } で応答コードを指定できる。
+type PageResponse = string | { status: number; text: string };
+
+function deps(
+  overrides: Partial<CollectDeps> & { pages: Record<string, PageResponse> },
+): CollectDeps {
   const { pages, ...rest } = overrides;
   const sleeps: number[] = [];
   const d: CollectDeps = {
     httpGet: (url: string) => {
-      const text = pages[url];
-      if (text === undefined) throw new Error(`unexpected fetch (live access?): ${url}`);
-      return Promise.resolve({ status: 200, text });
+      const page = pages[url];
+      if (page === undefined) throw new Error(`unexpected fetch (live access?): ${url}`);
+      const res = typeof page === "string" ? { status: 200, text: page } : page;
+      return Promise.resolve(res);
     },
     sleep: (ms: number) => {
       sleeps.push(ms);
@@ -173,6 +179,50 @@ Deno.test("collectWork: 本文抽出できない不良ページは原本にせ�
     await assertRejects(() => collectWork("123", [], d));
 
     assertEquals(await loadDataset(datasetPath), []);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+// キャプチャ格納ディレクトリ（作品単位）が一切作られていないことを外部観測で確かめる。
+async function assertNoCaptureDir(base: string): Promise<void> {
+  await assertRejects(() => Deno.stat(join(base, "pages", "kakuyomu_123")));
+}
+
+Deno.test("collectWork: 第1話フェッチが非200なら原本もdataset行も残さない（C5）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const datasetPath = join(base, "dataset.jsonl");
+    const pages = {
+      "https://kakuyomu.jp/works/123": workPage("123"),
+      "https://kakuyomu.jp/works/123/episodes/1": { status: 403, text: episode("123", 1, 40) },
+    };
+    const d = deps({ pages, baseDir: base, datasetPath });
+    await assertRejects(() => collectWork("123", [], d));
+
+    assertEquals(await loadDataset(datasetPath), []);
+    await assertNoCaptureDir(base);
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+Deno.test("collectWork: 後続話フェッチが非200なら収集を丸ごと中止し、原本もdataset行も残さない（C5）", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const datasetPath = join(base, "dataset.jsonl");
+    // 第1話は too-short で連結継続が必要。その後続フェッチが 500 で失敗する。
+    const pages = {
+      "https://kakuyomu.jp/works/123": workPage("123"),
+      "https://kakuyomu.jp/works/123/episodes/1": episode("123", 1, 10, 2),
+      "https://kakuyomu.jp/works/123/episodes/2": { status: 500, text: episode("123", 2, 10) },
+    };
+    const d = deps({ pages, baseDir: base, datasetPath });
+    await assertRejects(() => collectWork("123", [], d));
+
+    // 第1話は健全だが、後続がエラーで打ち切られたキャプチャは再実験の入力を汚すため保存しない。
+    assertEquals(await loadDataset(datasetPath), []);
+    await assertNoCaptureDir(base);
   } finally {
     await Deno.remove(base, { recursive: true });
   }
