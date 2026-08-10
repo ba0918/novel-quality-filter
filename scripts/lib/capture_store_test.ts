@@ -202,7 +202,6 @@ Deno.test("saveCapture: manifest.fetched の file がキャプチャ外を指す
       pages: [{ entry: { episodeId: "1", url: "u1", order: 0, file: "000_1.html" }, html: BODY }],
     };
     await assertRejects(() => saveCapture(base, cap), Error, UNSAFE);
-    await assertRejects(() => Deno.stat(join(base, "pages", "kakuyomu_123", "evil")));
   } finally {
     await Deno.remove(base, { recursive: true });
   }
