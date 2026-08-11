@@ -50,28 +50,33 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.3,
   },
   {
+    // 家族 2 デルタ: weight 0.07 → 0。実測分布 median/Q1/Q3 すべて 0.000 の死指標
+    // (Codex 実測、130 件中 Q3=0 = 50% 以上が 0 値)。d=-0.452 は外れ値効果。
     key: "separatorFrequency",
     label: "水平線/区切りの頻度",
-    weight: 0.07,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw * 10, 1),
     invert: true,
     flagThreshold: 0.4,
   },
   {
-    // 家族 0 デルタ 3 回目 (Fable A4 相当): dialogueEndingVariety は canonical と同値
-    // (weight 0.08) を維持。narrativeShort14Ratio weight 化を諦めたため weight 移動不要。
-    // 家族 2 で正式に廃止判断予定。
+    // 家族 2 デルタ: weight 0.08 → 0。実測 d=+0.088 の死指標 + 会話数バイアス
+    // (r(variety, dialogueCount)=-0.669、少会話ほど variety 上振れの構造バイアス)。
+    // Fable 裁定 B1 (「前 P2 は破棄でなく成立条件不成立で失効」) に整合。
     key: "dialogueEndingVariety",
     label: "会話語尾の多様性",
-    weight: 0.08,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw, 1),
     invert: false,
     flagThreshold: 0.3,
   },
   {
+    // 家族 2 デルタ: weight 0.06 → 0。charCount 交絡 r=-0.815 で「良で低い」の実測 d=-0.616
+    // は文字数依存の擬似判別と判明 (良作は長い → unique/total の分母効果で TTR 下がる)。
+    // Fable 裁定 C1 (n=25 で正規化設計不能)。
     key: "ttr",
     label: "語彙多様性（TTR）",
-    weight: 0.06,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw / 0.7, 1),
     invert: false,
     flagThreshold: 0.3,

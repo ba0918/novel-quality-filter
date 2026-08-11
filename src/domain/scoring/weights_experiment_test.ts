@@ -68,11 +68,11 @@ Deno.test("weights_experiment[家族0]: 実験式は正本キー ∪ {narrativeS
   );
 });
 
-Deno.test("weights_experiment[家族0]: dialogueEndingVariety は canonical と同値 0.08 を維持 (家族 2 で廃止判断)", () => {
+Deno.test("weights_experiment[家族2]: dialogueEndingVariety は weight 0 化された (実測 d=+0.088 の死指標 + 会話数バイアス)", () => {
   const canonical = METRIC_CONFIGS.find((c) => c.key === "dialogueEndingVariety");
   const experiment = EXPERIMENT_METRIC_CONFIGS.find((c) => c.key === "dialogueEndingVariety");
   assertEquals(canonical?.weight, 0.08);
-  assertEquals(experiment?.weight, 0.08);
+  assertEquals(experiment?.weight, 0);
 });
 
 Deno.test("weights_experiment[家族0]: narrativeShort14Ratio エントリは残すが weight 0 (A4 で判別力は penalty 側で活用)", () => {
@@ -148,9 +148,16 @@ Deno.test("weights_experiment[家族0]: 共有 12 指標の normalize/invert/fla
       samples.map((x) => canonical.normalize(x)),
       `${canonical.key} normalize 一致`,
     );
-    // 家族 1a 以降: descriptionDensitySD のみ差分あり (canonical 0.05 → experiment 0)
-    if (canonical.key === "descriptionDensitySD") {
-      assertEquals(experiment.weight, 0);
+    // 家族 2 以降: 4 指標を weight 0 化 (descriptionSD 家族 1a + separatorFrequency /
+    // dialogueEndingVariety / TTR 家族 2)。他は canonical と一致。
+    const zeroed = new Set([
+      "descriptionDensitySD",
+      "separatorFrequency",
+      "dialogueEndingVariety",
+      "ttr",
+    ]);
+    if (zeroed.has(canonical.key)) {
+      assertEquals(experiment.weight, 0, `${canonical.key} weight 0 化`);
     } else {
       assertEquals(experiment.weight, canonical.weight, `${canonical.key} weight 一致`);
     }
