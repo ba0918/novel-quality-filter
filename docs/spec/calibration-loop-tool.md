@@ -344,6 +344,16 @@ border-radius 3px）よりひと回り大きい font 13px / padding 4px 10px / b
 更新を受ける。「未ラベルに戻す」用の行削除ヘルパを `labels_store` に新設する。localhost 限定バインド
 (127.0.0.1) は維持する。
 
+`cal serve` はラベル変更時、対応する `cal.json` エントリの `labels` フィールドだけを差分 patch
+する（fast-path）。作品の metric 再計算・score 再計算・エントリ追加を含む全 build は 依然 `cal list`
+の責務で、`cal serve` からは scoring 依存を持たない。両者の責務境界を混ぜず、 Web 編集は「labels
+フィールドの上書き」だけに閉じる。
+
+書き込み系ハンドラは Deno のシングルスレッド実行下で Promise chain により直列化する
+（read-modify-write の race で labels.jsonl の更新が消えるのを防ぐ）。labels.jsonl と cal.json
+の書き込みは tmpfile + rename の atomic write に統一し、書き込み途中のクラッシュで
+半端に壊れた状態が残らないようにする。
+
 同一プロセス内で CLI と Web が併走する運用は許容する（labels.jsonl は追記ではなく既存 レコードの
 upsert / delete で書き換えるため、CLI と Web の同時操作は last-write-wins に
 なる。個人用途で並走頻度は低い前提）。
