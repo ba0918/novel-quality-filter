@@ -168,3 +168,18 @@ export const PENALTY_RULES: PenaltyRule[] = [
 ];
 
 export const DEFAULT_THRESHOLD = 40;
+
+// 表示スコア較正カーブの制御点（集約段の 13 本目の normalize）。
+// PCHIP 単調保持補間で `base_score * penalty_multiplier` を表示スコアに写す。
+// 契約: 単調性 / f(40)=40 / C1 連続 / pass-fail 集合不変（calibration_test.ts で固定）。
+// 初期値は moderate 系（良側の押し上げと分布連続性のバランス）。cal_viewer で目視選定し
+// docs/spec/scoring.md「表示較正カーブ」節で議論した値。制御点変更は spec 更新と
+// brainstorm 経由の合意を必須とする（勝手にいじると駄側の誤透過リスクが顕在化する）。
+export const CALIBRATION_CONTROL_POINTS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [40, 40],
+  [50, 52],
+  [60, 65],
+  [75, 80],
+  [100, 100],
+];
