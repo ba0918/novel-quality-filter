@@ -12,11 +12,13 @@ import { loadViewerConfig, type ViewerConfig } from "./cal_viewer_config.ts";
 import { DEFAULT_LABELS } from "./labels_cli.ts";
 import {
   deleteLabel,
+  type LabelRecord2,
   type LabelValue,
   loadLabels2,
   saveLabels2,
   setLabel,
 } from "./labels_store.ts";
+import { labelsFor } from "./cal_list.ts";
 
 // ブラウザに配信する assets。ここに漏れると cal serve が dist にコピーせず、app.js の
 // module import が 404 で失敗して viewer 全体が起動しない。app.js のローカル ./*.js import
@@ -90,9 +92,74 @@ function isValidSiteWorkId(value: unknown): value is string {
   return typeof value === "string" && SITE_WORK_ID_PATTERN.test(value);
 }
 
+// cal.json の該当作品 labels フィールドだけを差分 patch する（POST/DELETE /labels 成功時）。
+// labels.jsonl は永続層、cal.json は viewer が実際に読む静的スナップショット。従来は cal list
+// 実行時にしか再生成されず、Web ラベル編集の結果がリロードで消えるバグの直接原因になっていた。
+// 全再生成 (buildCalJson) は scoring 依存を cal serve に持ち込む上、metrics/score まで走らせる
+// のに対しラベル編集は labels フィールドしか変えないので fast-path として差分 patch を採る。
+// 失敗（読込エラー・parse 失敗・該当作品なし・書込失敗のいずれか）は「labels.jsonl は正、
+// cal.json 反映は次回 cal list で解消」の過渡的不整合として扱い、warning 文字列を返す。
+// 例外を投げず undefined = 成功、string = 警告メッセージ の形にすることで、呼び出し側は
+// try/catch を書かずに 200+warning レスポンスへ流せる。
+async function patchCalJsonLabels(
+  distDir: string,
+  siteWorkId: string,
+  newLabels: string[],
+): Promise<string | undefined> {
+  const calJsonPath = join(distDir, "cal.json");
+  let text: string;
+  try {
+    text = await Deno.readTextFile(calJsonPath);
+  } catch {
+    return "cal.json への反映に失敗しました（読み込み不可）。次回 `deno task cal list` で解消します。";
+  }
+  let parsed: { works?: Array<{ siteWorkId?: string; labels?: string[] }> };
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return "cal.json への反映に失敗しました（JSON parse 失敗）。次回 `deno task cal list` で解消します。";
+  }
+  const works = parsed.works;
+  if (!Array.isArray(works)) {
+    return "cal.json への反映に失敗しました（works 配列なし）。次回 `deno task cal list` で解消します。";
+  }
+  const index = works.findIndex((w) => w?.siteWorkId === siteWorkId);
+  if (index === -1) {
+    return `cal.json への反映をスキップしました（${siteWorkId} が cal.json に無い）。次回 \`deno task cal list\` で追加されます。`;
+  }
+  works[index] = { ...works[index], labels: newLabels };
+  try {
+    await Deno.writeTextFile(calJsonPath, JSON.stringify(parsed, null, 2));
+  } catch {
+    return "cal.json への反映に失敗しました（書き込み不可）。次回 `deno task cal list` で解消します。";
+  }
+  return undefined;
+}
+
+// patchCalJsonLabels の結果を Response に載せる。warning あり → 200 + JSON body、なし →
+// 現状互換の null body。client 側は content-type が application/json のときだけ body を読む
+// ため、既存の 200 (body 空) を返していた成功系テスト・呼び出し元は変更不要（後方互換）。
+function labelWriteResponse(warning: string | undefined): Response {
+  if (warning === undefined) return new Response(null, { status: 200 });
+  return new Response(JSON.stringify({ warning }), {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
+function labelsForSiteWorkId(records: LabelRecord2[], siteWorkId: string): string[] {
+  return labelsFor(records.find((r) => r.siteWorkId === siteWorkId));
+}
+
 // POST /labels の body 契約: {siteWorkId, value}。setLabel を再利用して upsert し、
 // saveLabels2 で永続化する。バリデーション違反はすべて 400 で拒否し labels を書かない。
-async function handleLabelPost(req: Request, labelsPath: string): Promise<Response> {
+// 永続化成功後、cal.json の該当作品 labels 配列も同じ内容へ差分 patch する（patch 失敗は
+// 200 + warning で返し、labels.jsonl は正のままにする）。
+async function handleLabelPost(
+  req: Request,
+  labelsPath: string,
+  distDir: string,
+): Promise<Response> {
   let body: unknown;
   try {
     body = await req.json();
@@ -112,13 +179,23 @@ async function handleLabelPost(req: Request, labelsPath: string): Promise<Respon
   const records = await loadLabels2(labelsPath);
   const updated = setLabel(records, siteWorkId, value, new Date().toISOString());
   await saveLabels2(labelsPath, updated);
-  return new Response(null, { status: 200 });
+  const warning = await patchCalJsonLabels(
+    distDir,
+    siteWorkId,
+    labelsForSiteWorkId(updated, siteWorkId),
+  );
+  return labelWriteResponse(warning);
 }
 
 // DELETE /labels/:siteWorkId 契約: 該当行を除いた配列で labels.jsonl を再保存する。
 // 存在しない ID でも 200（べき等）。siteWorkId のパスセグメントは decode 後に enum
-// パターンへ照合し、"../" や "%2F" などの逸脱は 400 で弾く。
-async function handleLabelDelete(pathname: string, labelsPath: string): Promise<Response> {
+// パターンへ照合し、"../" や "%2F" などの逸脱は 400 で弾く。cal.json 側は該当作品の
+// labels を空配列に patch する（作品エントリ自体は残す＝未ラベル state を示す）。
+async function handleLabelDelete(
+  pathname: string,
+  labelsPath: string,
+  distDir: string,
+): Promise<Response> {
   const rest = pathname.replace(/^\/labels\/?/, "");
   if (rest === "") return new Response("siteWorkId required", { status: 400 });
   let siteWorkId: string;
@@ -132,7 +209,8 @@ async function handleLabelDelete(pathname: string, labelsPath: string): Promise<
   }
   const records = await loadLabels2(labelsPath);
   await saveLabels2(labelsPath, deleteLabel(records, siteWorkId));
-  return new Response(null, { status: 200 });
+  const warning = await patchCalJsonLabels(distDir, siteWorkId, []);
+  return labelWriteResponse(warning);
 }
 
 // resolveAssetPath の封じ込め判定は文字列 resolve のみで symlink を辿らない。distDir 配下に
@@ -155,10 +233,10 @@ export function createRequestHandler(
     // /labels* は API 側の分岐。静的配信のパス解決には落とさない（asset 名衝突の予防）。
     if (pathname === "/labels" || pathname.startsWith("/labels/")) {
       if (req.method === "POST" && pathname === "/labels") {
-        return await handleLabelPost(req, labelsPath);
+        return await handleLabelPost(req, labelsPath, distDir);
       }
       if (req.method === "DELETE") {
-        return await handleLabelDelete(pathname, labelsPath);
+        return await handleLabelDelete(pathname, labelsPath, distDir);
       }
       return new Response("Method Not Allowed", {
         status: 405,

@@ -184,6 +184,23 @@ async function withServeFixture(
   }
 }
 
+// cal.json の該当作品 labels フィールドだけを patch する差分更新の検証で使う最小限の
+// cal.json fixture。works の要素は siteWorkId / labels の他に「patch で触られていないこと」を
+// 検証するための飾りフィールドを持つ（実本番の CalWork は canonical/experiment/meta 等を持つが、
+// ここでは他フィールドを不変で保つ契約が守られていれば十分なので余計な shape を持ち込まない）。
+function calJsonFixture(works: Array<Record<string, unknown>>): string {
+  return JSON.stringify(
+    {
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      canonicalWeightsRef: "src/domain/scoring/weights.ts",
+      experimentWeightsRef: "src/domain/scoring/weights_experiment.ts",
+      works,
+    },
+    null,
+    2,
+  );
+}
+
 Deno.test("POST /labels: 品質ラベル「駄」を書き込み 200 を返す", async () => {
   await withServeFixture(async ({ distDir, labelsPath }) => {
     const handler = createRequestHandler(distDir, labelsPath);
@@ -328,6 +345,178 @@ Deno.test("createRequestHandler: /labels に対する未対応メソッド（PUT
       }),
     );
     assertEquals(res.status, 405);
+  });
+});
+
+// --- cal.json 差分 patch（labels フィールドだけを更新する契約） ---
+// labels.jsonl は永続層、cal.json は viewer が実際に読む静的スナップショット。
+// 従来は cal list 実行時にしか再生成されず、Web ラベル編集の結果がリロードで消える
+// バグを招いていた。POST/DELETE 成功時に該当作品の labels 配列だけを patch することで、
+// ラベル以外（metrics/score/meta）を触らず fast-path で反映する。全再生成 (buildCalJson) の
+// 呼び出しは避ける（依存が重く、cal serve から scoring を呼ぶ動線を作らないため）。
+
+Deno.test("POST /labels: cal.json の該当作品 labels 配列を新値に patch する", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await Deno.writeTextFile(
+      join(distDir, "cal.json"),
+      calJsonFixture([
+        { siteWorkId: "kakuyomu:123", title: "作品A", labels: [] },
+        { siteWorkId: "kakuyomu:456", title: "作品B", labels: ["良"] },
+      ]),
+    );
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "駄" }),
+      }),
+    );
+    assertEquals(res.status, 200);
+    const patched = JSON.parse(await Deno.readTextFile(join(distDir, "cal.json")));
+    assertEquals(patched.works[0].labels, ["駄"]);
+    // 他作品は不変。
+    assertEquals(patched.works[1].labels, ["良"]);
+  });
+});
+
+Deno.test("POST /labels: cal.json patch は該当作品の他フィールドを一切触らない", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const originalWork = {
+      siteWorkId: "kakuyomu:123",
+      title: "作品A",
+      author: "著者A",
+      labels: [],
+      canonical: { score: 42, metrics: [], penalties: [] },
+      experiment: { score: 45, metrics: [], penalties: [] },
+      meta: { reviewCount: 10, totalReviewPoint: 100 },
+      diff: 3,
+    };
+    await Deno.writeTextFile(join(distDir, "cal.json"), calJsonFixture([originalWork]));
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "良" }),
+      }),
+    );
+    assertEquals(res.status, 200);
+    const patched = JSON.parse(await Deno.readTextFile(join(distDir, "cal.json")));
+    const patchedWork = patched.works[0];
+    // labels 以外の全フィールドが元のまま。
+    assertEquals(patchedWork.title, originalWork.title);
+    assertEquals(patchedWork.author, originalWork.author);
+    assertEquals(patchedWork.canonical, originalWork.canonical);
+    assertEquals(patchedWork.experiment, originalWork.experiment);
+    assertEquals(patchedWork.meta, originalWork.meta);
+    assertEquals(patchedWork.diff, originalWork.diff);
+    assertEquals(patchedWork.labels, ["良"]);
+  });
+});
+
+Deno.test("POST /labels: 「対象外」選択で既存 quality を保持した labels 配列に patch する", async () => {
+  // labels_store.setLabel の「対象外は scope のみ更新、quality 保持」と、cal_list.labelsFor
+  // の順序（["quality?", "対象外"?, ...tags]）が一貫することを ふたつの層をまたいで検証する。
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await saveLabels2(labelsPath, setLabel([], "kakuyomu:123", "良", "t"));
+    await Deno.writeTextFile(
+      join(distDir, "cal.json"),
+      calJsonFixture([{ siteWorkId: "kakuyomu:123", labels: ["良"] }]),
+    );
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "対象外" }),
+      }),
+    );
+    assertEquals(res.status, 200);
+    const patched = JSON.parse(await Deno.readTextFile(join(distDir, "cal.json")));
+    assertEquals(patched.works[0].labels, ["良", "対象外"]);
+  });
+});
+
+Deno.test("DELETE /labels/:siteWorkId: cal.json の該当作品 labels 配列を空にする", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await saveLabels2(labelsPath, setLabel([], "kakuyomu:123", "良", "t"));
+    await Deno.writeTextFile(
+      join(distDir, "cal.json"),
+      calJsonFixture([{ siteWorkId: "kakuyomu:123", labels: ["良"] }]),
+    );
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels/kakuyomu:123", { method: "DELETE" }),
+    );
+    assertEquals(res.status, 200);
+    const patched = JSON.parse(await Deno.readTextFile(join(distDir, "cal.json")));
+    assertEquals(patched.works[0].labels, []);
+  });
+});
+
+Deno.test("POST /labels: cal.json に該当作品が無い場合は labels.jsonl のみ更新し 200+warning を返す", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await Deno.writeTextFile(
+      join(distDir, "cal.json"),
+      calJsonFixture([{ siteWorkId: "kakuyomu:999", labels: [] }]),
+    );
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "良" }),
+      }),
+    );
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("content-type"), "application/json; charset=utf-8");
+    const body = await res.json();
+    assertStringIncludes(body.warning, "cal.json");
+    // labels.jsonl 側は正しく更新されている。
+    const labels = await loadLabels2(labelsPath);
+    assertEquals(labels[0].quality, "良");
+  });
+});
+
+Deno.test("POST /labels: cal.json 書き込み失敗（読み込み時 parse エラー）は 200+warning を返す", async () => {
+  // 「labels.jsonl は正、cal.json 反映失敗」を過渡的不整合として扱う契約。
+  // 決定的な故障注入として cal.json に不正 JSON を書いておくと read/parse で確実に失敗する。
+  // client は warning toast を出すだけで rollback しない（labels.jsonl が正なので UI 表示を
+  // 戻すとむしろズレる）。次回 cal list で cal.json が再生成されれば自然に整合する。
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await Deno.writeTextFile(join(distDir, "cal.json"), "not-a-json");
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "駄" }),
+      }),
+    );
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertStringIncludes(body.warning, "cal.json");
+    const labels = await loadLabels2(labelsPath);
+    assertEquals(labels[0].quality, "駄");
+  });
+});
+
+Deno.test("POST /labels: cal.json 未生成でも 200+warning を返し labels.jsonl は更新される", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const res = await handler(
+      new Request("http://localhost/labels", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteWorkId: "kakuyomu:123", value: "良" }),
+      }),
+    );
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertStringIncludes(body.warning, "cal.json");
+    const labels = await loadLabels2(labelsPath);
+    assertEquals(labels[0].quality, "良");
   });
 });
 
