@@ -17,6 +17,7 @@ import type {
 } from "../../src/domain/types.ts";
 import {
   CALIBRATION_CONTROL_POINTS,
+  combinePenaltyMultipliers,
   METRIC_CONFIGS,
   type MetricConfig,
   PENALTY_RULES,
@@ -113,17 +114,19 @@ export function scoreResultFromMetrics(
   const rawScore = metrics.reduce((sum, m) => sum + m.contribution, 0);
   const baseScore = Math.max(0, Math.min(100, rawScore));
 
-  let penaltyMultiplier = 1.0;
   const penalties: PenaltyResult[] = [];
+  const firedMultipliers: number[] = [];
   for (const rule of formula.penaltyRules) {
     const fires = rule.evaluate
       ? rule.evaluate(raw, lineMetadata)
       : matchesConditionsFor(rule, raw, metrics);
     if (fires) {
-      penaltyMultiplier *= rule.penaltyMultiplier;
+      firedMultipliers.push(rule.penaltyMultiplier);
       penalties.push({ label: rule.label, multiplier: rule.penaltyMultiplier });
     }
   }
+  // 案 A: mod.ts と同じ min-mult 合成 (weights.ts の combinePenaltyMultipliers 参照)。
+  const penaltyMultiplier = combinePenaltyMultipliers(firedMultipliers);
 
   // mod.ts calculateScore と同一の較正段（集約段の 13 本目の normalize）を通す。
   // canonical/experiment 両方に同じ f を掛けることで、指標側の実験と較正側の実験を分離する。

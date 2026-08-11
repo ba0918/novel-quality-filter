@@ -155,6 +155,22 @@ export interface PenaltyRule {
 // 地の文短行14 率の閾値。strict `>` で判定する（境界 30% は非発火）。
 const SHORT14_NARRATIVE_RATIO_THRESHOLD = 0.30;
 
+// 案 A (rev 20260812、cycle plan は本コミットの pack 参照): 発火した rule 群の multiplier を
+// 「乗算合成」から「min-mult 合成 (最も強い 1 個だけ適用)」に切り替える。
+// 動機: n=25 (良15/駄10) 実測で境界作品の誤 drop 主犯が二重発火時の乗算合成と判明。
+//   例: 良「スキルレベル」base 56.7 が 0.75×0.80=0.60 で 34.0 に潰れた (min-mult なら 42.5)。
+// 単発発火時は乗算/最小どちらも同値なので、既存駄側の判別 (10/10 drop) は温存見込み。
+// 判定パック (Fable 5) が案 A 単独 → 実測ゲート → 案 E の 2 段階を承認。ゲート:
+//   駄 drop=10/10 維持 / AUC ≥ 0.933 近傍 / 良 keep ≥ 12/15。
+export function combinePenaltyMultipliers(multipliers: number[]): number {
+  if (multipliers.length === 0) return 1.0;
+  let m = multipliers[0];
+  for (let i = 1; i < multipliers.length; i++) {
+    if (multipliers[i] < m) m = multipliers[i];
+  }
+  return m;
+}
+
 export const PENALTY_RULES: PenaltyRule[] = [
   {
     label: "文長の緩急・ばらつき不足",

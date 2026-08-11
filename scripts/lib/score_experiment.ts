@@ -8,6 +8,7 @@
 import type { RawMetrics } from "../../src/domain/types.ts";
 import {
   CALIBRATION_CONTROL_POINTS,
+  combinePenaltyMultipliers,
   METRIC_CONFIGS,
   type MetricConfig,
   PENALTY_RULES,
@@ -38,7 +39,7 @@ export function scoreWithConfig(
   for (const c of metricConfigs) sum += normOf(c.key) * c.weight * 100;
   const base = Math.max(0, Math.min(100, sum));
 
-  let mult = 1;
+  const firedMultipliers: number[] = [];
   for (const rule of penaltyRules) {
     // evaluate ベースの rule は lineMetadata 派生値を条件に取るため、RawMetrics だけを扱う
     // 本研究エンジンのスコープ外。calculateScore が lineMetadata 未指定時に evaluate を false と
@@ -56,8 +57,10 @@ export function scoreWithConfig(
         break;
       }
     }
-    if (met) mult *= rule.penaltyMultiplier;
+    if (met) firedMultipliers.push(rule.penaltyMultiplier);
   }
+  // 案 A: mod.ts と同じ min-mult 合成。
+  const mult = combinePenaltyMultipliers(firedMultipliers);
   const penalized = Math.max(0, Math.min(100, base * mult));
   return Math.round(calibrate(penalized));
 }
@@ -92,7 +95,7 @@ export function scoreExperiment(raw: RawMetrics, cfg: ExperimentConfig): number 
   }
   const base = Math.max(0, Math.min(100, sum));
 
-  let mult = 1;
+  const firedMultipliers: number[] = [];
   for (const rule of PENALTY_RULES) {
     // scoreWithConfig と同じ理由で、evaluate ベース rule は本エンジンでは常に非発火扱い
     // （lineMetadata を受け取れないため）。
@@ -110,11 +113,15 @@ export function scoreExperiment(raw: RawMetrics, cfg: ExperimentConfig): number 
       }
     }
     if (met) {
-      mult *= cfg.compositeMult != null && rule.label === COMPOSITE_LABEL
-        ? cfg.compositeMult
-        : rule.penaltyMultiplier;
+      firedMultipliers.push(
+        cfg.compositeMult != null && rule.label === COMPOSITE_LABEL
+          ? cfg.compositeMult
+          : rule.penaltyMultiplier,
+      );
     }
   }
+  // 案 A: mod.ts と同じ min-mult 合成。
+  const mult = combinePenaltyMultipliers(firedMultipliers);
   const penalized = Math.max(0, Math.min(100, base * mult));
   return Math.round(calibrate(penalized));
 }

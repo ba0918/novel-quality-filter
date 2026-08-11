@@ -1,6 +1,6 @@
 import type { LineMetadata, PenaltyResult, RawMetrics, ScoreResult } from "../types.ts";
 import { normalizeMetrics } from "./normalizer.ts";
-import { CALIBRATION_CONTROL_POINTS, PENALTY_RULES } from "./weights.ts";
+import { CALIBRATION_CONTROL_POINTS, combinePenaltyMultipliers, PENALTY_RULES } from "./weights.ts";
 import { makeCalibration } from "./calibration.ts";
 
 // 較正関数はモジュールスコープで一度だけ構築する（PCHIP 傾きは制御点から決まる不変量）。
@@ -17,8 +17,8 @@ export function calculateScore(
   const rawScore = metrics.reduce((sum, m) => sum + m.contribution, 0);
   const baseScore = Math.max(0, Math.min(100, rawScore));
 
-  let penaltyMultiplier = 1.0;
   const penalties: PenaltyResult[] = [];
+  const firedMultipliers: number[] = [];
 
   for (const rule of PENALTY_RULES) {
     // evaluate 定義済み rule は関数側で発火判定する（lineMetadata 派生値を条件に取れる）。
@@ -27,10 +27,15 @@ export function calculateScore(
       ? rule.evaluate(rawMetrics, lineMetadata)
       : matchesConditions(rule.conditions, rawMetrics, metrics);
     if (fires) {
-      penaltyMultiplier *= rule.penaltyMultiplier;
+      firedMultipliers.push(rule.penaltyMultiplier);
       penalties.push({ label: rule.label, multiplier: rule.penaltyMultiplier });
     }
   }
+
+  // 案 A: 乗算合成から min-mult 合成へ (weights.ts の combinePenaltyMultipliers コメント参照)。
+  // penalties 配列自体は「発火した個々の rule」を記録し続ける (UI 側で発火理由を表示するため)。
+  // baseScore に掛かる実効 multiplier だけを min にする設計。
+  const penaltyMultiplier = combinePenaltyMultipliers(firedMultipliers);
 
   // 集約段の 13 本目の normalize（表示較正カーブ）は round の直前・penalty 適用の直後に
   // 挟む。penalty 前に挟むと駄側の分布が動く（f が閾値 40 で固定でも中間帯が動くため）。

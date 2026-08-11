@@ -149,19 +149,23 @@ function makeLineMetadata(narrative: Partial<NarrativeCount>): LineMetadata {
 Deno.test(
   "evaluateRecord: record.lineMetadata を calculateScore に渡し、新ペナルティが反映される",
   () => {
-    const r = raw();
+    // 案 A (min-mult 合成) 導入以降、「短行14 発火 → 常にスコアが下がる」は成立しない。
+    // 他 rule が既発火なら追加発火は min を更新しない限り無影響。ここでは「短行14 だけが
+    // 発火する構成」を明示的に組み、min-mult 合成でも下がることを検証する。
+    // raw の singleSentParaRatio=0.2 / sentenceLengthSD=25 で他 rule は非発火。
+    const cleanRaw = raw({ singleSentParaRatio: 0.2, sentenceLengthSD: 25 });
     // 100 行中 40 行が 14 字未満 → 40% > 30% で新ペナルティが発火する
     const firingMeta = makeLineMetadata({ lineCount: 100, short14: 40 });
-    const rec: DatasetRecord = { ...record(0, r), lineMetadata: firingMeta };
+    const rec: DatasetRecord = { ...record(0, cleanRaw), lineMetadata: firingMeta };
     const result = evaluateRecord(rec, CANONICAL_FORMULA);
     const short14Penalty = result.penalties.find((p) => p.label === "地の文短行14 の過多");
     assert(short14Penalty, "record.lineMetadata が calculateScore に渡っていない");
     assertEquals(short14Penalty.multiplier, 0.80);
-    // 新ペナルティ発火時のスコアは、渡さない場合より低い
-    const scoreNoMeta = calculateScore(r).score;
+    // 短行14 単独発火 → mult=0.80 が baseScore に掛かる → score は下がる
+    const scoreNoMeta = calculateScore(cleanRaw).score;
     if (!(result.score < scoreNoMeta)) {
       throw new Error(
-        `短行14 発火時は score が下がるはず: no-meta=${scoreNoMeta} with-meta=${result.score}`,
+        `短行14 単独発火時は score が下がるはず: no-meta=${scoreNoMeta} with-meta=${result.score}`,
       );
     }
   },
