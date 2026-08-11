@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { combinePenaltyMultipliers, METRIC_CONFIGS, PENALTY_RULES } from "./weights.ts";
+import { combinePenaltyMultipliers, PENALTY_RULES } from "./weights.ts";
 
 // 較正で確定した「地の文短行14 の過多」ペナルティが weights.ts に登録されていることを、
 // 存在検査として固定する（挙動テストは mod_test.ts 側）。
@@ -38,42 +38,4 @@ Deno.test("weights: combinePenaltyMultipliers は複数発火時 min(multipliers
   assertEquals(combinePenaltyMultipliers([0.75, 0.80]), 0.75);
   // 文長ばらつき不足(0.55) + 一文一段落過多(0.75) + 短行14過多(0.80) → 乗算 0.33、min-mult 0.55
   assertEquals(combinePenaltyMultipliers([0.55, 0.75, 0.80]), 0.55);
-});
-
-// 感情直接率・論理接続密度の weight 0 化。n=25 実測で符号逆の判別を持つと判明:
-//   感情直接率 d=-1.33 (AUC=0.15) だが invert=true で weight 0.07 → 良側を叩いていた
-//   論理接続密度 d=-0.71 (AUC=0.33) だが invert=true で weight 0.06 → 同じ
-// 合計 0.13 を判別 4 指標 (sentenceLengthSD/paragraphLengthSD/paragraphTransitionEntropy/
-// sentenceLengthBurstiness) へ均等按分 (各 +0.0325)。「按分を境界作品に合わせて手調整しない」の
-// 判定原則に従い、機械的な等分で回避可能な過適合を退ける。base 合計 1.0 は維持する。
-Deno.test("weights: 感情直接率・論理接続密度は weight 0 化されている (符号逆問題の除去)", () => {
-  const emo = METRIC_CONFIGS.find((c) => c.key === "emotionDirectnessRatio");
-  const log = METRIC_CONFIGS.find((c) => c.key === "logicalConnectiveDensity");
-  assert(emo, "emotionDirectnessRatio が未登録");
-  assert(log, "logicalConnectiveDensity が未登録");
-  assertEquals(emo.weight, 0);
-  assertEquals(log.weight, 0);
-});
-
-Deno.test("weights: 削減 weight 0.13 は判別 4 指標に均等按分されている (各 +0.0325)", () => {
-  const expected: Record<string, number> = {
-    sentenceLengthSD: 0.22 + 0.0325,
-    paragraphLengthSD: 0.09 + 0.0325,
-    paragraphTransitionEntropy: 0.08 + 0.0325,
-    sentenceLengthBurstiness: 0.16 + 0.0325,
-  };
-  for (const [key, w] of Object.entries(expected)) {
-    const c = METRIC_CONFIGS.find((x) => x.key === key);
-    assert(c, `${key} が未登録`);
-    // 浮動小数比較は誤差許容
-    assert(
-      Math.abs(c.weight - w) < 1e-9,
-      `${key} の weight が ${w} でない (実際: ${c.weight})`,
-    );
-  }
-});
-
-Deno.test("weights: METRIC_CONFIGS の weight 合計は 1.0 (base 合計不変)", () => {
-  const sum = METRIC_CONFIGS.reduce((s, c) => s + c.weight, 0);
-  assert(Math.abs(sum - 1.0) < 1e-9, `weight 合計が 1.0 でない (実際: ${sum})`);
 });

@@ -26,13 +26,7 @@ export interface MetricConfig {
 //   sentenceLengthBurstiness 0.08→0.16。base 合計 1.0 維持
 // - PENALTY_RULES: 短行14 penalty multiplier 0.85 → 0.80 (家族 0 で narrative シグナル強化)
 // - narrativeShort14Ratio の weight 化は家族 0 実測で駄側境界作品を押し上げるため見送り
-//
-// 続く追加改修 (境界作品の誤 drop 低減):
-// - 感情直接率・論理接続密度を weight 0 化 (実測で invert 方向が符号逆と判明。d=-1.33/-0.71)。
-//   合計 0.13 を判別 4 指標へ均等按分 (各 +0.0325)、base 合計 1.0 維持。按分は境界作品に
-//   合わせず機械的に等分し過適合を回避する。
-// - PENALTY_RULES 合成方式を乗算から min-mult へ変更 (別コミット、weights.ts の
-//   combinePenaltyMultipliers 参照)。
+// - emotion / logical 辞書純化は本文再解析要で別 cycle に持ち越し
 export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "singleSentParaRatio",
@@ -43,10 +37,9 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.4,
   },
   {
-    // 0.22 + 0.0325 (感情直接率・論理接続密度 weight 0 化での均等按分)。
     key: "sentenceLengthSD",
     label: "文長の標準偏差",
-    weight: 0.2525,
+    weight: 0.22,
     normalize: (raw: number) => Math.min(raw / 25, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -88,10 +81,9 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.3,
   },
   {
-    // 0.09 + 0.0325 (感情直接率・論理接続密度 weight 0 化での均等按分)。
     key: "paragraphLengthSD",
     label: "段落長の標準偏差",
-    weight: 0.1225,
+    weight: 0.09,
     normalize: (raw: number) => Math.min(raw / 40, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -105,40 +97,37 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.4,
   },
   {
-    // n=25 実測で d=-1.33 (AUC=0.15)。「感情を直接書くと駄」の設計前提に反し、
-    // 良側の方が感情直接率が高い。invert=true のまま weight 0.07 で運用すると良側を叩く
-    // 方向に寄与するため weight 0 化。辞書純化は次 cycle で本文再解析経由で実測。
+    // rev 20260811224443: 辞書純化は次 cycle で本文再解析経由で実測予定。この rev では
+    // canonical の weight/normalize/invert は現行のまま維持。
     key: "emotionDirectnessRatio",
     label: "感情直接表現率",
-    weight: 0,
+    weight: 0.07,
     normalize: (raw: number) => Math.min(raw / 0.08, 1),
     invert: true,
     flagThreshold: 0.4,
   },
   {
-    // n=25 実測で d=-0.71 (AUC=0.33)。「論理接続詞が少ないほど良」の設計前提に反し、
-    // 良側の方が接続詞密度が高い。感情直接率と同じ理由で weight 0 化。
+    // rev 20260811224443: 辞書純化は次 cycle で本文再解析経由で実測予定。この rev では
+    // canonical の weight/normalize/invert は現行のまま維持。
     key: "logicalConnectiveDensity",
     label: "論理接続詞密度",
-    weight: 0,
+    weight: 0.06,
     normalize: (raw: number) => Math.min(raw / 0.3, 1),
     invert: true,
     flagThreshold: 0.4,
   },
   {
-    // 0.08 + 0.0325 (感情直接率・論理接続密度 weight 0 化での均等按分)。
     key: "paragraphTransitionEntropy",
     label: "段落遷移エントロピー",
-    weight: 0.1125,
+    weight: 0.08,
     normalize: (raw: number) => Math.min(raw / 1.5, 1),
     invert: false,
     flagThreshold: 0.3,
   },
   {
-    // 0.16 + 0.0325 (感情直接率・論理接続密度 weight 0 化での均等按分)。
     key: "sentenceLengthBurstiness",
     label: "文長バースティネス",
-    weight: 0.1925,
+    weight: 0.16,
     normalize: (raw: number) => Math.min(raw / 8, 1),
     invert: false,
     flagThreshold: 0.5,

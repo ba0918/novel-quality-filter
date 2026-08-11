@@ -16,19 +16,12 @@ async function scoreFixture(filename: string): Promise<number> {
 }
 
 Deno.test({
-  name: "scoring: high-quality-01 scores above 60",
+  name: "scoring: high-quality-01 scores above 70",
   async fn() {
-    // 感情直接率・論理接続密度の weight 0 化 (n=25 実測で符号逆判別が判明) 以降、
-    // この fixture の 2 指標由来の 11.77pts が消え、素点が 78→66 に下がった。fixture 個体の
-    // raw (感情直接率 0.0031、論理接続密度 0.048) が n=25 良側平均 (0.007/0.034) より
-    // 「invert 逆方向で悪い」側にあることが原因で、canonical の設計変更に沿った減点。
-    // 閾値は n=25 の駄側 max ~39 に対する gap を確保する 60 に緩和する (fixture が n=25
-    // より低スコアなのは「感情直接率で稼げなくなった」ためで、fixture 自体の再選定は
-    // 別 cycle で扱う)。
     await initTokenizer();
     const score = await scoreFixture("high-quality-01.txt");
     console.log(`  high-quality-01: ${score}/100`);
-    assert(score >= 60, `Expected >= 60, got ${score}`);
+    assert(score >= 70, `Expected >= 70, got ${score}`);
   },
   sanitizeResources: false,
   sanitizeOps: false,
