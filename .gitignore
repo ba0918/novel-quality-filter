@@ -37,6 +37,11 @@ temp/
 # Spike (検証用コード、Git管理外)
 spike/
 
+# Experiments (アルゴリズム設計の検証用サンドボックス、Git管理外)
+# 本流のコミット履歴に実験の試行錯誤を残さない。有望な成果は別途 clean な形で
+# 本流へ移送する (このディレクトリ自体は本流に含めない)。
+experiments/
+
 # Playwright
 playwright-report/
 test-results/
