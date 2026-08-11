@@ -547,7 +547,11 @@ function AmountRow({ label, entry, colorVar }) {
   `;
 }
 
-function ShortRow({ label, entry20, entry30 }) {
+// 短行率の並列表示。数字は「14:X / 20:Y / 30:Z」で小さい順に並べる（docs/spec/line-metadata.md
+// 「表示」節）。warn 判定と cm-bar は 14 を含めず 20/30 で従来通り: 14 は 20/30 より狭い区間で
+// 0.5 に達しやすく、閾値の意味を歪めるので警告色には参加させない。バー幅は shortBarRatio
+// （short30 側）を継続使用する。
+function ShortRow({ label, entry14, entry20, entry30 }) {
   const warn = entry20.warn || entry30.warn;
   return html`
     <div class=${warn ? "cat-metric warn" : "cat-metric"}>
@@ -555,7 +559,8 @@ function ShortRow({ label, entry20, entry30 }) {
       <div class="cm-bar">
         <div style=${`width:${shortBarRatio(entry20, entry30) * 100}%;background:var(--bad)`}></div>
       </div>
-      <span class="cm-v">20:${entry20.ratioLabel} / 30:${entry30.ratioLabel}</span>
+      <span class="cm-v">14:${entry14.ratioLabel} / 20:${entry20.ratioLabel} / 30:${entry30
+        .ratioLabel}</span>
     </div>
   `;
 }
@@ -578,9 +583,21 @@ function CategoryCard({ lineMetadata, categoryKey, bandKey }) {
       <div class="cat-metrics">
         <${AmountRow} label="行" entry=${breakdown.lineCount} colorVar=${meta.colorVar} />
         <${AmountRow} label="文字" entry=${breakdown.charCount} colorVar=${meta.colorVar} />
-        <${ShortRow} label="短行" entry20=${breakdown.short20} entry30=${breakdown.short30} />
+        <${ShortRow}
+          label="短行"
+          entry14=${breakdown.short14}
+          entry20=${breakdown.short20}
+          entry30=${breakdown.short30}
+        />
         ${breakdown.shortChunk20 !== undefined
-          ? html`<${ShortRow} label="短チャンク" entry20=${breakdown.shortChunk20} entry30=${breakdown.shortChunk30} />`
+          ? html`
+            <${ShortRow}
+              label="短チャンク"
+              entry14=${breakdown.shortChunk14}
+              entry20=${breakdown.shortChunk20}
+              entry30=${breakdown.shortChunk30}
+            />
+          `
           : ""}
       </div>
     </div>
