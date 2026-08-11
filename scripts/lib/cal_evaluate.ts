@@ -8,6 +8,7 @@
 // スカラーが score_experiment.scoreWithConfig と一致することをテストで固定し、二重実装のドリフトを禁じる。
 
 import type {
+  LineMetadata,
   MetricResult,
   OpeningFormat,
   PenaltyResult,
@@ -88,7 +89,12 @@ function normalizeWith(raw: RawMetrics, configs: MetricConfig[]): MetricResult[]
 
 // mod.ts calculateScore と同じ計算を、任意の式を注入して行う。ペナルティ発火判定は注入後の
 // normalizedValue で行う（scoreWithConfig と同セマンティクス。正規化の変更が発火に波及する）。
-export function scoreResultFromMetrics(raw: RawMetrics, formula: Formula): ScoreResult {
+// lineMetadata は省略可能。省略時は evaluate ベース rule が常に非発火（calculateScore と同挙動）。
+export function scoreResultFromMetrics(
+  raw: RawMetrics,
+  formula: Formula,
+  lineMetadata?: LineMetadata,
+): ScoreResult {
   const metrics = normalizeWith(raw, formula.metricConfigs);
   const rawScore = metrics.reduce((sum, m) => sum + m.contribution, 0);
   const baseScore = Math.max(0, Math.min(100, rawScore));
@@ -96,20 +102,10 @@ export function scoreResultFromMetrics(raw: RawMetrics, formula: Formula): Score
   let penaltyMultiplier = 1.0;
   const penalties: PenaltyResult[] = [];
   for (const rule of formula.penaltyRules) {
-    let allConditionsMet = true;
-    for (const cond of rule.conditions) {
-      const rawValue = raw[cond.key as keyof RawMetrics] as number;
-      if (cond.exemptWhenZero && rawValue === 0) {
-        allConditionsMet = false;
-        break;
-      }
-      const m = metrics.find((m) => m.key === cond.key);
-      if (!m || m.normalizedValue >= cond.criticalThreshold) {
-        allConditionsMet = false;
-        break;
-      }
-    }
-    if (allConditionsMet) {
+    const fires = rule.evaluate
+      ? rule.evaluate(raw, lineMetadata)
+      : matchesConditionsFor(rule, raw, metrics);
+    if (fires) {
       penaltyMultiplier *= rule.penaltyMultiplier;
       penalties.push({ label: rule.label, multiplier: rule.penaltyMultiplier });
     }
@@ -117,6 +113,20 @@ export function scoreResultFromMetrics(raw: RawMetrics, formula: Formula): Score
 
   const score = Math.round(baseScore * penaltyMultiplier);
   return { score, metrics, penalties };
+}
+
+function matchesConditionsFor(
+  rule: PenaltyRule,
+  raw: RawMetrics,
+  metrics: MetricResult[],
+): boolean {
+  for (const cond of rule.conditions) {
+    const rawValue = raw[cond.key as keyof RawMetrics] as number;
+    if (cond.exemptWhenZero && rawValue === 0) return false;
+    const m = metrics.find((m) => m.key === cond.key);
+    if (!m || m.normalizedValue >= cond.criticalThreshold) return false;
+  }
+  return true;
 }
 
 const OPENING_FORMATS: OpeningFormat[] = [
@@ -133,8 +143,10 @@ function asOpeningFormat(value: string): OpeningFormat | undefined {
 }
 
 // 1レコードを式で採点し、詳細票が要る診断メタ（開幕文脈・行メタ）を添えた ScoreResult を返す。
+// record.lineMetadata は「地の文短行14 の過多」ペナルティの入力として scoreResultFromMetrics に
+// 渡す（無ければ evaluate 側で非発火扱い）。
 export function evaluateRecord(record: DatasetRecord, formula: Formula): ScoreResult {
-  const base = scoreResultFromMetrics(record.rawMetrics, formula);
+  const base = scoreResultFromMetrics(record.rawMetrics, formula, record.lineMetadata);
   return {
     ...base,
     openingType: asOpeningFormat(record.openingType),

@@ -35,6 +35,10 @@ export function scoreWithConfig(
 
   let mult = 1;
   for (const rule of penaltyRules) {
+    // evaluate ベースの rule は lineMetadata 派生値を条件に取るため、RawMetrics だけを扱う
+    // 本研究エンジンのスコープ外。calculateScore が lineMetadata 未指定時に evaluate を false と
+    // 扱うのと同じ意味づけで、ここでは常に非発火として扱う（gate スコアの baseline 忠実性を保つ）。
+    if (rule.evaluate) continue;
     let met = true;
     for (const cond of rule.conditions) {
       const rv = raw[cond.key as keyof RawMetrics] as number;
@@ -84,6 +88,9 @@ export function scoreExperiment(raw: RawMetrics, cfg: ExperimentConfig): number 
 
   let mult = 1;
   for (const rule of PENALTY_RULES) {
+    // scoreWithConfig と同じ理由で、evaluate ベース rule は本エンジンでは常に非発火扱い
+    // （lineMetadata を受け取れないため）。
+    if (rule.evaluate) continue;
     let met = true;
     for (const cond of rule.conditions) {
       const rv = raw[cond.key as keyof RawMetrics] as number;

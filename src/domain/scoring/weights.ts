@@ -1,3 +1,5 @@
+import type { LineMetadata, RawMetrics } from "../types.ts";
+
 export interface MetricConfig {
   key: string;
   label: string;
@@ -112,11 +114,20 @@ export interface PenaltyCondition {
   exemptWhenZero?: boolean;
 }
 
+// PenaltyRule は 2 系統ある。
+// - conditions ベース: 既存 rule。RawMetrics の正規化値だけで発火判定する
+// - evaluate ベース: 新 rule。RawMetrics に加えて lineMetadata の派生値（短行率など）を参照する
+// どちらか一方を使う設計とし、conditions + evaluate 併用は想定しない（judgement path が 1 本になる）。
+// evaluate 定義時は calculateScore がその関数だけを呼ぶ。conditions は無視する（空配列で表現）。
 export interface PenaltyRule {
   label: string;
   conditions: PenaltyCondition[];
   penaltyMultiplier: number;
+  evaluate?: (rawMetrics: RawMetrics, lineMetadata?: LineMetadata) => boolean;
 }
+
+// 地の文短行14 率の閾値。strict `>` で判定する（境界 30% は非発火）。
+const SHORT14_NARRATIVE_RATIO_THRESHOLD = 0.30;
 
 export const PENALTY_RULES: PenaltyRule[] = [
   {
@@ -130,12 +141,29 @@ export const PENALTY_RULES: PenaltyRule[] = [
   {
     // 一文一段落が多くても、文の長短が豊かなら紋切りではない（人気長編に多い）。
     // 文長のばらつきが小さい（単調な）ときに限って紋切り型として減点する。
+    // n=24 較正で駄 8/10 が発火 → 「強すぎる」観測。0.65 から 0.75 に緩和し、
+    // 「地の文短行14 の過多」と併用することで良巻き込みリスクを分散する。
     label: "一文一段落の過多",
     conditions: [
       { key: "singleSentParaRatio", criticalThreshold: 0.30 },
       { key: "sentenceLengthSD", criticalThreshold: 0.60 },
     ],
-    penaltyMultiplier: 0.65,
+    penaltyMultiplier: 0.75,
+  },
+  {
+    // 地の文の 14 字未満短行率が 30% を超える作品を「1 行の情報量が薄い」帯として減点する。
+    // 較正で駄側に集中して観測される帯（n=24）。lineMetadata が無い、または地の文が 0 行なら
+    // 測定不能として適用外にする（0 割回避 & 「短行なし」との混同回避）。
+    label: "地の文短行14 の過多",
+    conditions: [],
+    penaltyMultiplier: 0.85,
+    evaluate: (_raw, lineMetadata) => {
+      if (!lineMetadata) return false;
+      const narrative = lineMetadata.narrative;
+      if (narrative.lineCount === 0) return false;
+      const ratio = narrative.short14 / narrative.lineCount;
+      return ratio > SHORT14_NARRATIVE_RATIO_THRESHOLD;
+    },
   },
 ];
 

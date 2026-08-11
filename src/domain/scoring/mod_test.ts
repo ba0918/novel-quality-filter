@@ -2,7 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { initTokenizer, tokenize } from "../tokenizer/mod.ts";
 import { analyzeAll } from "../analyzer/mod.ts";
 import { calculateScore } from "./mod.ts";
-import type { RawMetrics } from "../types.ts";
+import type { CategoryCount, LineMetadata, NarrativeCount, RawMetrics } from "../types.ts";
 import { PENALTY_RULES } from "./weights.ts";
 
 const FIXTURES_DIR = new URL("../../../tests/fixtures/", import.meta.url).pathname;
@@ -99,11 +99,11 @@ Deno.test("scoring: 一文一段落比率が高く文長SDも小さいと過多�
   const result = calculateScore(raw);
 
   const singleSentPenalty = result.penalties.find(
-    (p) => p.label !== "" && p.multiplier === 0.65,
+    (p) => p.label !== "" && p.multiplier === 0.75,
   );
   assert(singleSentPenalty, "singleSentParaRatio penalty should fire");
   assert(singleSentPenalty.label.length > 0, "Penalty should have a human-readable label");
-  assertEquals(singleSentPenalty.multiplier, 0.65);
+  assertEquals(singleSentPenalty.multiplier, 0.75);
 });
 
 Deno.test("scoring: 一文一段落比率が高くても文長SDが大きければ過多ペナルティは発火しない", () => {
@@ -114,12 +114,87 @@ Deno.test("scoring: 一文一段落比率が高くても文長SDが大きけれ�
   });
   const result = calculateScore(raw);
 
-  const singleSentPenalty = result.penalties.find((p) => p.multiplier === 0.65);
+  const singleSentPenalty = result.penalties.find((p) => p.multiplier === 0.75);
   assertEquals(
     singleSentPenalty,
     undefined,
     "文長SDが大きければ一文一段落ペナルティは免除される",
   );
+});
+
+// --- 「地の文短行14 の過多」ペナルティ ---
+
+const SHORT14_PENALTY_LABEL = "地の文短行14 の過多";
+
+function makeCategory(overrides: Partial<CategoryCount> = {}): CategoryCount {
+  return { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0, ...overrides };
+}
+
+function makeNarrative(overrides: Partial<NarrativeCount> = {}): NarrativeCount {
+  return {
+    lineCount: 0,
+    charCount: 0,
+    short14: 0,
+    short20: 0,
+    short30: 0,
+    chunkCount: 0,
+    shortChunk14: 0,
+    shortChunk20: 0,
+    shortChunk30: 0,
+    ...overrides,
+  };
+}
+
+function makeLineMetadata(narrative: Partial<NarrativeCount>): LineMetadata {
+  return {
+    totalLines: 100,
+    totalChars: 3000,
+    blankCount: 0,
+    separatorCount: 0,
+    narrative: makeNarrative(narrative),
+    dialogue: makeCategory(),
+    meta: makeCategory(),
+    nonTerminal: makeCategory(),
+  };
+}
+
+Deno.test("scoring: 地の文短行14 率が 30% を超えると新ペナルティが発火し ×0.85 が掛かる", () => {
+  const raw = makeSyntheticMetrics();
+  // 100 行中 31 行が 14 字未満 → 31%（30% 超え）
+  const lineMeta = makeLineMetadata({ lineCount: 100, short14: 31 });
+  const result = calculateScore(raw, lineMeta);
+
+  const p = result.penalties.find((p) => p.label === SHORT14_PENALTY_LABEL);
+  assert(p, "short14 penalty should fire when narrative short14 ratio exceeds 30%");
+  assertEquals(p.multiplier, 0.85);
+});
+
+Deno.test("scoring: 地の文短行14 率がちょうど 30% では新ペナルティは発火しない（境界）", () => {
+  const raw = makeSyntheticMetrics();
+  // 100 行中 30 行が 14 字未満 → 30.0%（境界、非発火）
+  const lineMeta = makeLineMetadata({ lineCount: 100, short14: 30 });
+  const result = calculateScore(raw, lineMeta);
+
+  const p = result.penalties.find((p) => p.label === SHORT14_PENALTY_LABEL);
+  assertEquals(p, undefined, "30% ちょうどは strict > 30% を満たさないので発火しない");
+});
+
+Deno.test("scoring: lineMetadata を渡さない旧呼び出しでは新ペナルティは発火しない（後方互換）", () => {
+  const raw = makeSyntheticMetrics();
+  const result = calculateScore(raw); // lineMetadata 省略
+
+  const p = result.penalties.find((p) => p.label === SHORT14_PENALTY_LABEL);
+  assertEquals(p, undefined, "lineMetadata 未指定は新ペナルティの適用外");
+});
+
+Deno.test("scoring: narrative.lineCount === 0 では新ペナルティは発火しない（測定不能）", () => {
+  const raw = makeSyntheticMetrics();
+  // 地の文がゼロ行（会話劇 / 掲示板等）→ 短行率が定義できない
+  const lineMeta = makeLineMetadata({ lineCount: 0, short14: 0 });
+  const result = calculateScore(raw, lineMeta);
+
+  const p = result.penalties.find((p) => p.label === SHORT14_PENALTY_LABEL);
+  assertEquals(p, undefined, "lineCount=0 は測定不能で適用外（0 割回避）");
 });
 
 Deno.test("scoring: all PenaltyRules have a label", () => {

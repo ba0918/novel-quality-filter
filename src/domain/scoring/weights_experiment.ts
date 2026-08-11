@@ -8,7 +8,11 @@
 // テスト側の期待も同時に更新する（＝デルタ導入が可視化される）。
 // 新しい評価軸を足すときも、正本には触れずこの配列へ追記する（拡張は追加で行う）。
 
+import type { LineMetadata, RawMetrics } from "../types.ts";
 import type { MetricConfig, PenaltyRule } from "./weights.ts";
+
+// 正本と同じ閾値。丸ごと複製方針に沿って import せず、値だけ独立に持つ。
+const SHORT14_NARRATIVE_RATIO_THRESHOLD = 0.30;
 
 export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
@@ -126,6 +130,20 @@ export const EXPERIMENT_PENALTY_RULES: PenaltyRule[] = [
       { key: "singleSentParaRatio", criticalThreshold: 0.30 },
       { key: "sentenceLengthSD", criticalThreshold: 0.60 },
     ],
-    penaltyMultiplier: 0.65,
+    penaltyMultiplier: 0.75,
+  },
+  {
+    // 地の文の 14 字未満短行率が 30% を超える帯を減点する。lineMetadata が無い、または
+    // 地の文が 0 行なら測定不能として適用外にする（0 割回避）。
+    label: "地の文短行14 の過多",
+    conditions: [],
+    penaltyMultiplier: 0.85,
+    evaluate: (_raw: RawMetrics, lineMetadata?: LineMetadata) => {
+      if (!lineMetadata) return false;
+      const narrative = lineMetadata.narrative;
+      if (narrative.lineCount === 0) return false;
+      const ratio = narrative.short14 / narrative.lineCount;
+      return ratio > SHORT14_NARRATIVE_RATIO_THRESHOLD;
+    },
   },
 ];
