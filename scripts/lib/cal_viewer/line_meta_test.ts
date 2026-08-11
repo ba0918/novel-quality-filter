@@ -184,6 +184,36 @@ Deno.test("categoryBreakdown: セリフ/メタ/非文末カテゴリは短行14 
   }
 });
 
+Deno.test("categoryBreakdown: 短行14 / 短チャンク14 の warn は必ず false（率が閾値超えでも警告判定には参加しない）", () => {
+  // 短行14 は較正実験用の表示専用フィールド。「14 は warn 判定に参加させない」の
+  // 契約（docs/spec/line-metadata.md）を型レベルで保証するため、ratio > 0.5 でも
+  // warn=false を返すことをテストで固定する。
+  const meta: LineMetadata = {
+    ...LINE_META,
+    narrative: {
+      ...LINE_META.narrative,
+      lineCount: 4,
+      short14: 3, // ratio = 0.75、閾値 0.5 超え
+      chunkCount: 4,
+      shortChunk14: 3, // ratio = 0.75、閾値 0.5 超え
+    } as NarrativeCount,
+  };
+  const result = categoryBreakdown(meta, "narrative");
+  assertEquals(result.short14?.warn, false);
+  assertEquals(result.shortChunk14?.warn, false);
+  // 対照: 短行20 は同じ ratio 0.75 なら warn=true（既存の挙動が壊れていないことを固定）
+  const controlMeta: LineMetadata = {
+    ...LINE_META,
+    narrative: {
+      ...LINE_META.narrative,
+      lineCount: 4,
+      short20: 3,
+    } as NarrativeCount,
+  };
+  const controlResult = categoryBreakdown(controlMeta, "narrative");
+  assertEquals(controlResult.short20.warn, true);
+});
+
 Deno.test("categoryBreakdown: セリフ/メタ/非文末カテゴリは短チャンクを含まない", () => {
   for (const key of ["dialogue", "meta", "nonTerminal"] as const) {
     const result = categoryBreakdown(LINE_META, key);

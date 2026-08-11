@@ -85,6 +85,19 @@ function shortEntry(value, numerator, denominator) {
   };
 }
 
+// 短行14 / 短チャンク14 用の表示専用エントリ。docs/spec/line-metadata.md「表示」節の
+// 契約「14 は warn 判定に参加させない」を型レベルで保証するため、warn を必ず false で返す。
+// shortEntry と同じ形状のオブジェクトを返して呼び出し側の分岐を不要にする（形状を揃えないと
+// consumers が型分岐を強いられて事故率が上がる）。
+function displayOnlyShortEntry(value, numerator, denominator) {
+  return {
+    value,
+    ratio: ratioOf(numerator, denominator),
+    ratioLabel: percentInt(numerator, denominator),
+    warn: false,
+  };
+}
+
 // 短行/短チャンクのバー幅として使う比率。Chrome拡張（work-page-injector.tsのshortMetricRow、
 // widthPercent(short30, denominator)）はentry20/entry30を両方テキスト表示しつつ、バーは常に
 // short30側の比率で描く（30側が20側を包含し重篤度の上限を示すため）。ShortRowもこれに合わせる。
@@ -104,18 +117,19 @@ export function categoryBreakdown(lineMetadata, categoryKey) {
   return {
     lineCount: amountEntry(count.lineCount, count.lineCount, lineMetadata.totalLines),
     charCount: amountEntry(count.charCount, count.charCount, lineMetadata.totalChars),
-    // 短行14 は表示側で 14/20/30 の 3 数字を並べるためだけに露出する（スコア・警告閾値には
-    // 参加させない）。docs/spec/line-metadata.md「表示」節参照。isShortRatioWarn は 20/30 と
-    // 同じ関数を通るので warn フィールド自体は持つが、ShortRow は warn 判定に 14 を使わない
-    // （app.js の ShortRow で `warn = entry20.warn || entry30.warn` として合成する）。
-    short14: shortEntry(count.short14, count.short14, count.lineCount),
+    // 短行14 は表示側で 14/20/30 の 3 数字を並べるためだけに露出する。docs/spec/line-metadata.md
+    // 「表示」節「14 は warn 判定に参加させない」の契約を型レベルで守るため、shortEntry ではなく
+    // displayOnlyShortEntry (warn 常に false) を経由する。app.js の ShortRow の合成
+    // `warn = entry20.warn || entry30.warn` は 14 を明示的に除外しているが、entry14 側に
+    // warn フラグが立ちうる状態自体を残さないほうが将来の consumer 誤読を防げる。
+    short14: displayOnlyShortEntry(count.short14, count.short14, count.lineCount),
     short20: shortEntry(count.short20, count.short20, count.lineCount),
     short30: shortEntry(count.short30, count.short30, count.lineCount),
     avgCharsLabel: averageCharsLabel(count),
     chunkCount: isNarrative ? count.chunkCount : undefined,
     chunkCountLabel: isNarrative ? formatInt(count.chunkCount) : undefined,
     shortChunk14: isNarrative
-      ? shortEntry(count.shortChunk14, count.shortChunk14, count.chunkCount)
+      ? displayOnlyShortEntry(count.shortChunk14, count.shortChunk14, count.chunkCount)
       : undefined,
     shortChunk20: isNarrative
       ? shortEntry(count.shortChunk20, count.shortChunk20, count.chunkCount)
