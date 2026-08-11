@@ -68,21 +68,17 @@ Deno.test("weights_experiment[家族0]: 実験式は正本キー ∪ {narrativeS
   );
 });
 
-Deno.test("weights_experiment[家族0]: dialogueEndingVariety の weight は 0 に落ちている", () => {
+Deno.test("weights_experiment[家族0]: dialogueEndingVariety は canonical と同値 0.08 を維持 (家族 2 で廃止判断)", () => {
   const canonical = METRIC_CONFIGS.find((c) => c.key === "dialogueEndingVariety");
   const experiment = EXPERIMENT_METRIC_CONFIGS.find((c) => c.key === "dialogueEndingVariety");
-  assertEquals(canonical?.weight, 0.08, "canonical は 0.08 のまま");
-  assertEquals(
-    experiment?.weight,
-    0,
-    "実験側は 0 に落ちる (家族 0 で weight 移動、家族 2 で正式廃止)",
-  );
+  assertEquals(canonical?.weight, 0.08);
+  assertEquals(experiment?.weight, 0.08);
 });
 
-Deno.test("weights_experiment[家族0]: narrativeShort14Ratio が weight 0.08 で追加、deriveRawValue 定義済み", () => {
+Deno.test("weights_experiment[家族0]: narrativeShort14Ratio エントリは残すが weight 0 (A4 で判別力は penalty 側で活用)", () => {
   const config = EXPERIMENT_METRIC_CONFIGS.find((c) => c.key === "narrativeShort14Ratio");
-  assert(config, "narrativeShort14Ratio エントリが存在する");
-  assertEquals(config.weight, 0.08);
+  assert(config, "narrativeShort14Ratio エントリが存在する (統合 Step で normalize 再設計の余地)");
+  assertEquals(config.weight, 0);
   assertEquals(config.invert, true);
   assert(config.deriveRawValue, "deriveRawValue が定義されている (lineMetadata から派生)");
 });
@@ -103,23 +99,31 @@ Deno.test("weights_experiment[家族0]: narrativeShort14Ratio の deriveRawValue
   assertEquals(config.deriveRawValue(raw(), undefined), 0.5);
 });
 
-Deno.test("weights_experiment[家族0]: PENALTY_RULES から「地の文短行14 の過多」が削除されている", () => {
+Deno.test("weights_experiment[家族0]: 短行14 penalty は実験側にも残っている (2 回目調整で復活)", () => {
+  // 1 回目の実測 (短行14 penalty 削除) で駄側 2 件が pass 化した (契約 4 破れ) ため
+  // Fable A3 相当に切り替え。narrativeShort14Ratio の weight 寄与だけでは penalty 削除分
+  // を相殺できないため、両方残す設計を実測で検証する。
   const canonicalHasShort14 = PENALTY_RULES.some((r) => r.label === "地の文短行14 の過多");
   const experimentHasShort14 = EXPERIMENT_PENALTY_RULES.some((r) =>
     r.label === "地の文短行14 の過多"
   );
-  assert(canonicalHasShort14, "canonical には残っている");
-  assert(
-    !experimentHasShort14,
-    "実験側からは削除されている (narrativeShort14Ratio と二重計上回避)",
-  );
+  assert(canonicalHasShort14, "canonical に残っている");
+  assert(experimentHasShort14, "実験側にも残っている (家族 0 の 2 回目調整で復活)");
 });
 
-Deno.test("weights_experiment[家族0]: 一文一段落の過多 multiplier は canonical 0.75 → experiment 0.70", () => {
+Deno.test("weights_experiment[家族0]: 一文一段落の過多 multiplier は canonical と同値 0.75", () => {
   const canonical = PENALTY_RULES.find((r) => r.label === "一文一段落の過多");
   const experiment = EXPERIMENT_PENALTY_RULES.find((r) => r.label === "一文一段落の過多");
   assertEquals(canonical?.penaltyMultiplier, 0.75);
-  assertEquals(experiment?.penaltyMultiplier, 0.70);
+  assertEquals(experiment?.penaltyMultiplier, 0.75);
+});
+
+Deno.test("weights_experiment[家族0]: 短行14 penalty multiplier は canonical 0.85 → experiment 0.80 に微強化", () => {
+  // 家族 0 の 4 回目調整: 0.70 では良側 1 件を巻き込んだため、0.85 と 0.70 の中間 0.80 に。
+  const canonical = PENALTY_RULES.find((r) => r.label === "地の文短行14 の過多");
+  const experiment = EXPERIMENT_PENALTY_RULES.find((r) => r.label === "地の文短行14 の過多");
+  assertEquals(canonical?.penaltyMultiplier, 0.85);
+  assertEquals(experiment?.penaltyMultiplier, 0.80);
 });
 
 // 家族 0 デルタ導入後、canonical と experiment の共有指標 (12 指標) は同一 normalize/invert/
@@ -144,12 +148,9 @@ Deno.test("weights_experiment[家族0]: 共有 12 指標の normalize/invert/fla
       samples.map((x) => canonical.normalize(x)),
       `${canonical.key} normalize 一致`,
     );
-    // weight は dialogueEndingVariety のみ差分あり (canonical 0.08 → experiment 0)、他は一致
-    if (canonical.key === "dialogueEndingVariety") {
-      assertEquals(experiment.weight, 0);
-    } else {
-      assertEquals(experiment.weight, canonical.weight, `${canonical.key} weight 一致`);
-    }
+    // A4 相当: 共有 12 指標の weight は canonical と完全一致 (narrativeShort14Ratio は
+    // 新規追加で共有指標に含まれない、weight 0 で保持)
+    assertEquals(experiment.weight, canonical.weight, `${canonical.key} weight 一致`);
   }
 });
 
