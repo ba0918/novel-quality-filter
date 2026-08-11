@@ -140,6 +140,50 @@ Deno.test("categoryBreakdown: 地の文カテゴリの行/文字/短行20/30/短
   assertEquals(result.chunkCountLabel, denoFormat.formatInt(6));
 });
 
+// 短行14 は表示・並列比較のためだけに categoryBreakdown 経由で公開される（スコア・警告閾値
+// には参加させない、docs/spec/line-metadata.md「表示」節参照）。
+Deno.test("categoryBreakdown: 地の文カテゴリで短行14 / 短チャンク14 を返す（値は narrative.short14 / narrative.shortChunk14 と一致）", () => {
+  const meta: LineMetadata = {
+    ...LINE_META,
+    narrative: {
+      ...LINE_META.narrative,
+      short14: 3,
+      shortChunk14: 4,
+    } as NarrativeCount,
+  };
+  const result = categoryBreakdown(meta, "narrative");
+  assertEquals(result.short14?.value, 3);
+  assertEquals(result.short14?.ratioLabel, denoFormat.percentInt(3, 4));
+  assertEquals(result.shortChunk14?.value, 4);
+  assertEquals(result.shortChunk14?.ratioLabel, denoFormat.percentInt(4, 6));
+});
+
+Deno.test("categoryBreakdown: セリフ/メタ/非文末カテゴリは短行14 は返すが短チャンク14 は返さない", () => {
+  const meta: LineMetadata = {
+    ...LINE_META,
+    dialogue: { lineCount: 3, charCount: 60, short14: 1, short20: 0, short30: 1 } as CategoryCount,
+    meta: { lineCount: 2, charCount: 20, short14: 2, short20: 0, short30: 0 } as CategoryCount,
+    nonTerminal: {
+      lineCount: 5,
+      charCount: 40,
+      short14: 3,
+      short20: 0,
+      short30: 0,
+    } as CategoryCount,
+  };
+  const cases: Array<[keyof LineMetadata, number, number]> = [
+    ["dialogue", 1, 3],
+    ["meta", 2, 2],
+    ["nonTerminal", 3, 5],
+  ];
+  for (const [key, expectedValue, expectedDenom] of cases) {
+    const result = categoryBreakdown(meta, key as string);
+    assertEquals(result.short14?.value, expectedValue);
+    assertEquals(result.short14?.ratioLabel, denoFormat.percentInt(expectedValue, expectedDenom));
+    assertEquals(result.shortChunk14, undefined);
+  }
+});
+
 Deno.test("categoryBreakdown: セリフ/メタ/非文末カテゴリは短チャンクを含まない", () => {
   for (const key of ["dialogue", "meta", "nonTerminal"] as const) {
     const result = categoryBreakdown(LINE_META, key);

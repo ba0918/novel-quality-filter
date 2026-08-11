@@ -104,11 +104,19 @@ export function categoryBreakdown(lineMetadata, categoryKey) {
   return {
     lineCount: amountEntry(count.lineCount, count.lineCount, lineMetadata.totalLines),
     charCount: amountEntry(count.charCount, count.charCount, lineMetadata.totalChars),
+    // 短行14 は表示側で 14/20/30 の 3 数字を並べるためだけに露出する（スコア・警告閾値には
+    // 参加させない）。docs/spec/line-metadata.md「表示」節参照。isShortRatioWarn は 20/30 と
+    // 同じ関数を通るので warn フィールド自体は持つが、ShortRow は warn 判定に 14 を使わない
+    // （app.js の ShortRow で `warn = entry20.warn || entry30.warn` として合成する）。
+    short14: shortEntry(count.short14, count.short14, count.lineCount),
     short20: shortEntry(count.short20, count.short20, count.lineCount),
     short30: shortEntry(count.short30, count.short30, count.lineCount),
     avgCharsLabel: averageCharsLabel(count),
     chunkCount: isNarrative ? count.chunkCount : undefined,
     chunkCountLabel: isNarrative ? formatInt(count.chunkCount) : undefined,
+    shortChunk14: isNarrative
+      ? shortEntry(count.shortChunk14, count.shortChunk14, count.chunkCount)
+      : undefined,
     shortChunk20: isNarrative
       ? shortEntry(count.shortChunk20, count.shortChunk20, count.chunkCount)
       : undefined,
