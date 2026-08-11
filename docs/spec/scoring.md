@@ -114,8 +114,17 @@ score = base_score × penalty_multiplier
   および測定不能条件（`narrative.lineCount === 0` など）では `evaluate` が `false` を
   返して非発火扱いにする（適用外を明示する）
 
-複数のルールが発動した場合、乗算は累積する。`exemptWhenZero: true` の条件は、生の値が
-0（計測不能）の場合にルール全体を免除する（conditions ベース側の仕組み）。
+複数のルールが発動した場合、発火した multiplier のうち **最小値 1 個だけ** を `base_score` に 掛ける
+(min-mult 合成)。旧仕様は乗算合成 (`Π multiplier`) だったが、n=25 実測で二重発火時の
+乗算合成が良側境界作品を過剰減点する事例が観測された (例: base 56.7 の良作品が
+`一文一段落過多 (×0.75)` + `短行14 過多 (×0.80)` の乗算 0.60 で 34 まで潰され threshold=40
+を割った)。 min-mult 合成に切り替えて、発火した個々の rule は `penalties`
+配列に記録し続けたまま、実効 multiplier
+だけ最小値に切り替えている。単発発火時は乗算/最小どちらも同値で、駄側の判別 (n=25 で 10/10 drop)
+は温存される。
+
+`exemptWhenZero: true` の条件は、生の値が 0（計測不能）の場合にルール全体を免除する （conditions
+ベース側の仕組み）。
 
 `calculateScore` のシグネチャは `calculateScore(rawMetrics, lineMetadata?)`。 lineMetadata
 を省略した旧呼び出しは、evaluate ベースのルールが全て非発火となるため

@@ -66,6 +66,19 @@ Deno.test("cache_staleness: 12 指標構造整地前のスキーマ9は stale", 
   assertEquals(isCacheStale(9), true);
 });
 
-Deno.test("cache_staleness: 12 指標構造整地でスキーマバージョンが 10 になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 10);
+Deno.test("cache_staleness: 12 指標構造整地でスキーマバージョンが 10 になった", () => {
+  // 元は「== 10」を assert する固定だったが、後続改修 (penalty 合成 min-mult 化) で
+  // さらに bump したため下限 assert に緩和する。
+  assertEquals(CURRENT_SCHEMA_VERSION >= 10, true);
+});
+
+Deno.test("cache_staleness: penalty 合成 min-mult 化前のスキーマ10は stale", () => {
+  // schemaVersion 10 のキャッシュは複数 penalty rule 発火時に「乗算合成」で算出されている。
+  // min-mult 合成 (最も強い 1 個だけ base に掛ける) に変わったことで、二重発火作品のスコアが
+  // 押し上がる (例: 良「スキルレベル」34→46)。スコアの絶対値が変わるため再算出させる。
+  assertEquals(isCacheStale(10), true);
+});
+
+Deno.test("cache_staleness: penalty 合成 min-mult 化でスキーマバージョンが 11 になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 11);
 });
