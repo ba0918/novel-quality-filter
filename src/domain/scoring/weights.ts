@@ -7,6 +7,12 @@ export interface MetricConfig {
   normalize: (raw: number) => number;
   invert: boolean;
   flagThreshold: number;
+  // 派生指標の生値取得関数。RawMetrics のキー参照では取れない指標
+  // (例: lineMetadata 依存の派生値) を weight 化するときに使う。
+  // 定義済みなら raw[key] の代わりにこの関数の返り値を rawValue として使う。
+  // canonical (weights.ts の METRIC_CONFIGS) では未使用。実験式 (weights_experiment.ts)
+  // で narrativeShort14Ratio 等を実験的に weight 化するときに指定する。
+  deriveRawValue?: (raw: RawMetrics, lineMetadata?: LineMetadata) => number;
 }
 
 export const METRIC_CONFIGS: MetricConfig[] = [

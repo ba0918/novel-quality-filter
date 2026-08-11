@@ -73,9 +73,17 @@ function formatReason(
   return `${label}が ${formatted} と${direction}`;
 }
 
-function normalizeWith(raw: RawMetrics, configs: MetricConfig[]): MetricResult[] {
+function normalizeWith(
+  raw: RawMetrics,
+  configs: MetricConfig[],
+  lineMetadata?: LineMetadata,
+): MetricResult[] {
   return configs.map((config) => {
-    const rawValue = raw[config.key as keyof RawMetrics] as number;
+    // deriveRawValue 定義済みなら raw[key] の代わりにその返り値を rawValue として使う。
+    // 例: narrativeShort14Ratio を lineMetadata から派生させて weight 化する実験。
+    const rawValue = config.deriveRawValue
+      ? config.deriveRawValue(raw, lineMetadata)
+      : (raw[config.key as keyof RawMetrics] as number);
     const normalized = config.normalize(rawValue);
     const score = config.invert ? 1 - normalized : normalized;
     const contribution = score * config.weight * 100;
@@ -101,7 +109,7 @@ export function scoreResultFromMetrics(
   formula: Formula,
   lineMetadata?: LineMetadata,
 ): ScoreResult {
-  const metrics = normalizeWith(raw, formula.metricConfigs);
+  const metrics = normalizeWith(raw, formula.metricConfigs, lineMetadata);
   const rawScore = metrics.reduce((sum, m) => sum + m.contribution, 0);
   const baseScore = Math.max(0, Math.min(100, rawScore));
 
