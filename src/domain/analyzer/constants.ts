@@ -25,8 +25,9 @@ export const META_PREFIX_CHARS = new Set([
 // ～…～ で全体を囲んだ見出し行を確定メタとみなす（U+FF5E と U+301C の両方）。
 export const META_WRAP_CHARS = new Set(["～", "〜"]);
 
-// 較正実験用の追加閾値（2026-08-11 追加）。既存の表示・スコアには使わず、
-// dataset.jsonl の lineMetadata に集計だけを追加して、閾値の判別力を後から統計比較する。
+// 短行判定の 3 段閾値。14 字未満は「地の文短行14 の過多」ペナルティの入力に加え、
+// バッジ・cal-viewer・cal evaluate CLI の 3 サーフェスで表示にも使う。20 / 30 字未満は
+// 表示と較正データセット集計に使い、スコアには入力しない（scoring.md / line-metadata.md 参照）。
 export const SHORT_LINE_THRESHOLD_14 = 14;
 export const SHORT_LINE_THRESHOLD_20 = 20;
 export const SHORT_LINE_THRESHOLD_30 = 30;

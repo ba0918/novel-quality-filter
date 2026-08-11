@@ -7,9 +7,10 @@ import {
   SHORT_LINE_THRESHOLD_30,
 } from "./constants.ts";
 
-// 各行を classifyLine で排他分類し、カテゴリ別の分量（行数・文字数）と短さ（短行20/30）を
-// 集計する。地の文は句点チャンク数と短チャンク20/30も数える。率は保存せず、分子（短カウント）と
-// 分母（行数・文字数）だけを持ち、表示時に必要な率を組み立てられるようにする。
+// 各行を classifyLine で排他分類し、カテゴリ別の分量（行数・文字数）と短さ（短行14/20/30）を
+// 集計する。地の文は句点チャンク数と短チャンク14/20/30も数える。率は保存せず、分子（短カウント）と
+// 分母（行数・文字数）だけを持ち、表示時に必要な率を組み立てられるようにする。地の文の短行14 は
+// 「地の文短行14 の過多」ペナルティの入力にも使う（scoring.md / line-metadata.md 参照）。
 export function aggregateLineMetadata(lines: LineData[]): LineMetadata {
   const narrative = emptyNarrative();
   const dialogue = emptyCategory();
