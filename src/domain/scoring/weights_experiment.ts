@@ -77,9 +77,12 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.3,
   },
   {
+    // 家族 1a デルタ: weight 0.05 → 0 (実質廃止)。Codex 実測で段落数バイアス確定
+    // (r(SD, 段落数)=+0.391、駄作 median 段落数 206.5 vs 良 161 で駄の方が段落数多い)
+    // + singleSentParaRatio (weight 0.30) と冗長。エントリは残す (統合段階で再検討余地)。
     key: "descriptionDensitySD",
     label: "描写密度の分散",
-    weight: 0.05,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw / 0.06, 1),
     invert: false,
     flagThreshold: 0.3,

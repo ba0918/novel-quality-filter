@@ -148,9 +148,12 @@ Deno.test("weights_experiment[家族0]: 共有 12 指標の normalize/invert/fla
       samples.map((x) => canonical.normalize(x)),
       `${canonical.key} normalize 一致`,
     );
-    // A4 相当: 共有 12 指標の weight は canonical と完全一致 (narrativeShort14Ratio は
-    // 新規追加で共有指標に含まれない、weight 0 で保持)
-    assertEquals(experiment.weight, canonical.weight, `${canonical.key} weight 一致`);
+    // 家族 1a 以降: descriptionDensitySD のみ差分あり (canonical 0.05 → experiment 0)
+    if (canonical.key === "descriptionDensitySD") {
+      assertEquals(experiment.weight, 0);
+    } else {
+      assertEquals(experiment.weight, canonical.weight, `${canonical.key} weight 一致`);
+    }
   }
 });
 
