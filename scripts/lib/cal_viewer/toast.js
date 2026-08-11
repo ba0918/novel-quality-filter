@@ -15,7 +15,10 @@ function ensureContainer() {
   return container;
 }
 
-// showToast(message, {kind}) — kind: "error" | "info"（見た目のバリアント。default は "info"）。
+// showToast(message, {kind}) — kind: "error" | "warning" | "info"（見た目のバリアント。
+// default は "info"）。error だけが role="alert"（緊急読み上げ）で、warning/info は
+// role="status"（穏やかな読み上げ）。warning は「操作は成功したが利用者へ知らせる」用途
+// （例: cal.json patch 失敗のとき labels.jsonl は正のまま warning だけ出す）。
 // 返り値はトースト要素そのものではなく dismiss 関数（呼ぶと即座に消える）。
 export function showToast(message, options = {}) {
   const { kind = "info", durationMs = DEFAULT_DURATION_MS } = options;

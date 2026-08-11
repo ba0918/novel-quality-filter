@@ -74,6 +74,11 @@ function onDocumentKeydown(event) {
 // optimistic 更新済みの labels を元に再計算してしまい、[良,対象外] → 「駄」失敗 →
 // [駄] を元に「対象外」を差し込むと [駄,対象外] になり、silent に quality が
 // 「良」→「駄」へ書き換わる race を招くため（labels 配列全体を復元する契約）。
+//
+// onWarning は「200 + JSON body {warning}」経路の受け口（cal_serve が
+// labels.jsonl は更新済 + cal.json patch 失敗を返すケース）。この経路では
+// labels.jsonl が正なので rollback すると UI 表示と永続層がむしろズレる。
+// rollback は呼ばず warning toast だけを出す。省略時は noop（既存呼び出しの後方互換）。
 export async function performLabelUpdate({
   siteWorkId,
   nextValue,
@@ -82,6 +87,7 @@ export async function performLabelUpdate({
   onOptimisticUpdate,
   onRollback,
   onError,
+  onWarning = (_msg) => {},
 }) {
   onOptimisticUpdate(nextValue);
   const req = nextValue === null
@@ -94,6 +100,16 @@ export async function performLabelUpdate({
       body: req.body,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // 成功時: content-type が JSON なら body から warning を拾って onWarning へ流す
+    // （content-type 無し／JSON でないときは body を触らない — 現行の Response(null,200) を
+    // 壊さないため）。warning が無ければ何もしない。
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const body = await res.json().catch(() => null);
+      if (body && typeof body.warning === "string") {
+        onWarning(body.warning);
+      }
+    }
   } catch (e) {
     onRollback(previousLabels);
     onError(`ラベル更新に失敗しました（${e.message ?? e}）`);
@@ -167,6 +183,7 @@ function openPopover(anchor, { siteWorkId, currentLabels, onUpdate, onRestore })
       onOptimisticUpdate: onUpdate,
       onRollback: onRestore,
       onError: (message) => showToast(message, { kind: "error" }),
+      onWarning: (message) => showToast(message, { kind: "warning" }),
     });
   };
 

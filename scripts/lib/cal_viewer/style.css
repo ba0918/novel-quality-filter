@@ -1087,6 +1087,14 @@ a {
   border-color: var(--bad);
 }
 
+/* warning: 操作は成功したが利用者へ知らせるケース（cal.json patch 失敗など）。
+   error（赤）ほど強くない橙系（flag トークン）で「注意だが破壊的ではない」を伝える。 */
+.toast-warning {
+  background: var(--flag-soft);
+  color: var(--flag);
+  border-color: var(--flag);
+}
+
 /* Responsive */
 @media (max-width: 800px) {
   .app {

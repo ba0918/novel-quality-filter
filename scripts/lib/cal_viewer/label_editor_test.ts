@@ -161,6 +161,74 @@ Deno.test("performLabelUpdate: nextValue=null (未ラベルに戻す) は DELETE
   assertEquals(requests, [{ url: "/labels/kakuyomu%3Axyz", method: "DELETE" }]);
 });
 
+// server 側 handleLabelPost が「labels.jsonl は更新済 + cal.json patch 失敗」を
+// 200 + JSON body {warning} で返す（詳細は cal_serve.ts）。この経路は
+// - labels.jsonl は正なので rollback すると UI 表示と永続層がむしろズレる
+// - でも「cal.json は次回 cal list で解消」を利用者へ知らせる必要はある
+// という2条件を同時に満たすため、rollback は呼ばず onWarning だけ呼ぶ契約にする。
+
+Deno.test("performLabelUpdate: 200 + warning JSON body は onWarning へ流し rollback は呼ばない", async () => {
+  const calls: unknown[] = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:1",
+    nextValue: "駄",
+    previousLabels: ["良"],
+    fetchImpl: () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ warning: "cal.json 反映に失敗" }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+      ),
+    onOptimisticUpdate: (v: string | null) => calls.push(["opt", v]),
+    onRollback: (labels: readonly string[]) => calls.push(["rollback", labels]),
+    onError: (msg: string) => calls.push(["error", msg]),
+    onWarning: (msg: string) => calls.push(["warning", msg]),
+  });
+  assertEquals(calls, [
+    ["opt", "駄"],
+    ["warning", "cal.json 反映に失敗"],
+  ]);
+});
+
+Deno.test("performLabelUpdate: onWarning が未指定でも 200+warning body で落ちない（既存呼び出しの後方互換）", async () => {
+  const calls: unknown[] = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:1",
+    nextValue: "駄",
+    previousLabels: ["良"],
+    fetchImpl: () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ warning: "cal.json 反映に失敗" }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+      ),
+    onOptimisticUpdate: (v: string | null) => calls.push(["opt", v]),
+    onRollback: (labels: readonly string[]) => calls.push(["rollback", labels]),
+    onError: (msg: string) => calls.push(["error", msg]),
+  });
+  // rollback も error も呼ばれず、optimistic 更新だけで完結する（warning は捨てられる）。
+  assertEquals(calls, [["opt", "駄"]]);
+});
+
+Deno.test("performLabelUpdate: 200 + 空 body は onWarning を呼ばない（現行の完全成功系）", async () => {
+  // 既存の handleLabelPost 完全成功は Response(null, {status: 200}) を返す。
+  // content-type が無いので res.json() は走らせない。
+  const calls: unknown[] = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:1",
+    nextValue: "良",
+    previousLabels: [],
+    fetchImpl: () => Promise.resolve(new Response(null, { status: 200 })),
+    onOptimisticUpdate: (v: string | null) => calls.push(["opt", v]),
+    onRollback: (labels: readonly string[]) => calls.push(["rollback", labels]),
+    onError: (msg: string) => calls.push(["error", msg]),
+    onWarning: (msg: string) => calls.push(["warning", msg]),
+  });
+  assertEquals(calls, [["opt", "良"]]);
+});
+
 Deno.test("performLabelUpdate: fetch 例外（network error）も onRollback へ previousLabels を渡す", async () => {
   const calls: unknown[] = [];
   await performLabelUpdate({
