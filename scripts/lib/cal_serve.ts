@@ -19,6 +19,7 @@ import {
   setLabel,
 } from "./labels_store.ts";
 import { labelsFor } from "./cal_list.ts";
+import { atomicWriteText } from "./atomic_write.ts";
 
 // ブラウザに配信する assets。ここに漏れると cal serve が dist にコピーせず、app.js の
 // module import が 404 で失敗して viewer 全体が起動しない。app.js のローカル ./*.js import
@@ -129,7 +130,10 @@ async function patchCalJsonLabels(
   }
   works[index] = { ...works[index], labels: newLabels };
   try {
-    await Deno.writeTextFile(calJsonPath, JSON.stringify(parsed, null, 2));
+    // atomic write（tmp + rename）で、書き込み途中のクラッシュで cal.json が半端に壊れて
+    // viewer 全体が起動しなくなる事態を避ける。read は非 atomic のままだが、rename は
+    // POSIX 上 atomic なので読み手は必ず「旧全体」か「新全体」のどちらかを読む。
+    await atomicWriteText(calJsonPath, JSON.stringify(parsed, null, 2));
   } catch {
     return "cal.json への反映に失敗しました（書き込み不可）。次回 `deno task cal list` で解消します。";
   }
@@ -227,16 +231,31 @@ export function createRequestHandler(
 ): (req: Request) => Promise<Response> {
   const realDistDirPromise = Deno.realPath(resolve(distDir));
 
+  // POST/DELETE /labels は「labels.jsonl を読む → 更新する → 書き戻す → cal.json を patch する」
+  // を含む read-modify-write。2 リクエストが同時に来ると同じ初期状態を読み、片方の書き戻しが
+  // もう片方を消す（labels.jsonl は原本なのでデータ喪失）。Deno のシングルスレッド実行下では
+  // Promise chain で書き込み系ハンドラを順に流すだけで直列化できるため、queue を handler の
+  // クロージャに持つ（テスト間・サーバ間で干渉させないため module-level にはしない）。
+  // localhost 単ユーザー用途で人間操作は 1 秒に 1 回程度なので、順序化のコストは無視できる。
+  let writeQueue: Promise<unknown> = Promise.resolve();
+  const serializeWrite = <T>(op: () => Promise<T>): Promise<T> => {
+    // 前段が失敗しても後続を止めない（onrejected にも op を渡すのは、前が失敗した後の
+    // 次リクエストが「前の失敗」を承継しないようにするため）。
+    const next = writeQueue.then(op, op);
+    writeQueue = next.catch(() => {});
+    return next;
+  };
+
   return async (req: Request) => {
     const { pathname } = new URL(req.url);
 
     // /labels* は API 側の分岐。静的配信のパス解決には落とさない（asset 名衝突の予防）。
     if (pathname === "/labels" || pathname.startsWith("/labels/")) {
       if (req.method === "POST" && pathname === "/labels") {
-        return await handleLabelPost(req, labelsPath, distDir);
+        return await serializeWrite(() => handleLabelPost(req, labelsPath, distDir));
       }
       if (req.method === "DELETE") {
-        return await handleLabelDelete(pathname, labelsPath, distDir);
+        return await serializeWrite(() => handleLabelDelete(pathname, labelsPath, distDir));
       }
       return new Response("Method Not Allowed", {
         status: 405,

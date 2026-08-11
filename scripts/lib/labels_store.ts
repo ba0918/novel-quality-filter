@@ -5,6 +5,7 @@
 import { parseTargetUrl } from "../../src/background/fetchers/kakuyomu.ts";
 import { siteWorkId as makeSiteWorkId } from "./capture_store.ts";
 import type { DatasetRecord } from "./dataset.ts";
+import { atomicWriteText } from "./atomic_write.ts";
 
 const SITE = "kakuyomu";
 
@@ -144,7 +145,10 @@ export async function loadLabels2(path: string): Promise<LabelRecord2[]> {
 }
 
 export async function saveLabels2(path: string, records: LabelRecord2[]): Promise<void> {
-  await Deno.writeTextFile(path, toLabelsJsonl(records));
+  // atomic write（tmp + rename）で、書き込み途中のクラッシュ・電源断で labels.jsonl が
+  // 半端に壊れて較正データを人手で作り直すことになる事故を避ける。labels.jsonl は原本
+  // 相当（cal.json は再生成可能な派生物）なので、この経路は特に atomic 性を保つ必要がある。
+  await atomicWriteText(path, toLabelsJsonl(records));
 }
 
 // dataset の既知作品集合（存在検証用）。新形式は siteWorkId、旧形式は workId から導出する。

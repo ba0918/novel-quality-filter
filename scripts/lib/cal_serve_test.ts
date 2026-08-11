@@ -520,6 +520,68 @@ Deno.test("POST /labels: cal.json 未生成でも 200+warning を返し labels.j
   });
 });
 
+// --- 並行書き込みの直列化（race による更新消失の防止） ---
+// createRequestHandler の POST/DELETE は「labels.jsonl を読む → 更新する → 書き戻す →
+// cal.json を patch する」という read-modify-write を伴う。この一連を排他制御なしで
+// 走らせると、2 つの同時 POST が同じ初期状態を読み、それぞれが自分の 1 件だけを含む
+// 配列を書き戻し、後勝ちで片方が消える（labels.jsonl は原本相当なのでデータ喪失）。
+// createRequestHandler は内部の書き込み経路を直列化することでこれを防ぐ。
+
+Deno.test("createRequestHandler: POST /labels を 2 件同時発行しても両方が labels.jsonl に反映される", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    const handler = createRequestHandler(distDir, labelsPath);
+    const post = (siteWorkId: string, value: string) =>
+      handler(
+        new Request("http://localhost/labels", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ siteWorkId, value }),
+        }),
+      );
+    const [r1, r2] = await Promise.all([
+      post("kakuyomu:111", "良"),
+      post("kakuyomu:222", "駄"),
+    ]);
+    assertEquals(r1.status, 200);
+    assertEquals(r2.status, 200);
+    const labels = await loadLabels2(labelsPath);
+    const byId = new Map(labels.map((r) => [r.siteWorkId, r.quality]));
+    assertEquals(byId.size, 2);
+    assertEquals(byId.get("kakuyomu:111"), "良");
+    assertEquals(byId.get("kakuyomu:222"), "駄");
+  });
+});
+
+Deno.test("createRequestHandler: POST /labels を 2 件同時発行しても両方が cal.json に patch される", async () => {
+  await withServeFixture(async ({ distDir, labelsPath }) => {
+    await Deno.writeTextFile(
+      join(distDir, "cal.json"),
+      calJsonFixture([
+        { siteWorkId: "kakuyomu:111", labels: [] },
+        { siteWorkId: "kakuyomu:222", labels: [] },
+      ]),
+    );
+    const handler = createRequestHandler(distDir, labelsPath);
+    const post = (siteWorkId: string, value: string) =>
+      handler(
+        new Request("http://localhost/labels", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ siteWorkId, value }),
+        }),
+      );
+    await Promise.all([
+      post("kakuyomu:111", "良"),
+      post("kakuyomu:222", "駄"),
+    ]);
+    const patched = JSON.parse(await Deno.readTextFile(join(distDir, "cal.json")));
+    const works = patched.works as Array<{ siteWorkId: string; labels: string[] }>;
+    const byId = new Map(works.map((w) => [w.siteWorkId, w.labels]));
+    assertEquals(byId.get("kakuyomu:111"), ["良"]);
+    assertEquals(byId.get("kakuyomu:222"), ["駄"]);
+  });
+});
+
 Deno.test("serveOptions: hostname を 127.0.0.1 に固定する（Deno.serve 既定の 0.0.0.0 bind を避ける）", () => {
   assertEquals(serveOptions({ distDir: "/dist", port: 8000 }), {
     hostname: "127.0.0.1",
