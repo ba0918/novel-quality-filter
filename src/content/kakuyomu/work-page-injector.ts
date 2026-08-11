@@ -456,7 +456,6 @@ function createLineCatBlock(cat: CategoryView, meta: LineMetadata): HTMLDivEleme
       "短行",
       cat.count.short14,
       cat.count.short20,
-      cat.count.short30,
       cat.count.lineCount,
     ),
   );
@@ -467,7 +466,6 @@ function createLineCatBlock(cat: CategoryView, meta: LineMetadata): HTMLDivEleme
         "短ﾁｬﾝｸ",
         cat.count.shortChunk14,
         cat.count.shortChunk20,
-        cat.count.shortChunk30,
         cat.count.chunkCount,
       ),
     );
@@ -512,14 +510,16 @@ function amountMetricRow(
 }
 
 // 短行率・短チャンク率。1行の情報量が少ないほど高くなる要注意指標なのでバーは要注意色。
-// 数値は「14:X / 20:Y / 30:Z」を小さい順に並べる（docs/spec/line-metadata.md「表示」節）。
-// バー幅は short30 側の比率で描く（short14 は表示専用で、警告色・スコアには参加させない）。
+// 数値は「14:X / 20:Y」を小さい順に並べる（docs/spec/line-metadata.md「表示」節）。
+// short30 は既存作品の分布で saturate しており判別力が薄く、狭い value 列に 3 数字を並べると
+// 桁数超過でレイアウトが崩れるため、Chrome 拡張の表示からは落とす（data には残す）。
+// バー幅は short20 側の比率で描く（残った 2 閾値の重篤上限。short14 は表示専用で警告色・
+// スコア・バー駆動どちらにも参加させない）。
 function shortMetricRow(
   kind: string,
   key: string,
   short14: number,
   short20: number,
-  short30: number,
   denominator: number,
 ): HTMLDivElement {
   const row = document.createElement("div");
@@ -534,7 +534,7 @@ function shortMetricRow(
   barBox.className = "nqf-lm-bar";
   const fill = document.createElement("i");
   fill.className = "nqf-lm-bar-fill nqf-lm-fill--warn";
-  fill.style.width = `${widthPercent(short30, denominator).toFixed(2)}%`;
+  fill.style.width = `${widthPercent(short20, denominator).toFixed(2)}%`;
   barBox.appendChild(fill);
   row.appendChild(barBox);
 
@@ -544,8 +544,6 @@ function shortMetricRow(
   v.appendChild(hiValue(percentInt(short14, denominator)));
   v.appendChild(document.createTextNode(" / 20:"));
   v.appendChild(hiValue(percentInt(short20, denominator)));
-  v.appendChild(document.createTextNode(" / 30:"));
-  v.appendChild(hiValue(percentInt(short30, denominator)));
   row.appendChild(v);
 
   return row;

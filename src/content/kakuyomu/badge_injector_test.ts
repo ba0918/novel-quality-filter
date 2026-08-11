@@ -212,14 +212,14 @@ Deno.test("work-page-injector: 行メタデータのサマリ・見出し・カ�
     const cats = section.querySelectorAll<HTMLElement>(".nqf-lm-cat");
     assertEquals(cats.length, 4, "カテゴリブロックは4枚");
 
-    // 地の文: 行割合 4/10=40.0%・文字割合 120/200=60.0%・短行 1/4,2/4・短チャンク 2/6,3/6
+    // 地の文: 行割合 4/10=40.0%・文字割合 120/200=60.0%・短行 0/4,1/4・短チャンク 0/6,2/6
+    // Chrome 拡張は 14/20 の 2 数字表示（30 は saturate 判別薄で落とした）。
     const narrative = cats[0];
     assertEquals(narrative.querySelector(".nqf-lm-cat-name")?.textContent, "地の文");
     const nText = narrative.textContent ?? "";
     assert(nText.includes("40.0%"), "地の文の行割合が表示される");
     assert(nText.includes("60.0%"), "地の文の文字割合が表示される");
     assert(nText.includes("25%"), "地の文短行20（1/4）が表示される");
-    assert(nText.includes("50%"), "地の文短行30（2/4）が表示される");
     assert(nText.includes("33%"), "地の文短チャンク20（2/6）が表示される");
     assert(nText.includes("チャンク 6"), "地の文のチャンク数が表示される");
     // 地の文だけが短チャンク行を持つ
@@ -268,7 +268,10 @@ const SHORT14_META: LineMetadata = {
   nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
 };
 
-Deno.test("work-page-injector: カテゴリカードの短行/短チャンクを 14:X / 20:Y / 30:Z の順で並列表示する", () => {
+Deno.test("work-page-injector: カテゴリカードの短行/短チャンクを 14:X / 20:Y の 2 数字で並列表示する（30 は表示しない）", () => {
+  // 30 は既存作品の分布で saturate しており（良/駄ともに 76%〜99% の帯に集中して判別力が薄い）、
+  // 数字を狭い value 列に 3 つ並べるとレイアウトが崩れる。data (dataset.jsonl / cal.json) には
+  // 30 も残すが、Chrome 拡張の作品ページ表示からは落とす。docs/spec/line-metadata.md「表示」節参照。
   withDocument("<div class='container'></div>", (doc) => {
     const container = doc.querySelector<HTMLElement>(".container")!;
     injectWorkBadge(container, makeResult({ lineMetadata: SHORT14_META }), () => {});
@@ -277,17 +280,24 @@ Deno.test("work-page-injector: カテゴリカードの短行/短チャンクを
 
     const shortRow = narrative.querySelector<HTMLElement>(".nqf-lm-metric--short");
     const shortText = shortRow?.textContent ?? "";
-    // 3 数字が「14:60% / 20:80% / 30:100%」の順で 1 行に並ぶ
     assert(
-      /14:\s*60%\s*\/\s*20:\s*80%\s*\/\s*30:\s*100%/.test(shortText),
-      `短行の 3 数字が 14/20/30 の順で並ぶ (実際: ${shortText})`,
+      /14:\s*60%\s*\/\s*20:\s*80%/.test(shortText),
+      `短行が 14/20 の順で並ぶ (実際: ${shortText})`,
+    );
+    assert(
+      !/30:/.test(shortText),
+      `短行の表示に「30:」が含まれない (実際: ${shortText})`,
     );
 
     const chunkRow = narrative.querySelector<HTMLElement>(".nqf-lm-metric--shortchunk");
     const chunkText = chunkRow?.textContent ?? "";
     assert(
-      /14:\s*25%\s*\/\s*20:\s*50%\s*\/\s*30:\s*75%/.test(chunkText),
-      `短チャンクの 3 数字が 14/20/30 の順で並ぶ (実際: ${chunkText})`,
+      /14:\s*25%\s*\/\s*20:\s*50%/.test(chunkText),
+      `短チャンクが 14/20 の順で並ぶ (実際: ${chunkText})`,
+    );
+    assert(
+      !/30:/.test(chunkText),
+      `短チャンクの表示に「30:」が含まれない (実際: ${chunkText})`,
     );
   });
 });
