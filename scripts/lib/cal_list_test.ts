@@ -244,6 +244,85 @@ Deno.test("runEvaluate: 未知フラグを渡すと使い方を出してエラ�
   assertEquals(code === 0, false);
 });
 
+// docs/spec/line-metadata.md「表示」節: 較正の一覧出力（cal evaluate）にも 14/20/30 の
+// 3 列を並べる。地の文の短行率 (short14 / short20 / short30 を narrative.lineCount で割った
+// パーセント整数) を「<14 <20 <30」列として出す。lineMetadata が無い旧レコードは "-" 表示。
+Deno.test("runEvaluate: header と各行に地の文短行 14/20/30 の 3 列を含む", async () => {
+  const base = await Deno.makeTempDir();
+  try {
+    const datasetPath = join(base, "dataset.jsonl");
+    const labelsPath = join(base, "labels.jsonl");
+    // 地の文 lineCount=5 / short14=1 / short20=2 / short30=4 → 20% / 40% / 80%
+    const rec: DatasetRecord = {
+      ...record("1", 0, raw()),
+      lineMetadata: {
+        totalLines: 10,
+        totalChars: 200,
+        blankCount: 1,
+        separatorCount: 0,
+        narrative: {
+          lineCount: 5,
+          charCount: 100,
+          short14: 1,
+          short20: 2,
+          short30: 4,
+          chunkCount: 6,
+          shortChunk14: 0,
+          shortChunk20: 1,
+          shortChunk30: 2,
+        },
+        dialogue: { lineCount: 3, charCount: 60, short14: 0, short20: 0, short30: 1 },
+        meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+        nonTerminal: { lineCount: 2, charCount: 40, short14: 0, short20: 0, short30: 0 },
+      },
+    };
+    await appendRecord(datasetPath, rec);
+    await saveLabels2(labelsPath, setLabel([], "kakuyomu:1", "良", "2026-08-10T00:00:00.000Z"));
+
+    const lines: string[] = [];
+    const orig = console.log;
+    console.log = (...a: unknown[]) => lines.push(a.join(" "));
+    try {
+      const code = await runEvaluate([], { datasetPath, labelsPath });
+      assertEquals(code, 0);
+      const out = lines.join("\n");
+      // header に 3 列（<14 <20 <30）が並ぶ
+      assertStringIncludes(out, "<14");
+      assertStringIncludes(out, "<20");
+      assertStringIncludes(out, "<30");
+      // 各行に地の文短行率のパーセント整数 3 つが並ぶ
+      assertStringIncludes(out, "20%");
+      assertStringIncludes(out, "40%");
+      assertStringIncludes(out, "80%");
+    } finally {
+      console.log = orig;
+    }
+  } finally {
+    await Deno.remove(base, { recursive: true });
+  }
+});
+
+// lineMetadata が undefined な旧レコードは "-" にフォールバック（現状 backfill 済みで
+// 実サンプルには出ないが、集計スキーマ差分を安全に処理できることを保証する）。
+Deno.test("runEvaluate: lineMetadata を持たない旧レコードでも 3 列に '-' を出す", async () => {
+  const p = await seed();
+  const lines: string[] = [];
+  const orig = console.log;
+  console.log = (...a: unknown[]) => lines.push(a.join(" "));
+  try {
+    const code = await runEvaluate([], { datasetPath: p.datasetPath, labelsPath: p.labelsPath });
+    assertEquals(code, 0);
+    const dataLine = lines.slice(1).find((l) => l.includes("作品1")) ?? "";
+    // header 行以外に 3 つの "-" が並ぶ（各列ぶん）
+    const dashCount = (dataLine.match(/-/g) ?? []).length;
+    // score が負値 diff の場合の "-" も含む可能性があるため、少なくとも 3 個以上
+    assertEquals(dashCount >= 3, true, `フォールバック '-' が 3 列ぶん出る（実際: ${dataLine}）`);
+  } finally {
+    console.log = orig;
+    await Deno.remove(p.base, { recursive: true });
+  }
+});
+
 Deno.test("runEvaluate: 再計算スコアをテキスト出力し、保存 score を使わない（C3）", async () => {
   const p = await seed();
   const lines: string[] = [];

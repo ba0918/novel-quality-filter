@@ -219,15 +219,30 @@ export async function runEvaluate(
   // 分析からは外す。一覧表示 (runList / buildCalJson) はここでは扱わず、そちらは
   // 対象外も含めて出す（サイドバーで見えないと再判定できないため）。
   const rows = allRows.filter((r) => r.scope !== "対象外");
-  console.log("ラベル  正本  実験  差分  作品");
+  console.log("ラベル  正本  実験  差分  <14  <20  <30  作品");
   for (const row of rows) {
     const q = (row.quality ?? "-").padEnd(3);
     const sign = row.diff > 0 ? `+${row.diff}` : String(row.diff);
+    // 地の文短行 14/20/30 の 3 列（率をパーセント整数）。lineMetadata が undefined な旧レコードは
+    // 3 列とも "-" を出す（現状 backfill 済みで出現しないが defensive）。docs/spec/line-metadata.md
+    // 「表示」節参照 — スコア・警告閾値には参加させず、目視で数字を並べるためだけの列。
+    const narrative = row.record.lineMetadata?.narrative;
+    const s14 = narrative ? shortColLabel(narrative.short14, narrative.lineCount) : "-";
+    const s20 = narrative ? shortColLabel(narrative.short20, narrative.lineCount) : "-";
+    const s30 = narrative ? shortColLabel(narrative.short30, narrative.lineCount) : "-";
     console.log(
       `${q} ${String(row.canonicalScore).padStart(4)} ${String(row.experimentScore).padStart(4)} ${
         sign.padStart(5)
-      }  ${row.record.title.slice(0, 30)}`,
+      }  ${s14.padStart(4)} ${s20.padStart(4)} ${s30.padStart(4)}  ${
+        row.record.title.slice(0, 30)
+      }`,
     );
   }
   return 0;
+}
+
+// 短行率の 1 セル表示。分母 0 は "-"、それ以外は "NN%"（整数、"0%" も含む）。
+function shortColLabel(numerator: number, denominator: number): string {
+  if (denominator === 0) return "-";
+  return `${Math.round((numerator / denominator) * 100)}%`;
 }
