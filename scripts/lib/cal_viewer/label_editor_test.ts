@@ -229,6 +229,36 @@ Deno.test("performLabelUpdate: 200 + 空 body は onWarning を呼ばない（�
   assertEquals(calls, [["opt", "良"]]);
 });
 
+// onWarning は toast 表示の UI callback で、レンダリング側の内部エラーで例外を投げうる。
+// これを本体の try/catch が拾ってしまうと「HTTP 成功で labels.jsonl も cal.json も更新済み
+// なのに rollback + error toast が出る」偽陽性経路になり、UI と永続層がむしろズレる。
+// warning 経路は例外境界を分け、onWarning が投げても rollback/onError は呼ばない契約にする。
+
+Deno.test("performLabelUpdate: onWarning が例外を投げても rollback/error は呼ばれない（HTTP は成功しているため）", async () => {
+  const calls: unknown[] = [];
+  await performLabelUpdate({
+    siteWorkId: "kakuyomu:1",
+    nextValue: "駄",
+    previousLabels: ["良"],
+    fetchImpl: () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ warning: "cal.json 反映に失敗" }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+      ),
+    onOptimisticUpdate: (v: string | null) => calls.push(["opt", v]),
+    onRollback: (labels: readonly string[]) => calls.push(["rollback", labels]),
+    onError: (msg: string) => calls.push(["error", msg]),
+    onWarning: () => {
+      throw new Error("toast callback crashed");
+    },
+  });
+  // onWarning は呼ばれたが例外を吸収し、optimistic 更新だけで完結する。
+  // rollback / error は呼ばれない（HTTP は成功していて labels.jsonl は正なので）。
+  assertEquals(calls, [["opt", "駄"]]);
+});
+
 Deno.test("performLabelUpdate: fetch 例外（network error）も onRollback へ previousLabels を渡す", async () => {
   const calls: unknown[] = [];
   await performLabelUpdate({

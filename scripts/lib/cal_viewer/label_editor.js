@@ -107,7 +107,15 @@ export async function performLabelUpdate({
     if (contentType.includes("application/json")) {
       const body = await res.json().catch(() => null);
       if (body && typeof body.warning === "string") {
-        onWarning(body.warning);
+        // onWarning は UI toast の receiver で、レンダリング側の内部エラーで例外を投げうる。
+        // ここで throw が外側 catch に落ちると HTTP 成功なのに rollback + error toast が
+        // 出て UI と永続層がむしろズレる。warning 経路は例外境界を分けて吸収する
+        // （HTTP は成功しているので rollback は不要、通知が出せなかっただけ）。
+        try {
+          onWarning(body.warning);
+        } catch {
+          // 通知に失敗しただけで永続層は正。ここでは何もしない。
+        }
       }
     }
   } catch (e) {
