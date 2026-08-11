@@ -34,6 +34,10 @@ function deriveNarrativeShort14Ratio(
 
 export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
+    // 家族 5 デルタ 2 回目 (パターン C 判別強い指標寄せ): 1 回目 (パターン B 判別 5 均等
+    // 按分) で一文一段落 weight 0.43 が「良で一文一段落多い」作品 (忘れられ令嬢等) を
+    // 過剰減点し良 gate 12/15 FAIL。一文一段落は canonical と同値 0.30 に据え置き、
+    // 削減 0.26 を他 4 判別指標 (良で高い、良に有利) に按分。
     key: "singleSentParaRatio",
     label: "一文一段落比率",
     weight: 0.30,
@@ -42,9 +46,10 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.4,
   },
   {
+    // 家族 5 デルタ 2 回目 (パターン C): 0.12 + 0.10 → 0.22。
     key: "sentenceLengthSD",
     label: "文長の標準偏差",
-    weight: 0.12,
+    weight: 0.22,
     normalize: (raw: number) => Math.min(raw / 25, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -93,9 +98,10 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.3,
   },
   {
+    // 家族 5 デルタ 2 回目 (パターン C): 0.05 + 0.04 → 0.09。
     key: "paragraphLengthSD",
     label: "段落長の標準偏差",
-    weight: 0.05,
+    weight: 0.09,
     normalize: (raw: number) => Math.min(raw / 40, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -125,17 +131,19 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.4,
   },
   {
+    // 家族 5 デルタ 2 回目 (パターン C): 0.04 + 0.04 → 0.08。
     key: "paragraphTransitionEntropy",
     label: "段落遷移エントロピー",
-    weight: 0.04,
+    weight: 0.08,
     normalize: (raw: number) => Math.min(raw / 1.5, 1),
     invert: false,
     flagThreshold: 0.3,
   },
   {
+    // 家族 5 デルタ 2 回目 (パターン C): 0.08 + 0.08 → 0.16。合計調整枠。
     key: "sentenceLengthBurstiness",
     label: "文長バースティネス",
-    weight: 0.08,
+    weight: 0.16,
     normalize: (raw: number) => Math.min(raw / 8, 1),
     invert: false,
     flagThreshold: 0.5,

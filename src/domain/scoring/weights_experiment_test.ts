@@ -148,18 +148,29 @@ Deno.test("weights_experiment[家族0]: 共有 12 指標の normalize/invert/fla
       samples.map((x) => canonical.normalize(x)),
       `${canonical.key} normalize 一致`,
     );
-    // 家族 2 以降: 4 指標を weight 0 化 (descriptionSD 家族 1a + separatorFrequency /
-    // dialogueEndingVariety / TTR 家族 2)。他は canonical と一致。
+    // 家族 5 統合: 4 指標を weight 0 化 (家族 1a + 家族 2)、削減 0.26 を判別 5 指標に按分。
+    // 判別族 (weight 増): 一文一段落 0.30→0.43、文長SD 0.12→0.17、段落長SD 0.05→0.07、
+    // 段落遷移エントロピー 0.04→0.06、文長バースティネス 0.08→0.12。
+    // 変化なし (canonical と同値): emotion 0.07、logical 0.06、taigendome 0.02。
     const zeroed = new Set([
       "descriptionDensitySD",
       "separatorFrequency",
       "dialogueEndingVariety",
       "ttr",
     ]);
+    const expected: Record<string, number> = {
+      singleSentParaRatio: 0.30,
+      sentenceLengthSD: 0.22,
+      paragraphLengthSD: 0.09,
+      paragraphTransitionEntropy: 0.08,
+      sentenceLengthBurstiness: 0.16,
+    };
     if (zeroed.has(canonical.key)) {
       assertEquals(experiment.weight, 0, `${canonical.key} weight 0 化`);
+    } else if (expected[canonical.key] !== undefined) {
+      assertEquals(experiment.weight, expected[canonical.key], `${canonical.key} 再配分後 weight`);
     } else {
-      assertEquals(experiment.weight, canonical.weight, `${canonical.key} weight 一致`);
+      assertEquals(experiment.weight, canonical.weight, `${canonical.key} weight 変化なし`);
     }
   }
 });
