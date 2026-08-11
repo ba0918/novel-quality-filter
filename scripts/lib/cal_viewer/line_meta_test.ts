@@ -25,29 +25,37 @@ const LINE_META: LineMetadata = {
   narrative: {
     lineCount: 4,
     charCount: 120,
+    short14: 0,
     short20: 1,
     short30: 2,
     chunkCount: 6,
+    shortChunk14: 0,
     shortChunk20: 2,
     shortChunk30: 3,
   } as NarrativeCount,
-  dialogue: { lineCount: 3, charCount: 60, short20: 0, short30: 1 } as CategoryCount,
-  meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 } as CategoryCount,
-  nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 } as CategoryCount,
+  dialogue: { lineCount: 3, charCount: 60, short14: 0, short20: 0, short30: 1 } as CategoryCount,
+  meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 } as CategoryCount,
+  nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 } as CategoryCount,
 };
 
 // モック（cal_viewer_mockup.html）のサンプル値と同じ行数構成。空行703（47%）など画像のサンプル
 // 値でbandSegmentsの合計幅100%を検証するためのフィクスチャ。文字数は band 計算に使わないため
 // 未使用フィールドはダミー値で埋める（narrative以外は同型のためCategoryCountでまとめて作る）。
 function dummyCategory(lineCount: number): CategoryCount {
-  return { lineCount, charCount: 0, short20: 0, short30: 0 };
+  return { lineCount, charCount: 0, short14: 0, short20: 0, short30: 0 };
 }
 const MOCK_LINE_META: LineMetadata = {
   totalLines: 1499,
   totalChars: 0,
   blankCount: 703,
   separatorCount: 27,
-  narrative: { ...dummyCategory(305), chunkCount: 0, shortChunk20: 0, shortChunk30: 0 },
+  narrative: {
+    ...dummyCategory(305),
+    chunkCount: 0,
+    shortChunk14: 0,
+    shortChunk20: 0,
+    shortChunk30: 0,
+  },
   dialogue: dummyCategory(99),
   meta: dummyCategory(207),
   nonTerminal: dummyCategory(158),

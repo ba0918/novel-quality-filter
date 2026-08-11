@@ -11,15 +11,17 @@ function lineMeta(): LineMetadata {
     narrative: {
       lineCount: 2,
       charCount: 30,
+      short14: 0,
       short20: 0,
       short30: 1,
       chunkCount: 2,
+      shortChunk14: 0,
       shortChunk20: 0,
       shortChunk30: 0,
     },
-    dialogue: { lineCount: 1, charCount: 10, short20: 1, short30: 1 },
-    meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-    nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+    dialogue: { lineCount: 1, charCount: 10, short14: 0, short20: 1, short30: 1 },
+    meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+    nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
   };
 }
 

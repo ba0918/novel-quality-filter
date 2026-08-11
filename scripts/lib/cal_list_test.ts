@@ -167,15 +167,17 @@ Deno.test("buildCalJson: lineMetadata が record にあれば works[] に渡る"
       narrative: {
         lineCount: 4,
         charCount: 100,
+        short14: 0,
         short20: 1,
         short30: 2,
         chunkCount: 5,
+        shortChunk14: 0,
         shortChunk20: 1,
         shortChunk30: 2,
       },
-      dialogue: { lineCount: 3, charCount: 60, short20: 0, short30: 1 },
-      meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-      nonTerminal: { lineCount: 2, charCount: 40, short20: 0, short30: 0 },
+      dialogue: { lineCount: 3, charCount: 60, short14: 0, short20: 0, short30: 1 },
+      meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+      nonTerminal: { lineCount: 2, charCount: 40, short14: 0, short20: 0, short30: 0 },
     },
   };
   const [work] = buildCalJson([rec], []).works;

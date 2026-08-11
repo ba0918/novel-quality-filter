@@ -80,25 +80,27 @@ Deno.test("averagePerLineLabel: 空行を除く1行平均字。分母0は退避"
     narrative: {
       lineCount: 0,
       charCount: 0,
+      short14: 0,
       short20: 0,
       short30: 0,
       chunkCount: 0,
+      shortChunk14: 0,
       shortChunk20: 0,
       shortChunk30: 0,
     },
-    dialogue: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-    meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-    nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+    dialogue: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+    meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+    nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
   });
   assertEquals(averagePerLineLabel(meta(10, 200, 2)), "25.0字/行");
   assertEquals(averagePerLineLabel(meta(3, 50, 3)), "-");
 });
 
 Deno.test("averageCharsLabel: 1行平均字。行0は退避", () => {
-  const count: CategoryCount = { lineCount: 4, charCount: 120, short20: 0, short30: 0 };
+  const count: CategoryCount = { lineCount: 4, charCount: 120, short14: 0, short20: 0, short30: 0 };
   assertEquals(averageCharsLabel(count), "30.0字");
   assertEquals(
-    averageCharsLabel({ lineCount: 0, charCount: 0, short20: 0, short30: 0 }),
+    averageCharsLabel({ lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 }),
     "-",
   );
 });
@@ -107,13 +109,15 @@ Deno.test("isNarrativeCount: chunkCount を持つものだけ地の文カウン�
   const narrative: NarrativeCount = {
     lineCount: 1,
     charCount: 1,
+    short14: 0,
     short20: 0,
     short30: 0,
     chunkCount: 1,
+    shortChunk14: 0,
     shortChunk20: 0,
     shortChunk30: 0,
   };
-  const plain: CategoryCount = { lineCount: 1, charCount: 1, short20: 0, short30: 0 };
+  const plain: CategoryCount = { lineCount: 1, charCount: 1, short14: 0, short20: 0, short30: 0 };
   assertEquals(isNarrativeCount(narrative), true);
   assertEquals(isNarrativeCount(plain), false);
 });
@@ -127,15 +131,17 @@ Deno.test("compositionSegments: 6区分の [slug,count] を構成順に返す", 
     narrative: {
       lineCount: 4,
       charCount: 120,
+      short14: 0,
       short20: 0,
       short30: 0,
       chunkCount: 0,
+      shortChunk14: 0,
       shortChunk20: 0,
       shortChunk30: 0,
     },
-    dialogue: { lineCount: 2, charCount: 30, short20: 0, short30: 0 },
-    meta: { lineCount: 1, charCount: 10, short20: 0, short30: 0 },
-    nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+    dialogue: { lineCount: 2, charCount: 30, short14: 0, short20: 0, short30: 0 },
+    meta: { lineCount: 1, charCount: 10, short14: 0, short20: 0, short30: 0 },
+    nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
   };
   assertEquals(compositionSegments(meta), [
     ["narrative", 4],

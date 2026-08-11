@@ -11,15 +11,17 @@ function meta(overrides: Partial<LineMetadata> = {}): LineMetadata {
     narrative: {
       lineCount: 5,
       charCount: 150,
+      short14: 0,
       short20: 1,
       short30: 3,
       chunkCount: 6,
+      shortChunk14: 0,
       shortChunk20: 0,
       shortChunk30: 2,
     },
-    dialogue: { lineCount: 2, charCount: 30, short20: 2, short30: 2 },
-    meta: { lineCount: 1, charCount: 20, short20: 0, short30: 1 },
-    nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+    dialogue: { lineCount: 2, charCount: 30, short14: 0, short20: 2, short30: 2 },
+    meta: { lineCount: 1, charCount: 20, short14: 0, short20: 0, short30: 1 },
+    nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
     ...overrides,
   };
 }
@@ -47,13 +49,15 @@ Deno.test("deriveLineMetrics: 分母0（空行のみ・地の文なし・総行0
     narrative: {
       lineCount: 0,
       charCount: 0,
+      short14: 0,
       short20: 0,
       short30: 0,
       chunkCount: 0,
+      shortChunk14: 0,
       shortChunk20: 0,
       shortChunk30: 0,
     },
-    meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+    meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
   });
   assertEquals(deriveLineMetrics(empty), {
     avgCharsPerLine: 0,

@@ -48,15 +48,17 @@ const LINE_META: LineMetadata = {
   narrative: {
     lineCount: 4,
     charCount: 120,
+    short14: 0,
     short20: 1,
     short30: 2,
     chunkCount: 6,
+    shortChunk14: 0,
     shortChunk20: 2,
     shortChunk30: 3,
   } as NarrativeCount,
-  dialogue: { lineCount: 3, charCount: 60, short20: 0, short30: 1 } as CategoryCount,
-  meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 } as CategoryCount,
-  nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 } as CategoryCount,
+  dialogue: { lineCount: 3, charCount: 60, short14: 0, short20: 0, short30: 1 } as CategoryCount,
+  meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 } as CategoryCount,
+  nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 } as CategoryCount,
 };
 
 Deno.test("averagePerLineLabel: 平均字/行の表示が一致する", () => {

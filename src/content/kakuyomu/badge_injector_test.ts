@@ -16,15 +16,17 @@ const SAMPLE_META: LineMetadata = {
   narrative: {
     lineCount: 4,
     charCount: 120,
+    short14: 0,
     short20: 1,
     short30: 2,
     chunkCount: 6,
+    shortChunk14: 0,
     shortChunk20: 2,
     shortChunk30: 3,
   },
-  dialogue: { lineCount: 2, charCount: 30, short20: 2, short30: 2 },
-  meta: { lineCount: 1, charCount: 10, short20: 1, short30: 1 },
-  nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+  dialogue: { lineCount: 2, charCount: 30, short14: 0, short20: 2, short30: 2 },
+  meta: { lineCount: 1, charCount: 10, short14: 0, short20: 1, short30: 1 },
+  nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
 };
 
 // 本文が全て空行のとき、平均字/行の分母（総行数−空行数）が0になる退化ケース。
@@ -36,15 +38,17 @@ const ALL_BLANK_META: LineMetadata = {
   narrative: {
     lineCount: 0,
     charCount: 0,
+    short14: 0,
     short20: 0,
     short30: 0,
     chunkCount: 0,
+    shortChunk14: 0,
     shortChunk20: 0,
     shortChunk30: 0,
   },
-  dialogue: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-  meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-  nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+  dialogue: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+  meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+  nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
 };
 
 function withDocument<T>(html: string, fn: (doc: Document) => T): T {

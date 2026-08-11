@@ -66,12 +66,17 @@ export type LineCategory =
 export interface CategoryCount {
   lineCount: number;
   charCount: number;
+  // short14 は較正実験用の追加集計（2026-08-11 追加）。
+  // 既存レコード（backfill 前）には欠損する可能性があるため、消費側は 0 で扱う。
+  short14: number;
   short20: number;
   short30: number;
 }
 
 export interface NarrativeCount extends CategoryCount {
   chunkCount: number;
+  // shortChunk14 は較正実験用の追加集計（2026-08-11 追加）。
+  shortChunk14: number;
   shortChunk20: number;
   shortChunk30: number;
 }

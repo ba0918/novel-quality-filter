@@ -80,14 +80,32 @@ Deno.test("aggregateLineMetadata: 率は保存せず分子と分母だけを保�
     narrative: {
       lineCount: 1,
       charCount: 8,
+      short14: 1,
       short20: 1,
       short30: 1,
       chunkCount: 1,
+      shortChunk14: 1,
       shortChunk20: 1,
       shortChunk30: 1,
     },
-    dialogue: { lineCount: 1, charCount: 6, short20: 1, short30: 1 },
-    meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-    nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+    dialogue: { lineCount: 1, charCount: 6, short14: 1, short20: 1, short30: 1 },
+    meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+    nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
   });
+});
+
+Deno.test("aggregateLineMetadata: short14 は 14字未満で判定する（境界: 13字は短行、14字は非短行）", () => {
+  // 行判定は 。込みのコードポイント数、チャンク判定は 。を除いた文字数、を反映するよう
+  // 行と句点チャンクで別々に境界を確認する。
+  const meta = aggregateLineMetadata([
+    line("一二三四五六七八九十一二。"), // 行=13cp, chunk=12cp
+    line("一二三四五六七八九十一二三。"), // 行=14cp, chunk=13cp
+  ]);
+  assertEquals(meta.narrative.charCount, 27);
+  // 行レベル: 13<14 は短行、14<14 は非短行
+  assertEquals(meta.narrative.short14, 1);
+  assertEquals(meta.narrative.short20, 2);
+  // チャンクレベル: 12/13 は両方 <14 なので shortChunk14 は 2
+  assertEquals(meta.narrative.shortChunk14, 2);
+  assertEquals(meta.narrative.shortChunk20, 2);
 });

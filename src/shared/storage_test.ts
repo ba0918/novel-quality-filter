@@ -14,15 +14,17 @@ Deno.test("storage: putScore した entry が開幕形式フィールドごと�
     narrative: {
       lineCount: 1,
       charCount: 8,
+      short14: 0,
       short20: 1,
       short30: 1,
       chunkCount: 1,
+      shortChunk14: 0,
       shortChunk20: 1,
       shortChunk30: 1,
     },
-    dialogue: { lineCount: 1, charCount: 6, short20: 1, short30: 1 },
-    meta: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
-    nonTerminal: { lineCount: 0, charCount: 0, short20: 0, short30: 0 },
+    dialogue: { lineCount: 1, charCount: 6, short14: 0, short20: 1, short30: 1 },
+    meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+    nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
   };
 
   await putScore({

@@ -1,7 +1,11 @@
 import type { CategoryCount, LineData, LineMetadata, NarrativeCount } from "../types.ts";
 import { classifyLine } from "./line_classifier.ts";
 import { splitSentences } from "./sentences.ts";
-import { SHORT_LINE_THRESHOLD_20, SHORT_LINE_THRESHOLD_30 } from "./constants.ts";
+import {
+  SHORT_LINE_THRESHOLD_14,
+  SHORT_LINE_THRESHOLD_20,
+  SHORT_LINE_THRESHOLD_30,
+} from "./constants.ts";
 
 // 各行を classifyLine で排他分類し、カテゴリ別の分量（行数・文字数）と短さ（短行20/30）を
 // 集計する。地の文は句点チャンク数と短チャンク20/30も数える。率は保存せず、分子（短カウント）と
@@ -66,6 +70,7 @@ function countChars(text: string): number {
 function addLine(category: CategoryCount, chars: number): void {
   category.lineCount++;
   category.charCount += chars;
+  if (chars < SHORT_LINE_THRESHOLD_14) category.short14++;
   if (chars < SHORT_LINE_THRESHOLD_20) category.short20++;
   if (chars < SHORT_LINE_THRESHOLD_30) category.short30++;
 }
@@ -77,15 +82,16 @@ function addChunks(narrative: NarrativeCount, text: string): void {
   for (const chunk of effective) {
     narrative.chunkCount++;
     const chars = countChars(chunk);
+    if (chars < SHORT_LINE_THRESHOLD_14) narrative.shortChunk14++;
     if (chars < SHORT_LINE_THRESHOLD_20) narrative.shortChunk20++;
     if (chars < SHORT_LINE_THRESHOLD_30) narrative.shortChunk30++;
   }
 }
 
 function emptyCategory(): CategoryCount {
-  return { lineCount: 0, charCount: 0, short20: 0, short30: 0 };
+  return { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 };
 }
 
 function emptyNarrative(): NarrativeCount {
-  return { ...emptyCategory(), chunkCount: 0, shortChunk20: 0, shortChunk30: 0 };
+  return { ...emptyCategory(), chunkCount: 0, shortChunk14: 0, shortChunk20: 0, shortChunk30: 0 };
 }

@@ -39,6 +39,13 @@ Deno.test("cache_staleness: 行メタデータ追加前のスキーマ5は stale
   assertEquals(isCacheStale(5), true);
 });
 
-Deno.test("cache_staleness: 行メタデータ追加でスキーマバージョンが6になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 6);
+Deno.test("cache_staleness: 短行14 集計追加前のスキーマ6は stale", () => {
+  // schemaVersion 6 のキャッシュは lineMetadata に short14/shortChunk14 を持たない。
+  // 型は必ず存在する数値として宣言しているため、undefined を許すと NaN 波及の原因になる。
+  // 較正実験の未評価候補としてデータだけ増やすが、cache の型完全性は保つ。
+  assertEquals(isCacheStale(6), true);
+});
+
+Deno.test("cache_staleness: 短行14 集計追加でスキーマバージョンが7になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 7);
 });
