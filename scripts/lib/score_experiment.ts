@@ -7,11 +7,16 @@
 
 import type { RawMetrics } from "../../src/domain/types.ts";
 import {
+  CALIBRATION_CONTROL_POINTS,
   METRIC_CONFIGS,
   type MetricConfig,
   PENALTY_RULES,
   type PenaltyRule,
 } from "../../src/domain/scoring/weights.ts";
+import { makeCalibration } from "../../src/domain/scoring/calibration.ts";
+
+// mod.ts calculateScore と同一の較正段を通す（研究エンジンの baseline 忠実性）。
+const calibrate = makeCalibration(CALIBRATION_CONTROL_POINTS);
 
 // 任意の重み・正規化・ペナルティでスコアを再計算する研究エンジン。mod.ts / normalizer.ts と
 // 同一の計算（normalize→invert→contribution 総和→clamp→ペナルティ乗算→round）を、設定を注入して行う。
@@ -53,7 +58,8 @@ export function scoreWithConfig(
     }
     if (met) mult *= rule.penaltyMultiplier;
   }
-  return Math.round(base * mult);
+  const penalized = Math.max(0, Math.min(100, base * mult));
+  return Math.round(calibrate(penalized));
 }
 
 export interface ExperimentConfig {
@@ -109,5 +115,6 @@ export function scoreExperiment(raw: RawMetrics, cfg: ExperimentConfig): number 
         : rule.penaltyMultiplier;
     }
   }
-  return Math.round(base * mult);
+  const penalized = Math.max(0, Math.min(100, base * mult));
+  return Math.round(calibrate(penalized));
 }

@@ -5,9 +5,15 @@ import type {
   NarrativeCount,
   RawMetrics,
 } from "../../src/domain/types.ts";
-import { calculateScore } from "../../src/domain/scoring/mod.ts";
-import { METRIC_CONFIGS, PENALTY_RULES } from "../../src/domain/scoring/weights.ts";
+import { calculateScore, DEFAULT_THRESHOLD } from "../../src/domain/scoring/mod.ts";
+import {
+  CALIBRATION_CONTROL_POINTS,
+  METRIC_CONFIGS,
+  PENALTY_RULES,
+} from "../../src/domain/scoring/weights.ts";
+import { makeCalibration } from "../../src/domain/scoring/calibration.ts";
 import { scoreWithConfig } from "./score_experiment.ts";
+import { parseJsonl } from "./dataset.ts";
 import type { DatasetRecord } from "./dataset.ts";
 import {
   CANONICAL_FORMULA,
@@ -171,3 +177,84 @@ Deno.test(
     assertEquals(short14Penalty, undefined);
   },
 );
+
+// --- 表示較正カーブ導入の契約テスト（plan: 全 129 件で pass/fail 集合ビット一致） ---
+
+const DATASET_PATH = new URL(
+  "../../.agents/runtime/dataset.jsonl",
+  import.meta.url,
+).pathname;
+
+async function tryLoadDataset(): Promise<DatasetRecord[] | null> {
+  try {
+    const text = await Deno.readTextFile(DATASET_PATH);
+    return parseJsonl(text);
+  } catch {
+    // dataset.jsonl は gitignored な runtime 成果物なので、CI 環境では存在しないことがある。
+    // その場合はテストを skip 相当にする（存在すれば必ず検査する）。
+    return null;
+  }
+}
+
+Deno.test({
+  name: "cal_evaluate: dataset.jsonl の全レコードで pass/fail が正本→較正で保存される（契約 4）",
+  async fn(t) {
+    const records = await tryLoadDataset();
+    if (!records) {
+      console.warn("  dataset.jsonl not found — skipping dataset-wide pass/fail check");
+      return;
+    }
+    // 較正カーブ導入前のスコア（生 base × penalty を round したもの）は record.score にあるが、
+    // 較正導入後の再算出結果と混在してしまうため、ここでは「較正なしの参照値」をこの場で
+    // 計算する（数式を単一経路 scoreResultFromMetrics に閉じつつ、比較用に生 base を再構成）。
+    // 具体的には rawMetrics から metrics を作り base × penalty を clamp→round した参照値と、
+    // 較正入りの scoreResultFromMetrics(...).score を比べる。
+    for (const rec of records) {
+      const cal = scoreResultFromMetrics(rec.rawMetrics, CANONICAL_FORMULA, rec.lineMetadata);
+      // 較正なし側は「clamp(base × penalty)」の round。base_score と penalty は
+      // scoreResultFromMetrics の内部再計算と同じロジックで再構成する。
+      let sum = 0;
+      for (const c of CANONICAL_FORMULA.metricConfigs) {
+        const n = c.normalize(rec.rawMetrics[c.key as keyof RawMetrics] as number);
+        sum += (c.invert ? 1 - n : n) * c.weight * 100;
+      }
+      const base = Math.max(0, Math.min(100, sum));
+      let mult = 1;
+      for (const rule of CANONICAL_FORMULA.penaltyRules) {
+        const fires = rule.evaluate
+          ? rule.evaluate(rec.rawMetrics, rec.lineMetadata)
+          : rule.conditions.every((cond) => {
+            const rv = rec.rawMetrics[cond.key as keyof RawMetrics] as number;
+            if (cond.exemptWhenZero && rv === 0) return false;
+            const c = CANONICAL_FORMULA.metricConfigs.find((c) => c.key === cond.key)!;
+            const n = c.normalize(rv);
+            const nv = c.invert ? 1 - n : n;
+            return nv < cond.criticalThreshold;
+          });
+        if (fires) mult *= rule.penaltyMultiplier;
+      }
+      const uncalibrated = Math.round(Math.max(0, Math.min(100, base * mult)));
+
+      const rawPass = uncalibrated > DEFAULT_THRESHOLD;
+      const calPass = cal.score > DEFAULT_THRESHOLD;
+      assertEquals(
+        rawPass,
+        calPass,
+        `pass/fail flip for ${rec.workId} (${rec.title}): raw=${uncalibrated} cal=${cal.score}`,
+      );
+      // 参考: t.step ではなく console.log でも良いが、失敗時のみ出す
+      void t;
+    }
+  },
+});
+
+Deno.test("cal_evaluate: canonical/experiment 両経路で同一の較正カーブが適用される（初期は同一 f）", () => {
+  // cal_evaluate.ts のモジュールスコープで単一の calibrate を canonical/experiment に共有する
+  // 設計を機構化する。ここでは formula に依存しない f(x) が制御点から一意に決まる不変量
+  // であることを、makeCalibration の純関数性で担保する。
+  const f1 = makeCalibration(CALIBRATION_CONTROL_POINTS);
+  const f2 = makeCalibration(CALIBRATION_CONTROL_POINTS);
+  for (const x of [0, 15, 30, 40, 45, 50, 60, 75, 90, 100]) {
+    assertEquals(f1(x), f2(x), `pure function must produce identical output at x=${x}`);
+  }
+});

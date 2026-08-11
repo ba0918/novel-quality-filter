@@ -52,6 +52,13 @@ Deno.test("cache_staleness: 短行14 ペナルティ導入前のスキーマ7は
   assertEquals(isCacheStale(7), true);
 });
 
-Deno.test("cache_staleness: 短行14 ペナルティ導入でスキーマバージョンが8になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 8);
+Deno.test("cache_staleness: 表示較正カーブ導入前のスキーマ8は stale", () => {
+  // schemaVersion 8 のキャッシュは表示較正カーブを通っていない生の base × penalty で
+  // 算出されている。表示尺度が変わる（良側 49→51 等）ため、古い score をそのまま
+  // 表示すると新旧が混在する。再算出させる必要がある。
+  assertEquals(isCacheStale(8), true);
+});
+
+Deno.test("cache_staleness: 表示較正カーブ導入でスキーマバージョンが9になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 9);
 });

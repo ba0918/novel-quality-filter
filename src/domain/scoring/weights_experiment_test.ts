@@ -1,7 +1,13 @@
 import { assertEquals } from "@std/assert";
 import type { RawMetrics } from "../types.ts";
-import { METRIC_CONFIGS, PENALTY_RULES } from "./weights.ts";
+import { CALIBRATION_CONTROL_POINTS, METRIC_CONFIGS, PENALTY_RULES } from "./weights.ts";
 import { EXPERIMENT_METRIC_CONFIGS, EXPERIMENT_PENALTY_RULES } from "./weights_experiment.ts";
+import {
+  CANONICAL_FORMULA,
+  EXPERIMENT_FORMULA,
+  scoreResultFromMetrics,
+} from "../../../scripts/lib/cal_evaluate.ts";
+import { makeCalibration } from "./calibration.ts";
 
 function raw(overrides: Partial<RawMetrics> = {}): RawMetrics {
   return {
@@ -56,6 +62,35 @@ Deno.test("weights_experiment: 初期状態はペナルティ規則が正本と�
     JSON.stringify(EXPERIMENT_PENALTY_RULES),
     JSON.stringify(PENALTY_RULES),
   );
+});
+
+// 較正カーブは正本と実験式で共有インフラ（cal_evaluate.ts のモジュールスコープの calibrate）。
+// 実験式は指標側の実験だけを行い、較正カーブは動かさない。差分ゼロの初期状態では
+// 全指標同一なので canonical と experiment のスカラーも同一になる。デルタを入れる瞬間に
+// この差分ゼロテストが赤くなり、そのタイミングで期待値を更新する契約とする。
+Deno.test("weights_experiment: 較正カーブは正本と実験式で同一値で始まる（差分ゼロ）", () => {
+  const samples: RawMetrics[] = [
+    raw(),
+    raw({ singleSentParaRatio: 0.3, sentenceLengthSD: 25 }),
+    raw({ sentenceLengthSD: 8, sentenceLengthBurstiness: 2 }),
+    raw({ sentenceLengthBurstiness: 0 }),
+  ];
+  for (const r of samples) {
+    assertEquals(
+      scoreResultFromMetrics(r, CANONICAL_FORMULA).score,
+      scoreResultFromMetrics(r, EXPERIMENT_FORMULA).score,
+      "初期状態は指標側が同一なので calibrate 後のスカラーも一致するはず",
+    );
+  }
+});
+
+Deno.test("weights_experiment: 較正カーブは制御点 CALIBRATION_CONTROL_POINTS を通し不変量として保つ", () => {
+  // 制御点が動くと canonical / experiment の較正カーブが揃わなくなる。
+  // 制御点そのものは immutable 定数として weights.ts に固定される契約を機構化する。
+  const f = makeCalibration(CALIBRATION_CONTROL_POINTS);
+  assertEquals(f(40), 40);
+  assertEquals(f(0), 0);
+  assertEquals(f(100), 100);
 });
 
 Deno.test("weights_experiment: 実験式を採点で使っても正本 weights.ts の値は不変（C1）", () => {

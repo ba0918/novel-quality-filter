@@ -1,6 +1,11 @@
 import type { LineMetadata, PenaltyResult, RawMetrics, ScoreResult } from "../types.ts";
 import { normalizeMetrics } from "./normalizer.ts";
-import { PENALTY_RULES } from "./weights.ts";
+import { CALIBRATION_CONTROL_POINTS, PENALTY_RULES } from "./weights.ts";
+import { makeCalibration } from "./calibration.ts";
+
+// 較正関数はモジュールスコープで一度だけ構築する（PCHIP 傾きは制御点から決まる不変量）。
+// 制御点は immutable 定数なので、都度 makeCalibration を呼ぶのは純粋な計算量の無駄。
+const calibrate = makeCalibration(CALIBRATION_CONTROL_POINTS);
 
 // lineMetadata は省略可能。省略時は「短行14 の過多」のように lineMetadata を要する rule は
 // evaluate 内部で false を返して非発火となる。旧呼び出し形式との後方互換を保つための設計。
@@ -27,7 +32,11 @@ export function calculateScore(
     }
   }
 
-  const score = Math.round(baseScore * penaltyMultiplier);
+  // 集約段の 13 本目の normalize（表示較正カーブ）は round の直前・penalty 適用の直後に
+  // 挟む。penalty 前に挟むと駄側の分布が動く（f が閾値 40 で固定でも中間帯が動くため）。
+  // clamp を先に通してから f に渡し、f の出力を再 round する（f の入出力は [0, 100] に閉じる）。
+  const penalized = Math.max(0, Math.min(100, baseScore * penaltyMultiplier));
+  const score = Math.round(calibrate(penalized));
   return { score, metrics, penalties };
 }
 

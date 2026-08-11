@@ -16,6 +16,7 @@ import type {
   ScoreResult,
 } from "../../src/domain/types.ts";
 import {
+  CALIBRATION_CONTROL_POINTS,
   METRIC_CONFIGS,
   type MetricConfig,
   PENALTY_RULES,
@@ -25,7 +26,12 @@ import {
   EXPERIMENT_METRIC_CONFIGS,
   EXPERIMENT_PENALTY_RULES,
 } from "../../src/domain/scoring/weights_experiment.ts";
+import { makeCalibration } from "../../src/domain/scoring/calibration.ts";
 import type { DatasetRecord } from "./dataset.ts";
+
+// 較正関数はモジュールスコープで一度だけ構築する。canonical / experiment とも同じ
+// 制御点を共有する設計（指標側の実験と較正側の実験を分離する）。
+const calibrate = makeCalibration(CALIBRATION_CONTROL_POINTS);
 
 export interface Formula {
   metricConfigs: MetricConfig[];
@@ -111,7 +117,10 @@ export function scoreResultFromMetrics(
     }
   }
 
-  const score = Math.round(baseScore * penaltyMultiplier);
+  // mod.ts calculateScore と同一の較正段（集約段の 13 本目の normalize）を通す。
+  // canonical/experiment 両方に同じ f を掛けることで、指標側の実験と較正側の実験を分離する。
+  const penalized = Math.max(0, Math.min(100, baseScore * penaltyMultiplier));
+  const score = Math.round(calibrate(penalized));
   return { score, metrics, penalties };
 }
 
