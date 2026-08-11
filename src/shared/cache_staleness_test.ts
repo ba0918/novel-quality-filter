@@ -46,6 +46,12 @@ Deno.test("cache_staleness: 短行14 集計追加前のスキーマ6は stale", 
   assertEquals(isCacheStale(6), true);
 });
 
-Deno.test("cache_staleness: 短行14 集計追加でスキーマバージョンが7になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 7);
+Deno.test("cache_staleness: 短行14 ペナルティ導入前のスキーマ7は stale", () => {
+  // schemaVersion 7 のキャッシュは「地の文短行14 の過多」ペナルティを含まない古い式で
+  // 算出されている。スコアの意味論が変わるため再算出させる必要がある。
+  assertEquals(isCacheStale(7), true);
+});
+
+Deno.test("cache_staleness: 短行14 ペナルティ導入でスキーマバージョンが8になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 8);
 });
