@@ -1,5 +1,10 @@
-import { assertEquals } from "@std/assert";
-import type { RawMetrics } from "../../src/domain/types.ts";
+import { assert, assertEquals } from "@std/assert";
+import type {
+  CategoryCount,
+  LineMetadata,
+  NarrativeCount,
+  RawMetrics,
+} from "../../src/domain/types.ts";
 import { calculateScore } from "../../src/domain/scoring/mod.ts";
 import { METRIC_CONFIGS, PENALTY_RULES } from "../../src/domain/scoring/weights.ts";
 import { scoreWithConfig } from "./score_experiment.ts";
@@ -102,3 +107,67 @@ Deno.test("evaluateRecord: 保存済み score を無視し rawMetrics から式�
   assertEquals(result.score, calculateScore(r).score);
   assertEquals(result.score === 999, false);
 });
+
+// --- lineMetadata を渡す経路の固定 ---
+
+function makeCategory(overrides: Partial<CategoryCount> = {}): CategoryCount {
+  return { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0, ...overrides };
+}
+function makeNarrative(overrides: Partial<NarrativeCount> = {}): NarrativeCount {
+  return {
+    lineCount: 0,
+    charCount: 0,
+    short14: 0,
+    short20: 0,
+    short30: 0,
+    chunkCount: 0,
+    shortChunk14: 0,
+    shortChunk20: 0,
+    shortChunk30: 0,
+    ...overrides,
+  };
+}
+function makeLineMetadata(narrative: Partial<NarrativeCount>): LineMetadata {
+  return {
+    totalLines: 100,
+    totalChars: 3000,
+    blankCount: 0,
+    separatorCount: 0,
+    narrative: makeNarrative(narrative),
+    dialogue: makeCategory(),
+    meta: makeCategory(),
+    nonTerminal: makeCategory(),
+  };
+}
+
+Deno.test(
+  "evaluateRecord: record.lineMetadata を calculateScore に渡し、新ペナルティが反映される",
+  () => {
+    const r = raw();
+    // 100 行中 40 行が 14 字未満 → 40% > 30% で新ペナルティが発火する
+    const firingMeta = makeLineMetadata({ lineCount: 100, short14: 40 });
+    const rec: DatasetRecord = { ...record(0, r), lineMetadata: firingMeta };
+    const result = evaluateRecord(rec, CANONICAL_FORMULA);
+    const short14Penalty = result.penalties.find((p) => p.label === "地の文短行14 の過多");
+    assert(short14Penalty, "record.lineMetadata が calculateScore に渡っていない");
+    assertEquals(short14Penalty.multiplier, 0.85);
+    // 新ペナルティ発火時のスコアは、渡さない場合より低い
+    const scoreNoMeta = calculateScore(r).score;
+    if (!(result.score < scoreNoMeta)) {
+      throw new Error(
+        `短行14 発火時は score が下がるはず: no-meta=${scoreNoMeta} with-meta=${result.score}`,
+      );
+    }
+  },
+);
+
+Deno.test(
+  "evaluateRecord: record.lineMetadata が undefined なら新ペナルティは発火しない（適用外）",
+  () => {
+    const r = raw();
+    const rec = record(0, r); // lineMetadata は undefined
+    const result = evaluateRecord(rec, CANONICAL_FORMULA);
+    const short14Penalty = result.penalties.find((p) => p.label === "地の文短行14 の過多");
+    assertEquals(short14Penalty, undefined);
+  },
+);

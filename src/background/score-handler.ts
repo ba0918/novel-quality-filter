@@ -115,12 +115,13 @@ async function scoreWork(workId: string): Promise<ScoreResultResponse> {
 
     const tokens = tokenize(sampling.targetText);
     const rawMetrics = analyzeAll(sampling.targetText, tokens, tokenize);
-    const calculated = calculateScore(rawMetrics);
-    // 行メタデータはスコア計算とは別経路の診断データ。抽出できた場合だけ添付し、
+    // 行メタデータは診断データであると同時に、「地の文短行14 の過多」ペナルティの入力にも
+    // なる。calculateScore へ渡すため aggregation を先に実行する。抽出できた場合だけ添付し、
     // 空（本文構造が取れない話）のときは付けずに誤解を招くゼロ集計の保存を避ける。
     const lineMetadata = sampling.targetLines.length > 0
       ? aggregateLineMetadata(sampling.targetLines)
       : undefined;
+    const calculated = calculateScore(rawMetrics, lineMetadata);
     const result: ScoreResult = {
       score: calculated.score,
       metrics: calculated.metrics,

@@ -65,7 +65,9 @@ async function main() {
       const after = red.rawMetrics[key];
       if (before !== after) diff.rawMetricsDiff.push(`${key}: ${before} → ${after}`);
     }
-    const newScore = calculateScore(red.rawMetrics).score;
+    // 「地の文短行14 の過多」ペナルティを新式に反映させるため、rederive で得た lineMetadata を
+    // calculateScore に渡す。undefined を渡す旧経路と結果が変わる作品は score 差分として現れる。
+    const newScore = calculateScore(red.rawMetrics, red.lineMetadata).score;
     if (newScore !== rec.score) diff.scoreDiff = { old: rec.score, new: newScore };
     if (red.bodyHash !== rec.bodyHash) {
       diff.bodyHashDiff = { old: rec.bodyHash ?? "(none)", new: red.bodyHash };

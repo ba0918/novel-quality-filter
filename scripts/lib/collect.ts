@@ -136,7 +136,10 @@ export async function collectWork(
     openingType: red.openingType,
     sampledCount: red.sampledCount,
     episodeUrl: pages[red.targetEpisodeIndex].entry.url,
-    score: calculateScore(red.rawMetrics).score,
+    // lineMetadata を渡し、「地の文短行14 の過多」ペナルティも含めた本番同等のスコアを保存する。
+    // 保存 score は化石化するので、cal-viewer 側は evaluateRecord で常に再計算するのが原則
+    // だが、収集直後の一覧・ソートで即座に本番相当スコアを見せられる意味はある。
+    score: calculateScore(red.rawMetrics, red.lineMetadata).score,
     rawMetrics: red.rawMetrics,
     blankLineRatio: analyzeBlankLineRatio(red.targetText),
     tags,
