@@ -242,6 +242,56 @@ Deno.test("work-page-injector: 行メタデータのサマリ・見出し・カ�
   });
 });
 
+// docs/spec/line-metadata.md「表示」節: 短行率は 14/20/30 を並べて表示する（14 はスコア・
+// 警告閾値には参加させないが、較正のため目視で読める場所に置く）。SAMPLE_META とは別に、
+// 14 に非ゼロの値を持たせて distinct な percent を出せるフィクスチャを組む。
+const SHORT14_META: LineMetadata = {
+  totalLines: 10,
+  totalChars: 200,
+  blankCount: 0,
+  separatorCount: 0,
+  narrative: {
+    // 行 5 / 短行14 3 (60%) / 短行20 4 (80%) / 短行30 5 (100%)
+    // チャンク 8 / 短チャンク14 2 (25%) / 短チャンク20 4 (50%) / 短チャンク30 6 (75%)
+    lineCount: 5,
+    charCount: 100,
+    short14: 3,
+    short20: 4,
+    short30: 5,
+    chunkCount: 8,
+    shortChunk14: 2,
+    shortChunk20: 4,
+    shortChunk30: 6,
+  },
+  dialogue: { lineCount: 5, charCount: 100, short14: 0, short20: 0, short30: 0 },
+  meta: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+  nonTerminal: { lineCount: 0, charCount: 0, short14: 0, short20: 0, short30: 0 },
+};
+
+Deno.test("work-page-injector: カテゴリカードの短行/短チャンクを 14:X / 20:Y / 30:Z の順で並列表示する", () => {
+  withDocument("<div class='container'></div>", (doc) => {
+    const container = doc.querySelector<HTMLElement>(".container")!;
+    injectWorkBadge(container, makeResult({ lineMetadata: SHORT14_META }), () => {});
+
+    const narrative = container.querySelectorAll<HTMLElement>(".nqf-lm-cat")[0];
+
+    const shortRow = narrative.querySelector<HTMLElement>(".nqf-lm-metric--short");
+    const shortText = shortRow?.textContent ?? "";
+    // 3 数字が「14:60% / 20:80% / 30:100%」の順で 1 行に並ぶ
+    assert(
+      /14:\s*60%\s*\/\s*20:\s*80%\s*\/\s*30:\s*100%/.test(shortText),
+      `短行の 3 数字が 14/20/30 の順で並ぶ (実際: ${shortText})`,
+    );
+
+    const chunkRow = narrative.querySelector<HTMLElement>(".nqf-lm-metric--shortchunk");
+    const chunkText = chunkRow?.textContent ?? "";
+    assert(
+      /14:\s*25%\s*\/\s*20:\s*50%\s*\/\s*30:\s*75%/.test(chunkText),
+      `短チャンクの 3 数字が 14/20/30 の順で並ぶ (実際: ${chunkText})`,
+    );
+  });
+});
+
 Deno.test("work-page-injector: 行メタデータはデフォルト畳みで、トグルで開閉できる", () => {
   withDocument("<div class='container'></div>", (doc) => {
     const container = doc.querySelector<HTMLElement>(".container")!;

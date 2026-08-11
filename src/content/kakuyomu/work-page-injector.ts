@@ -451,13 +451,21 @@ function createLineCatBlock(cat: CategoryView, meta: LineMetadata): HTMLDivEleme
     amountMetricRow("chars", "文字", cat.slug, cat.count.charCount, meta.totalChars),
   );
   block.appendChild(
-    shortMetricRow("short", "短行", cat.count.short20, cat.count.short30, cat.count.lineCount),
+    shortMetricRow(
+      "short",
+      "短行",
+      cat.count.short14,
+      cat.count.short20,
+      cat.count.short30,
+      cat.count.lineCount,
+    ),
   );
   if (isNarrativeCount(cat.count)) {
     block.appendChild(
       shortMetricRow(
         "shortchunk",
         "短ﾁｬﾝｸ",
+        cat.count.shortChunk14,
         cat.count.shortChunk20,
         cat.count.shortChunk30,
         cat.count.chunkCount,
@@ -504,9 +512,12 @@ function amountMetricRow(
 }
 
 // 短行率・短チャンク率。1行の情報量が少ないほど高くなる要注意指標なのでバーは要注意色。
+// 数値は「14:X / 20:Y / 30:Z」を小さい順に並べる（docs/spec/line-metadata.md「表示」節）。
+// バー幅は short30 側の比率で描く（short14 は表示専用で、警告色・スコアには参加させない）。
 function shortMetricRow(
   kind: string,
   key: string,
+  short14: number,
   short20: number,
   short30: number,
   denominator: number,
@@ -529,7 +540,9 @@ function shortMetricRow(
 
   const v = document.createElement("span");
   v.className = "nqf-lm-v";
-  v.appendChild(document.createTextNode("20:"));
+  v.appendChild(document.createTextNode("14:"));
+  v.appendChild(hiValue(percentInt(short14, denominator)));
+  v.appendChild(document.createTextNode(" / 20:"));
   v.appendChild(hiValue(percentInt(short20, denominator)));
   v.appendChild(document.createTextNode(" / 30:"));
   v.appendChild(hiValue(percentInt(short30, denominator)));
