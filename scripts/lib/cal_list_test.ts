@@ -63,25 +63,16 @@ Deno.test("buildComparisonRows: 保存 score でなく正本・実験式の再�
   assertEquals(row.canonicalScore === 999, false);
 });
 
-Deno.test("buildComparisonRows: 家族 0 デルタ導入後は canonical と experiment に差分が生じる", () => {
-  // 較正の運用方針: 家族 0 デルタ (20260811224443) 導入後、実験式は canonical と差分を
-  // 持つ。差分内容: narrativeShort14Ratio 追加 + dialogueEndingVariety weight 0 + 短行14
-  // penalty 削除 + 一文一段落 multiplier 0.75→0.70。scoreResultFromMetrics が両式で
-  // 同じ rawMetrics/lineMetadata に対して異なるスコアを返すため、buildComparisonRows の
-  // canonical/experiment/diff は「両式スコアが cal_evaluate と一致していること」を検証する
-  // (差分がゼロかどうかは家族 0 デルタで壊れたため契約外)。
+Deno.test("buildComparisonRows: 初期状態（差分ゼロ）では正本と実験式のスコアが一致する", () => {
+  // 較正の運用方針: weights_experiment の初期状態は正本と完全一致（差分ゼロ）で始める。
+  // 実験デルタは brainstorm で議論してから明示的に入れる（weights_experiment.ts 参照）。
+  // デルタを入れたらこのテストは赤くなり、テスト側の期待も同時に更新することで
+  // 「差分が入ったこと」が可視化される。
   const rec = record("1", 0, raw({ singleSentParaRatio: 0.85, sentenceLengthSD: 12 }));
   const labels = setLabel([], "kakuyomu:1", "良", "2026-08-10T00:00:00.000Z");
   const [row] = buildComparisonRows([rec], labels);
-  assertEquals(
-    row.canonicalScore,
-    scoreResultFromMetrics(rec.rawMetrics, CANONICAL_FORMULA, rec.lineMetadata).score,
-  );
-  assertEquals(
-    row.experimentScore,
-    scoreResultFromMetrics(rec.rawMetrics, EXPERIMENT_FORMULA, rec.lineMetadata).score,
-  );
-  assertEquals(row.diff, row.experimentScore - row.canonicalScore);
+  assertEquals(row.canonicalScore, row.experimentScore);
+  assertEquals(row.diff, 0);
 });
 
 Deno.test("labelsFor: ラベル未設定は空配列", () => {

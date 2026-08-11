@@ -15,6 +15,18 @@ export interface MetricConfig {
   deriveRawValue?: (raw: RawMetrics, lineMetadata?: LineMetadata) => number;
 }
 
+// 12 指標構造整地 (rev 20260811224443、cycle plan/20260811223047_family0-narrative-layer.md
+// および parent plan/20260811223047_12-metrics-integrity-refactor.md 参照)。
+// n=25 良/駄ラベル + n=130 dataset の実測駆動改修で以下の構造変更を反映:
+// - 4 指標を weight 0 化 (実測で判別ゼロ or 交絡・バイアス確定): descriptionDensitySD,
+//   separatorFrequency, dialogueEndingVariety, ttr。エントリは残す (削除で型変更 or
+//   backfill 前データ壊れる懸念、weight 0 で寄与ゼロ)
+// - 削減 weight 合計 0.26 を判別 4 指標に按分: sentenceLengthSD 0.12→0.22、
+//   paragraphLengthSD 0.05→0.09、paragraphTransitionEntropy 0.04→0.08、
+//   sentenceLengthBurstiness 0.08→0.16。base 合計 1.0 維持
+// - PENALTY_RULES: 短行14 penalty multiplier 0.85 → 0.80 (家族 0 で narrative シグナル強化)
+// - narrativeShort14Ratio の weight 化は家族 0 実測で駄側境界作品を押し上げるため見送り
+// - emotion / logical 辞書純化は本文再解析要で別 cycle に持ち越し
 export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "singleSentParaRatio",
@@ -27,39 +39,43 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "sentenceLengthSD",
     label: "文長の標準偏差",
-    weight: 0.12,
+    weight: 0.22,
     normalize: (raw: number) => Math.min(raw / 25, 1),
     invert: false,
     flagThreshold: 0.3,
   },
   {
+    // rev 20260811224443: 実測分布 median/Q1/Q3=0.000 の死指標のため weight 0 化。
     key: "separatorFrequency",
     label: "水平線/区切りの頻度",
-    weight: 0.07,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw * 10, 1),
     invert: true,
     flagThreshold: 0.4,
   },
   {
+    // rev 20260811224443: 実測 d=+0.088 の死指標 + 会話数バイアス r=-0.669 で weight 0 化。
     key: "dialogueEndingVariety",
     label: "会話語尾の多様性",
-    weight: 0.08,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw, 1),
     invert: false,
     flagThreshold: 0.3,
   },
   {
+    // rev 20260811224443: charCount 交絡 r=-0.815 で weight 0 化 (n=25 で正規化設計不能)。
     key: "ttr",
     label: "語彙多様性（TTR）",
-    weight: 0.06,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw / 0.7, 1),
     invert: false,
     flagThreshold: 0.3,
   },
   {
+    // rev 20260811224443: 段落数バイアス r=+0.391 で weight 0 化 (singleSentParaRatio と冗長)。
     key: "descriptionDensitySD",
     label: "描写密度の分散",
-    weight: 0.05,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw / 0.06, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -67,7 +83,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "paragraphLengthSD",
     label: "段落長の標準偏差",
-    weight: 0.05,
+    weight: 0.09,
     normalize: (raw: number) => Math.min(raw / 40, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -81,6 +97,8 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.4,
   },
   {
+    // rev 20260811224443: 辞書純化は次 cycle で本文再解析経由で実測予定。この rev では
+    // canonical の weight/normalize/invert は現行のまま維持。
     key: "emotionDirectnessRatio",
     label: "感情直接表現率",
     weight: 0.07,
@@ -89,6 +107,8 @@ export const METRIC_CONFIGS: MetricConfig[] = [
     flagThreshold: 0.4,
   },
   {
+    // rev 20260811224443: 辞書純化は次 cycle で本文再解析経由で実測予定。この rev では
+    // canonical の weight/normalize/invert は現行のまま維持。
     key: "logicalConnectiveDensity",
     label: "論理接続詞密度",
     weight: 0.06,
@@ -99,7 +119,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "paragraphTransitionEntropy",
     label: "段落遷移エントロピー",
-    weight: 0.04,
+    weight: 0.08,
     normalize: (raw: number) => Math.min(raw / 1.5, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -107,7 +127,7 @@ export const METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "sentenceLengthBurstiness",
     label: "文長バースティネス",
-    weight: 0.08,
+    weight: 0.16,
     normalize: (raw: number) => Math.min(raw / 8, 1),
     invert: false,
     flagThreshold: 0.5,
@@ -160,9 +180,12 @@ export const PENALTY_RULES: PenaltyRule[] = [
     // 地の文の 14 字未満短行率が 30% を超える作品を「1 行の情報量が薄い」帯として減点する。
     // 較正で駄側に集中して観測される帯（n=24）。lineMetadata が無い、または地の文が 0 行なら
     // 測定不能として適用外にする（0 割回避 & 「短行なし」との混同回避）。
+    // rev 20260811224443: multiplier を 0.85 → 0.80 に微強化 (実測 d=-1.728 の narrative
+    // シグナルを penalty 側で活用、家族 0 の narrativeShort14Ratio weight 化案が失敗した
+    // 代替として)。
     label: "地の文短行14 の過多",
     conditions: [],
-    penaltyMultiplier: 0.85,
+    penaltyMultiplier: 0.80,
     evaluate: (_raw, lineMetadata) => {
       if (!lineMetadata) return false;
       const narrative = lineMetadata.narrative;

@@ -59,6 +59,13 @@ Deno.test("cache_staleness: 表示較正カーブ導入前のスキーマ8は st
   assertEquals(isCacheStale(8), true);
 });
 
-Deno.test("cache_staleness: 表示較正カーブ導入でスキーマバージョンが9になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 9);
+Deno.test("cache_staleness: 12 指標構造整地前のスキーマ9は stale", () => {
+  // schemaVersion 9 のキャッシュは 12 指標構造整地 (rev 20260811224443) 前の
+  // weight/penalty で算出されている。指標セット (4 指標 weight 0 化 + 判別 4 指標に weight
+  // 再配分) + 短行14 penalty multiplier 0.85→0.80 でスコアが変わるため再算出させる。
+  assertEquals(isCacheStale(9), true);
+});
+
+Deno.test("cache_staleness: 12 指標構造整地でスキーマバージョンが 10 になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 10);
 });

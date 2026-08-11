@@ -123,6 +123,6 @@ Deno.test(
     }
     const short14Penalty = scoreWithMeta.penalties.find((p) => p.label === "地の文短行14 の過多");
     if (!short14Penalty) throw new Error("短行14 ペナルティが penalties に現れていない");
-    assertEquals(short14Penalty.multiplier, 0.85);
+    assertEquals(short14Penalty.multiplier, 0.80);
   },
 );

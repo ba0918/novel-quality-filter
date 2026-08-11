@@ -158,7 +158,8 @@ function makeLineMetadata(narrative: Partial<NarrativeCount>): LineMetadata {
   };
 }
 
-Deno.test("scoring: 地の文短行14 率が 30% を超えると新ペナルティが発火し ×0.85 が掛かる", () => {
+Deno.test("scoring: 地の文短行14 率が 30% を超えると新ペナルティが発火し ×0.80 が掛かる", () => {
+  // rev 20260811224443: 0.85 → 0.80 に微強化。
   const raw = makeSyntheticMetrics();
   // 100 行中 31 行が 14 字未満 → 31%（30% 超え）
   const lineMeta = makeLineMetadata({ lineCount: 100, short14: 31 });
@@ -166,7 +167,7 @@ Deno.test("scoring: 地の文短行14 率が 30% を超えると新ペナルテ�
 
   const p = result.penalties.find((p) => p.label === SHORT14_PENALTY_LABEL);
   assert(p, "short14 penalty should fire when narrative short14 ratio exceeds 30%");
-  assertEquals(p.multiplier, 0.85);
+  assertEquals(p.multiplier, 0.80);
 });
 
 Deno.test("scoring: 地の文短行14 率がちょうど 30% では新ペナルティは発火しない（境界）", () => {

@@ -3,10 +3,12 @@ import { PENALTY_RULES } from "./weights.ts";
 
 // 較正で確定した「地の文短行14 の過多」ペナルティが weights.ts に登録されていることを、
 // 存在検査として固定する（挙動テストは mod_test.ts 側）。
-Deno.test("weights: PENALTY_RULES に「地の文短行14 の過多」が登録され、evaluate ベースで multiplier 0.85", () => {
+Deno.test("weights: PENALTY_RULES に「地の文短行14 の過多」が登録され、evaluate ベースで multiplier 0.80", () => {
+  // rev 20260811224443 で multiplier を 0.85 → 0.80 に微強化。narrative シグナルを penalty
+  // 側で活用する家族 0 の設計。
   const rule = PENALTY_RULES.find((r) => r.label === "地の文短行14 の過多");
   assert(rule, "「地の文短行14 の過多」ペナルティが未登録");
-  assertEquals(rule.penaltyMultiplier, 0.85);
+  assertEquals(rule.penaltyMultiplier, 0.80);
   assert(rule.evaluate, "短行14 ペナルティは evaluate ベース（lineMetadata を要する）");
 });
 

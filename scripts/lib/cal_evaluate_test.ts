@@ -156,7 +156,7 @@ Deno.test(
     const result = evaluateRecord(rec, CANONICAL_FORMULA);
     const short14Penalty = result.penalties.find((p) => p.label === "地の文短行14 の過多");
     assert(short14Penalty, "record.lineMetadata が calculateScore に渡っていない");
-    assertEquals(short14Penalty.multiplier, 0.85);
+    assertEquals(short14Penalty.multiplier, 0.80);
     // 新ペナルティ発火時のスコアは、渡さない場合より低い
     const scoreNoMeta = calculateScore(r).score;
     if (!(result.score < scoreNoMeta)) {
