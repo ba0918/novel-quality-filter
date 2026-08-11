@@ -11,6 +11,9 @@
 // rev 20260811224443 (12 指標構造整地): 家族 0/1a/2/5 の実験成果を canonical に反映した
 // 直後で、実験式は canonical と再度同一の差分ゼロベースラインに戻した。次の実験デルタは
 // 辞書純化 (家族 1b、次 cycle) の予定。
+//
+// 続く追加改修: 感情直接率・論理接続密度を weight 0 化 (n=25 実測で符号逆判別と判明)、
+// 削減 weight 0.13 を判別 4 指標に均等按分 (各 +0.0325)。canonical と再同期。
 
 import type { LineMetadata, RawMetrics } from "../types.ts";
 import type { MetricConfig, PenaltyRule } from "./weights.ts";
@@ -30,7 +33,7 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "sentenceLengthSD",
     label: "文長の標準偏差",
-    weight: 0.22,
+    weight: 0.2525,
     normalize: (raw: number) => Math.min(raw / 25, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -70,7 +73,7 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "paragraphLengthSD",
     label: "段落長の標準偏差",
-    weight: 0.09,
+    weight: 0.1225,
     normalize: (raw: number) => Math.min(raw / 40, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -86,7 +89,7 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "emotionDirectnessRatio",
     label: "感情直接表現率",
-    weight: 0.07,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw / 0.08, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -94,7 +97,7 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "logicalConnectiveDensity",
     label: "論理接続詞密度",
-    weight: 0.06,
+    weight: 0,
     normalize: (raw: number) => Math.min(raw / 0.3, 1),
     invert: true,
     flagThreshold: 0.4,
@@ -102,7 +105,7 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "paragraphTransitionEntropy",
     label: "段落遷移エントロピー",
-    weight: 0.08,
+    weight: 0.1125,
     normalize: (raw: number) => Math.min(raw / 1.5, 1),
     invert: false,
     flagThreshold: 0.3,
@@ -110,7 +113,7 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
   {
     key: "sentenceLengthBurstiness",
     label: "文長バースティネス",
-    weight: 0.16,
+    weight: 0.1925,
     normalize: (raw: number) => Math.min(raw / 8, 1),
     invert: false,
     flagThreshold: 0.5,
