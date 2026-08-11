@@ -5,14 +5,14 @@ diversity, filtering out template-style writing. Personal use.
 
 ## Tech Stack
 
-| Component  | Choice                                    |
-| ---------- | ----------------------------------------- |
-| Runtime    | Deno                                      |
-| Bundler    | esbuild + esbuild-deno-loader             |
-| UI (popup) | Preact                                    |
-| Tokenizer  | lindera-wasm-ipadic-web (IPADIC, WASM)    |
-| Test       | deno test (unit/integration) + Playwright |
-| Storage    | IndexedDB + thin wrapper                  |
+| Component  | Choice                                 |
+| ---------- | -------------------------------------- |
+| Runtime    | Deno                                   |
+| Bundler    | esbuild + esbuild-deno-loader          |
+| UI (popup) | Preact                                 |
+| Tokenizer  | lindera-wasm-ipadic-web (IPADIC, WASM) |
+| Test       | deno test (unit/integration)           |
+| Storage    | IndexedDB + thin wrapper               |
 
 Technology decisions are recorded in `.agents/artifacts/decisions/`.
 
