@@ -1,11 +1,22 @@
 import type { LineMetadata, PenaltyResult, RawMetrics, ScoreResult } from "../types.ts";
 import { normalizeMetrics } from "./normalizer.ts";
-import { CALIBRATION_CONTROL_POINTS, combinePenaltyMultipliers, PENALTY_RULES } from "./weights.ts";
+import {
+  CALIBRATION_CONTROL_POINTS,
+  combinePenaltyMultipliers,
+  METRIC_CONFIGS,
+  PENALTY_RULES,
+} from "./weights.ts";
 import { makeCalibration } from "./calibration.ts";
 
 // 較正関数はモジュールスコープで一度だけ構築する（PCHIP 傾きは制御点から決まる不変量）。
 // 制御点は immutable 定数なので、都度 makeCalibration を呼ぶのは純粋な計算量の無駄。
 const calibrate = makeCalibration(CALIBRATION_CONTROL_POINTS);
+
+// base 合計の rescale 係数。候補 D で weight 合計が 1.0 を超えた (narrativeCharPerLine 追加、
+// 既存 weight の按分はしない方針) ため、Σweight で割って 100 満点を維持する。
+// 定数 1.15 を直書きせず Σweight から導出する: 将来 weight を足すときも「合計を増やして
+// rescale」の不変量が式のまま保たれ、定数と実合計のズレ事故が起きない。
+const WEIGHT_SUM = METRIC_CONFIGS.reduce((sum, c) => sum + c.weight, 0);
 
 // lineMetadata は省略可能。省略時は「短行14 の過多」のように lineMetadata を要する rule は
 // evaluate 内部で false を返して非発火となる。旧呼び出し形式との後方互換を保つための設計。
@@ -13,16 +24,25 @@ export function calculateScore(
   rawMetrics: RawMetrics,
   lineMetadata?: LineMetadata,
 ): ScoreResult {
-  const metrics = normalizeMetrics(rawMetrics);
+  const metrics = normalizeMetrics(rawMetrics, lineMetadata);
   const rawScore = metrics.reduce((sum, m) => sum + m.contribution, 0);
-  const baseScore = Math.max(0, Math.min(100, rawScore));
+  const baseScore = Math.max(0, Math.min(100, rawScore / WEIGHT_SUM));
 
   const penalties: PenaltyResult[] = [];
   const firedMultipliers: number[] = [];
 
   for (const rule of PENALTY_RULES) {
-    // evaluate 定義済み rule は関数側で発火判定する（lineMetadata 派生値を条件に取れる）。
-    // conditions ベースの既存 rule は RawMetrics 正規化値だけで判定する。両者は排他。
+    // 3 系統排他 (weights.ts の PenaltyRule コメント参照):
+    // grader は連続 multiplier を返す (1.0 = 非発火)。evaluate / conditions は on/off で
+    // penaltyMultiplier を適用する。
+    if (rule.graderMultiplier) {
+      const multiplier = rule.graderMultiplier(rawMetrics, lineMetadata);
+      if (multiplier < 1.0) {
+        firedMultipliers.push(multiplier);
+        penalties.push({ label: rule.label, multiplier });
+      }
+      continue;
+    }
     const fires = rule.evaluate
       ? rule.evaluate(rawMetrics, lineMetadata)
       : matchesConditions(rule.conditions, rawMetrics, metrics);

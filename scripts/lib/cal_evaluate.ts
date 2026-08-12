@@ -112,11 +112,23 @@ export function scoreResultFromMetrics(
 ): ScoreResult {
   const metrics = normalizeWith(raw, formula.metricConfigs, lineMetadata);
   const rawScore = metrics.reduce((sum, m) => sum + m.contribution, 0);
-  const baseScore = Math.max(0, Math.min(100, rawScore));
+  // mod.ts と同じ Σweight rescale (候補 D で weight 合計が 1.0 を超えたため)。式ごとの
+  // 合計から導出するので、weight 合計の異なる実験式を注入しても常に 100 満点に正規化される。
+  const weightSum = formula.metricConfigs.reduce((sum, c) => sum + c.weight, 0);
+  const baseScore = Math.max(0, Math.min(100, rawScore / weightSum));
 
   const penalties: PenaltyResult[] = [];
   const firedMultipliers: number[] = [];
   for (const rule of formula.penaltyRules) {
+    // mod.ts と同じ 3 系統排他 (grader / evaluate / conditions)。
+    if (rule.graderMultiplier) {
+      const multiplier = rule.graderMultiplier(raw, lineMetadata);
+      if (multiplier < 1.0) {
+        firedMultipliers.push(multiplier);
+        penalties.push({ label: rule.label, multiplier });
+      }
+      continue;
+    }
     const fires = rule.evaluate
       ? rule.evaluate(raw, lineMetadata)
       : matchesConditionsFor(rule, raw, metrics);

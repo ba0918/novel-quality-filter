@@ -31,20 +31,28 @@ export function scoreWithConfig(
 ): number {
   const normOf = (key: string): number => {
     const c = metricConfigs.find((x) => x.key === key)!;
-    const n = c.normalize(raw[key as keyof RawMetrics] as number);
+    // deriveRawValue 定義済み指標 (narrativeCharPerLine 等) は raw[key] に存在しない。
+    // 本エンジンは lineMetadata を受け取らないため、派生値は「lineMetadata なし」契約の
+    // 返り値 (=0) で評価する (calculateScore の lineMetadata 未指定時と同じ挙動)。
+    const rawValue = c.deriveRawValue
+      ? c.deriveRawValue(raw, undefined)
+      : (raw[key as keyof RawMetrics] as number);
+    const n = c.normalize(rawValue);
     return c.invert ? 1 - n : n;
   };
 
   let sum = 0;
   for (const c of metricConfigs) sum += normOf(c.key) * c.weight * 100;
-  const base = Math.max(0, Math.min(100, sum));
+  // mod.ts と同じ Σweight rescale (候補 D で weight 合計が 1.0 を超えたため)。
+  const weightSum = metricConfigs.reduce((s, c) => s + c.weight, 0);
+  const base = Math.max(0, Math.min(100, sum / weightSum));
 
   const firedMultipliers: number[] = [];
   for (const rule of penaltyRules) {
-    // evaluate ベースの rule は lineMetadata 派生値を条件に取るため、RawMetrics だけを扱う
-    // 本研究エンジンのスコープ外。calculateScore が lineMetadata 未指定時に evaluate を false と
+    // evaluate / grader ベースの rule は lineMetadata 派生値を条件に取るため、RawMetrics だけを
+    // 扱う本研究エンジンのスコープ外。calculateScore が lineMetadata 未指定時に非発火と
     // 扱うのと同じ意味づけで、ここでは常に非発火として扱う（gate スコアの baseline 忠実性を保つ）。
-    if (rule.evaluate) continue;
+    if (rule.evaluate || rule.graderMultiplier) continue;
     let met = true;
     for (const cond of rule.conditions) {
       const rv = raw[cond.key as keyof RawMetrics] as number;
@@ -75,9 +83,13 @@ const M1_KEY = "singleSentParaRatio";
 const COMPOSITE_LABEL = "一文一段落の過多";
 
 // 指標の canonical normalizedValue（invert 適用済み。normalizer.ts と同一）。
+// 派生指標は lineMetadata なし契約の返り値 (=0) で評価する (scoreWithConfig と同じ)。
 function normalizedValue(key: string, raw: RawMetrics): number {
   const c = METRIC_CONFIGS.find((x) => x.key === key)!;
-  const n = c.normalize(raw[key as keyof RawMetrics] as number);
+  const rawValue = c.deriveRawValue
+    ? c.deriveRawValue(raw, undefined)
+    : (raw[key as keyof RawMetrics] as number);
+  const n = c.normalize(rawValue);
   return c.invert ? 1 - n : n;
 }
 
@@ -93,13 +105,19 @@ export function scoreExperiment(raw: RawMetrics, cfg: ExperimentConfig): number 
     }
     sum += contrib * weight * 100;
   }
-  const base = Math.max(0, Math.min(100, sum));
+  // mod.ts と同じ Σweight rescale。m1Weight 上書き時はその上書き後の合計で正規化する
+  // (重み変更実験でも常に 100 満点スケールを保つ)。
+  let weightSum = 0;
+  for (const c of METRIC_CONFIGS) {
+    weightSum += c.key === M1_KEY && cfg.m1Weight != null ? cfg.m1Weight : c.weight;
+  }
+  const base = Math.max(0, Math.min(100, sum / weightSum));
 
   const firedMultipliers: number[] = [];
   for (const rule of PENALTY_RULES) {
-    // scoreWithConfig と同じ理由で、evaluate ベース rule は本エンジンでは常に非発火扱い
+    // scoreWithConfig と同じ理由で、evaluate / grader ベース rule は本エンジンでは常に非発火扱い
     // （lineMetadata を受け取れないため）。
-    if (rule.evaluate) continue;
+    if (rule.evaluate || rule.graderMultiplier) continue;
     let met = true;
     for (const cond of rule.conditions) {
       const rv = raw[cond.key as keyof RawMetrics] as number;

@@ -1,4 +1,4 @@
-import type { MetricResult, RawMetrics } from "../types.ts";
+import type { LineMetadata, MetricResult, RawMetrics } from "../types.ts";
 import { METRIC_CONFIGS } from "./weights.ts";
 
 const CUSTOM_REASONS: Record<string, (rawValue: number) => string> = {
@@ -19,9 +19,15 @@ function formatReason(
   return `${label}が ${formatted} と${direction}`;
 }
 
-export function normalizeMetrics(raw: RawMetrics): MetricResult[] {
+// lineMetadata は deriveRawValue 定義済み指標 (narrativeCharPerLine 等) の派生元。
+// 省略時はそれらの rawValue が 0 になる (deriveRawValue 側の契約)。
+export function normalizeMetrics(raw: RawMetrics, lineMetadata?: LineMetadata): MetricResult[] {
   return METRIC_CONFIGS.map((config) => {
-    const rawValue = raw[config.key as keyof RawMetrics] as number;
+    // deriveRawValue 定義済みなら raw[key] の代わりにその返り値を rawValue として使う
+    // (RawMetrics のキー参照では取れない lineMetadata 派生指標の weight 化)。
+    const rawValue = config.deriveRawValue
+      ? config.deriveRawValue(raw, lineMetadata)
+      : (raw[config.key as keyof RawMetrics] as number);
     const normalized = config.normalize(rawValue);
     const score = config.invert ? 1 - normalized : normalized;
     const contribution = score * config.weight * 100;

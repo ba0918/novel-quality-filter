@@ -115,6 +115,20 @@ export const EXPERIMENT_METRIC_CONFIGS: MetricConfig[] = [
     invert: false,
     flagThreshold: 0.5,
   },
+  {
+    // 候補 D (rev 20260812190006) を canonical に反映した直後の差分ゼロ同期。
+    key: "narrativeCharPerLine",
+    label: "地の文の平均字/行",
+    weight: 0.15,
+    normalize: (raw: number) => Math.min(raw / 25, 1),
+    invert: false,
+    flagThreshold: 0.3,
+    deriveRawValue: (_raw: RawMetrics, lineMetadata?: LineMetadata) => {
+      const narrative = lineMetadata?.narrative;
+      if (!narrative || narrative.lineCount === 0) return 0;
+      return narrative.charCount / narrative.lineCount;
+    },
+  },
 ];
 
 export const EXPERIMENT_PENALTY_RULES: PenaltyRule[] = [
@@ -132,18 +146,18 @@ export const EXPERIMENT_PENALTY_RULES: PenaltyRule[] = [
       { key: "singleSentParaRatio", criticalThreshold: 0.30 },
       { key: "sentenceLengthSD", criticalThreshold: 0.60 },
     ],
-    penaltyMultiplier: 0.75,
+    penaltyMultiplier: 0.85,
   },
   {
     label: "地の文短行14 の過多",
     conditions: [],
-    penaltyMultiplier: 0.80,
-    evaluate: (_raw: RawMetrics, lineMetadata?: LineMetadata) => {
-      if (!lineMetadata) return false;
-      const narrative = lineMetadata.narrative;
-      if (narrative.lineCount === 0) return false;
+    penaltyMultiplier: 0.80, // grader 定義時は未使用 (正本と同じ後方参照用の旧値)
+    graderMultiplier: (_raw: RawMetrics, lineMetadata?: LineMetadata) => {
+      const narrative = lineMetadata?.narrative;
+      if (!narrative || narrative.lineCount === 0) return 1.0;
       const ratio = narrative.short14 / narrative.lineCount;
-      return ratio > SHORT14_NARRATIVE_RATIO_THRESHOLD;
+      if (ratio <= SHORT14_NARRATIVE_RATIO_THRESHOLD) return 1.0;
+      return Math.max(0.55, 1 - (ratio - SHORT14_NARRATIVE_RATIO_THRESHOLD));
     },
   },
 ];

@@ -79,6 +79,13 @@ Deno.test("cache_staleness: penalty 合成 min-mult 化前のスキーマ10は s
   assertEquals(isCacheStale(10), true);
 });
 
-Deno.test("cache_staleness: penalty 合成 min-mult 化でスキーマバージョンが 11 になる", () => {
-  assertEquals(CURRENT_SCHEMA_VERSION, 11);
+Deno.test("cache_staleness: 候補 D 反映前のスキーマ11は stale", () => {
+  // schemaVersion 11 のキャッシュは narrativeCharPerLine weight 化・Σweight rescale・
+  // 短行14 grade 化・一文一段落 0.85 緩和のいずれも反映されていない。スコアの絶対値が
+  // 全作品で変わるため再算出させる。
+  assertEquals(isCacheStale(11), true);
+});
+
+Deno.test("cache_staleness: 候補 D 反映でスキーマバージョンが 12 になる", () => {
+  assertEquals(CURRENT_SCHEMA_VERSION, 12);
 });

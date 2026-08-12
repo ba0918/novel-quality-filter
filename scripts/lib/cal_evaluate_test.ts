@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import type {
   CategoryCount,
   LineMetadata,
@@ -8,6 +8,7 @@ import type {
 import { calculateScore, DEFAULT_THRESHOLD } from "../../src/domain/scoring/mod.ts";
 import {
   CALIBRATION_CONTROL_POINTS,
+  combinePenaltyMultipliers,
   METRIC_CONFIGS,
   PENALTY_RULES,
 } from "../../src/domain/scoring/weights.ts";
@@ -160,8 +161,9 @@ Deno.test(
     const result = evaluateRecord(rec, CANONICAL_FORMULA);
     const short14Penalty = result.penalties.find((p) => p.label === "地の文短行14 の過多");
     assert(short14Penalty, "record.lineMetadata が calculateScore に渡っていない");
-    assertEquals(short14Penalty.multiplier, 0.80);
-    // 短行14 単独発火 → mult=0.80 が baseScore に掛かる → score は下がる
+    // 候補 D: grade 化により 40% → 1-(0.40-0.30) = 0.90 (浮動小数のため almost)
+    assertAlmostEquals(short14Penalty.multiplier, 0.90, 1e-9);
+    // 短行14 単独発火 → grade mult が baseScore に掛かる → score は下がる
     const scoreNoMeta = calculateScore(cleanRaw).score;
     if (!(result.score < scoreNoMeta)) {
       throw new Error(
@@ -219,12 +221,23 @@ Deno.test({
       // scoreResultFromMetrics の内部再計算と同じロジックで再構成する。
       let sum = 0;
       for (const c of CANONICAL_FORMULA.metricConfigs) {
-        const n = c.normalize(rec.rawMetrics[c.key as keyof RawMetrics] as number);
+        // deriveRawValue 定義済み指標 (narrativeCharPerLine) は raw[key] に無い派生値
+        const rv = c.deriveRawValue
+          ? c.deriveRawValue(rec.rawMetrics, rec.lineMetadata)
+          : (rec.rawMetrics[c.key as keyof RawMetrics] as number);
+        const n = c.normalize(rv);
         sum += (c.invert ? 1 - n : n) * c.weight * 100;
       }
-      const base = Math.max(0, Math.min(100, sum));
-      let mult = 1;
+      // 候補 D: Σweight rescale (scoreResultFromMetrics と同じ)
+      const weightSum = CANONICAL_FORMULA.metricConfigs.reduce((s, c) => s + c.weight, 0);
+      const base = Math.max(0, Math.min(100, sum / weightSum));
+      const fired: number[] = [];
       for (const rule of CANONICAL_FORMULA.penaltyRules) {
+        if (rule.graderMultiplier) {
+          const m = rule.graderMultiplier(rec.rawMetrics, rec.lineMetadata);
+          if (m < 1.0) fired.push(m);
+          continue;
+        }
         const fires = rule.evaluate
           ? rule.evaluate(rec.rawMetrics, rec.lineMetadata)
           : rule.conditions.every((cond) => {
@@ -235,8 +248,10 @@ Deno.test({
             const nv = c.invert ? 1 - n : n;
             return nv < cond.criticalThreshold;
           });
-        if (fires) mult *= rule.penaltyMultiplier;
+        if (fires) fired.push(rule.penaltyMultiplier);
       }
+      // 案 A: min-mult 合成 (scoreResultFromMetrics と同じ)
+      const mult = combinePenaltyMultipliers(fired);
       const uncalibrated = Math.round(Math.max(0, Math.min(100, base * mult)));
 
       const rawPass = uncalibrated > DEFAULT_THRESHOLD;

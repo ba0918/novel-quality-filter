@@ -1,14 +1,16 @@
-import { assertEquals } from "@std/assert";
+import { assertAlmostEquals, assertEquals } from "@std/assert";
 import type { CategoryCount, LineMetadata, NarrativeCount, RawMetrics } from "../types.ts";
 import { calculateScore } from "./mod.ts";
 import { aggregateLineMetadata } from "../analyzer/line_metadata.ts";
 
 // スコア寄与の契約:
-//   - lineMetadata は「指定された penalty rule から参照される派生値」だけがスコアに影響する
+//   - lineMetadata は「weight 指標または penalty rule から参照される派生値」だけがスコアに影響する
 //   - それ以外の lineMetadata フィールド（dialogue / meta / non-terminal / narrative の
 //     参照されない集計）は素通しでスコアを動かさない
-// 現行で参照されるのは「地の文短行14 の過多」ペナルティ経由の narrative.short14 / lineCount のみ。
-// 将来 rule が増えたときはこの契約自体を書き直す（＝スコア入力の昇格を明示的に扱う）。
+// 現行で参照されるのは narrative.charCount / lineCount（narrativeCharPerLine 指標）と
+// narrative.short14 / lineCount（「地の文短行14 の過多」grade ペナルティ）のみ。
+// 候補 D (rev 20260812190006) で narrative.charCount がスコア入力へ昇格した（この契約書き直しが
+// 「スコア入力の昇格を明示的に扱う」の実行）。将来さらに増えたときも同様にここを書き直す。
 
 const SAMPLE: RawMetrics = {
   charCount: 1200,
@@ -74,20 +76,17 @@ Deno.test("スコア非干渉: 別経路で aggregateLineMetadata を呼んで�
 Deno.test(
   "スコア寄与: 参照されない lineMetadata フィールド（dialogue/meta/non-terminal/narrative の非参照集計）は score を動かさない",
   () => {
-    const scoreNoMeta = calculateScore(SAMPLE);
-
-    // narrative.lineCount と narrative.short14 だけが「地の文短行14 の過多」ペナルティの参照対象。
-    // それ以外は数字を派手に変えても score に影響しないことを固定する。
+    // 参照フィールド (narrative.charCount/lineCount/short14) を両者で同一に保ち、
+    // 非参照フィールドだけを派手に膨らませて score が一致することを固定する。
+    const referenced = { lineCount: 100, charCount: 8000, short14: 10 };
+    const baseMeta = makeLineMetadata({ narrative: makeNarrative(referenced) });
     const noisyMeta = makeLineMetadata({
       totalLines: 999,
       totalChars: 99999,
       blankCount: 500,
       separatorCount: 20,
-      // narrative は「非参照フィールド」だけ膨らませる（short14/lineCount は現状比率 0 を保つ）。
       narrative: makeNarrative({
-        lineCount: 100,
-        charCount: 8000,
-        short14: 10, // 10/100 = 10% → 閾値 30% 未満で非発火
+        ...referenced,
         short20: 60,
         short30: 80,
         chunkCount: 150,
@@ -99,30 +98,34 @@ Deno.test(
       meta: makeCategory({ lineCount: 50, charCount: 800, short14: 40 }),
       nonTerminal: makeCategory({ lineCount: 30, charCount: 400, short14: 20 }),
     });
+    const scoreBase = calculateScore(SAMPLE, baseMeta);
     const scoreWithNoise = calculateScore(SAMPLE, noisyMeta);
-    assertEquals(scoreWithNoise, scoreNoMeta, "参照されないフィールドはスコアを動かしてはならない");
+    assertEquals(scoreWithNoise, scoreBase, "参照されないフィールドはスコアを動かしてはならない");
   },
 );
 
 Deno.test(
   "スコア寄与: 参照される派生値（narrative.short14 / lineCount）は指定 rule 経由で score を下げる",
   () => {
-    const scoreNoMeta = calculateScore(SAMPLE);
-
-    // 地の文 100 行中 40 行が 14 字未満 → 40% で 30% 閾値超え → 「地の文短行14 の過多」発火。
-    const firingMeta = makeLineMetadata({
-      narrative: makeNarrative({ lineCount: 100, short14: 40 }),
+    // 地の文の行数・字数を固定したまま short14 だけを増やし、grade ペナルティ経由で
+    // score が下がることを固定する（ncpl 指標の寄与を両者で同一に保つため charCount も固定）。
+    const calmMeta = makeLineMetadata({
+      narrative: makeNarrative({ lineCount: 100, charCount: 3000, short14: 10 }),
     });
+    // 100 行中 40 行が 14 字未満 → 40% で 30% 閾値超え → grade multiplier 1-(0.40-0.30)=0.90
+    const firingMeta = makeLineMetadata({
+      narrative: makeNarrative({ lineCount: 100, charCount: 3000, short14: 40 }),
+    });
+    const scoreCalm = calculateScore(SAMPLE, calmMeta);
     const scoreWithMeta = calculateScore(SAMPLE, firingMeta);
 
-    // 参照される派生値がスコアを下げること、および指定 rule が penalties に現れることを固定。
-    if (!(scoreWithMeta.score < scoreNoMeta.score)) {
+    if (!(scoreWithMeta.score < scoreCalm.score)) {
       throw new Error(
-        `短行14 発火時は score が下がるはず: no-meta=${scoreNoMeta.score} with-meta=${scoreWithMeta.score}`,
+        `短行14 発火時は score が下がるはず: calm=${scoreCalm.score} with-meta=${scoreWithMeta.score}`,
       );
     }
     const short14Penalty = scoreWithMeta.penalties.find((p) => p.label === "地の文短行14 の過多");
     if (!short14Penalty) throw new Error("短行14 ペナルティが penalties に現れていない");
-    assertEquals(short14Penalty.multiplier, 0.80);
+    assertAlmostEquals(short14Penalty.multiplier, 0.90, 1e-9);
   },
 );
