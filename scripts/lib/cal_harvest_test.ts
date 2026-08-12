@@ -102,7 +102,7 @@ Deno.test("harvestCandidates: 一覧取得ごとに intervalMs で sleep する"
   assertEquals(slept, [2000, 2000, 2000, 2000]);
 });
 
-Deno.test("executeHarvest: 通常経路は register へ workId と --tag を渡す", async () => {
+Deno.test("executeHarvest: 通常経路は register へ workId と --tag と --out を渡す", async () => {
   const registered: string[][] = [];
   const code = await executeHarvest(
     parseHarvestArgs(["t", "--max", "5"]),
@@ -116,8 +116,35 @@ Deno.test("executeHarvest: 通常経路は register へ workId と --tag を渡�
   );
   assertEquals(code, 0);
   assertEquals(registered.length, 1);
-  assertEquals(registered[0].slice(-2), ["--tag", "auto-harvest"]);
-  assertEquals(registered[0].slice(0, -2).sort(), ["111", "222"]);
+  assertEquals(registered[0].slice(-4), [
+    "--out",
+    ".agents/runtime/dataset.jsonl",
+    "--tag",
+    "auto-harvest",
+  ]);
+  assertEquals(registered[0].slice(0, -4).sort(), ["111", "222"]);
+});
+
+Deno.test("executeHarvest: --out は seen の読み先と register の書き先の両方に効く", async () => {
+  const seenPaths: string[] = [];
+  const registered: string[][] = [];
+  await executeHarvest(
+    parseHarvestArgs(["t", "--out", "/tmp/other.jsonl"]),
+    depsWith({
+      httpGet: () => Promise.resolve(`<a href="/works/111"></a>`),
+      loadSeen: (path) => {
+        seenPaths.push(path);
+        return Promise.resolve(new Set<string>());
+      },
+      register: (argv) => {
+        registered.push(argv);
+        return Promise.resolve(0);
+      },
+    }),
+  );
+  assertEquals(seenPaths, ["/tmp/other.jsonl"]);
+  assertEquals(registered[0].includes("--out"), true);
+  assertEquals(registered[0][registered[0].indexOf("--out") + 1], "/tmp/other.jsonl");
 });
 
 Deno.test("executeHarvest: --dry-run は register を呼ばない", async () => {

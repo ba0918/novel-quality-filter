@@ -137,8 +137,9 @@ export async function executeHarvest(
     for (const id of candidates) console.log(`  ${id}`);
     return 0;
   }
+  // --out は seen の読み先と register の書き先の両方に効かせる (食い違うと重複判定が壊れる)
   const tagArgs = opts.registerTags.flatMap((t) => ["--tag", t]);
-  return await deps.register([...candidates, ...tagArgs]);
+  return await deps.register([...candidates, "--out", opts.datasetPath, ...tagArgs]);
 }
 
 function httpGetText(url: string): Promise<string> {
