@@ -68,7 +68,45 @@ deno task check
 
 # 較正データセットの収集・スコアリング（デバッグ用）
 deno task cal register <URL または作品ID>...
+
+# 候補の自動収穫 → そのまま register（タグ×更新順一覧から未収集作品を無作為抽出）
+deno task cal harvest [--dry-run] [--max N] [タグ...]
+
+# ラベル付けビューア（cal.json を再生成してから配信）
+deno task cal list
+deno task cal serve
 ```
+
+### スマホでラベル付けする（cal serve --lan）
+
+同一 LAN のスマホからラベル付けする場合は `--lan` を付けて起動する（既定は localhost 限定。cal.json
+は作品由来のメタを含むため、明示 opt-in のときだけ LAN へ公開する）。
+
+```bash
+deno task cal serve --lan
+# 起動時に表示される http://<LAN IP>:8000/mobile.html をスマホで開く
+```
+
+`/mobile.html` はラベル付け専用の軽量ページで、未ラベル作品を境界帯 （スコア 45 近傍 =
+判定が最も揺れる帯）から順に 1 件ずつ表示する。 スキップした作品は列の最後尾に回る。
+
+**WSL2 でのハマりどころ（ファイアウォール）**: WSL2 の mirrored ネットワーク モードでは、Hyper-V
+ファイアウォールが既定で外部からの着信をブロックするため、 `0.0.0.0` に bind
+してもスマホから届かない。Windows 側の管理者 PowerShell で ポート 8000
+だけを許可するルールを追加する（GUID は WSL の VMCreatorId 固定値）:
+
+```powershell
+New-NetFirewallHyperVRule -DisplayName 'novel-quality-filter cal serve' -Direction Inbound -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol TCP -LocalPorts 8000 -Action Allow
+```
+
+使い終わったら削除する:
+
+```powershell
+Remove-NetFirewallHyperVRule -DisplayName 'novel-quality-filter cal serve'
+```
+
+`Set-NetFirewallHyperVVMSetting -DefaultInboundAction Allow` でも通るが、 WSL
+への着信を全開放するため使わないこと。
 
 ## Chrome への読み込み
 
