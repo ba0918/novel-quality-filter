@@ -272,7 +272,7 @@ weights_experiment 段階の候補を canonical へ反映する前に以下を�
 ```typescript
 interface ScoreResult {
   score: number; // 0-100（表示較正カーブ f を通し round した最終値）
-  metrics: MetricResult[]; // 12 指標それぞれの詳細
+  metrics: MetricResult[]; // 全指標 (METRIC_CONFIGS の各エントリ) それぞれの詳細
   penalties: PenaltyResult[]; // 発火した複合ペナルティのラベルと乗算係数
   openingType?: OpeningFormat; // 第1話の形式判定結果（キャラ紹介 / 掲示板 / 短文 / 通常）
   sampledCount?: number; // 再評価で取得・調査した話数（1 = 第1話のみ）
