@@ -37,6 +37,11 @@ export const ASSET_FILES = [
   "label_editor.js",
   "label_update.js",
   "toast.js",
+  // スマホ向けラベル付けページ (mobile.html は index.html と独立の入口)
+  "mobile.html",
+  "mobile.css",
+  "mobile.js",
+  "mobile_queue.js",
 ];
 
 // scripts/lib/cal_viewer/ の絶対パス（assets のソース）。cal.json はここに含めない
@@ -305,7 +310,22 @@ export function shouldAutoOpen(argv: string[]): boolean {
 
 // serve 用の既知フラグ以外は typo として即座に返し、意図せず素通りするのを防ぐ。
 // list/evaluate と揃えて、未知フラグは非零 exit で運用者に気づかせる。
-const KNOWN_SERVE_FLAGS = new Set(["--no-open"]);
+const KNOWN_SERVE_FLAGS = new Set(["--no-open", "--lan"]);
+
+export function isLanRequested(argv: string[]): boolean {
+  return argv.includes("--lan");
+}
+
+// LAN 側からアクセスできる URL の一覧。Deno.networkInterfaces() の結果を注入して
+// IPv4 かつループバック以外だけを URL 化する (IPv6 はスマホのブラウザで打ちにくいので出さない)。
+export function lanUrls(
+  port: number,
+  interfaces: Array<{ family: string; address: string }>,
+): string[] {
+  return interfaces
+    .filter((i) => i.family === "IPv4" && i.address !== "127.0.0.1")
+    .map((i) => `http://${i.address}:${port}/`);
+}
 
 export function unknownServeFlags(argv: string[]): string[] {
   return argv.filter((a) => !KNOWN_SERVE_FLAGS.has(a));
@@ -331,16 +351,21 @@ function openBrowser(url: string): void {
 
 // hostname を明示しないと Deno.serve の既定値 0.0.0.0 で全インターフェースへ bind される。
 // cal.json は作品本文由来のメタを含み著作権上 git 管理外にしている（cal_viewer_config の
-// デフォルト distDir 参照）以上、LAN 越しに露出させるのは事故なので localhost 限定にする。
-export function serveOptions(cfg: ViewerConfig): { hostname: string; port: number } {
-  return { hostname: "127.0.0.1", port: cfg.port };
+// デフォルト distDir 参照）以上、意図せず LAN 越しに露出させるのは事故なので既定は
+// localhost 限定。スマホからのラベル付け用に --lan で明示 opt-in したときだけ全
+// インターフェースへ広げる（露出はユーザーの明示判断に限る）。
+export function serveOptions(
+  cfg: ViewerConfig,
+  lan = false,
+): { hostname: string; port: number } {
+  return { hostname: lan ? "0.0.0.0" : "127.0.0.1", port: cfg.port };
 }
 
 export async function runServe(argv: string[], config?: ViewerConfig): Promise<number> {
   const unknown = unknownServeFlags(argv);
   if (unknown.length > 0) {
     console.error(`未知のフラグ: ${unknown.join(" ")}`);
-    console.error("使い方: deno task cal serve [--no-open]");
+    console.error("使い方: deno task cal serve [--no-open] [--lan]");
     return 1;
   }
   const cfg = config ?? await loadViewerConfig();
@@ -349,10 +374,20 @@ export async function runServe(argv: string[], config?: ViewerConfig): Promise<n
   const hint = await missingCalJsonHint(cfg.distDir);
   if (hint) console.error(hint);
 
+  const lan = isLanRequested(argv);
   const handler = createRequestHandler(cfg.distDir, DEFAULT_LABELS);
-  const server = Deno.serve({ ...serveOptions(cfg), onListen: () => {} }, handler);
+  const server = Deno.serve({ ...serveOptions(cfg, lan), onListen: () => {} }, handler);
   const url = `http://localhost:${cfg.port}/`;
   console.log(`cal viewer を配信中: ${url}（Ctrl+C で終了）`);
+  if (lan) {
+    const urls = lanUrls(cfg.port, Deno.networkInterfaces());
+    if (urls.length === 0) {
+      console.log("LAN 向けアドレスが見つかりませんでした (localhost のみ)");
+    }
+    for (const u of urls) {
+      console.log(`  LAN: ${u} (スマホのラベル付けは ${u}mobile.html)`);
+    }
+  }
 
   if (shouldAutoOpen(argv)) openBrowser(url);
 

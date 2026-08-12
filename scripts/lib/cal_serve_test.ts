@@ -9,6 +9,8 @@ import {
   contentTypeFor,
   copyAssets,
   createRequestHandler,
+  isLanRequested,
+  lanUrls,
   missingCalJsonHint,
   openBrowserCommand,
   resolveAssetPath,
@@ -655,11 +657,45 @@ Deno.test("ASSET_FILES: app.js からの推移的なローカル ./*.js import �
   }
 });
 
-Deno.test("unknownServeFlags: --no-open は既知、他は未知扱い", () => {
+Deno.test("unknownServeFlags: --no-open と --lan は既知、他は未知扱い", () => {
   assertEquals(unknownServeFlags([]), []);
   assertEquals(unknownServeFlags(["--no-open"]), []);
+  assertEquals(unknownServeFlags(["--lan"]), []);
   assertEquals(unknownServeFlags(["--bogus"]), ["--bogus"]);
   assertEquals(unknownServeFlags(["--no-open", "--extra"]), ["--extra"]);
+});
+
+Deno.test("serveOptions: --lan 指定時のみ全インターフェースへ bind する", () => {
+  assertEquals(serveOptions({ distDir: "/dist", port: 8000 }, true), {
+    hostname: "0.0.0.0",
+    port: 8000,
+  });
+  // 省略時は従来どおり localhost 限定（既定挙動の不変を保証）
+  assertEquals(serveOptions({ distDir: "/dist", port: 8000 }).hostname, "127.0.0.1");
+});
+
+Deno.test("isLanRequested: --lan の有無で判定する", () => {
+  assertEquals(isLanRequested([]), false);
+  assertEquals(isLanRequested(["--lan"]), true);
+  assertEquals(isLanRequested(["--no-open", "--lan"]), true);
+});
+
+Deno.test("lanUrls: IPv4 かつループバック以外のアドレスだけを URL 化する", () => {
+  const interfaces = [
+    { family: "IPv4", address: "127.0.0.1" },
+    { family: "IPv4", address: "192.168.1.23" },
+    { family: "IPv6", address: "::1" },
+    { family: "IPv6", address: "fe80::1" },
+    { family: "IPv4", address: "172.20.0.5" },
+  ];
+  assertEquals(lanUrls(8000, interfaces), [
+    "http://192.168.1.23:8000/",
+    "http://172.20.0.5:8000/",
+  ]);
+});
+
+Deno.test("lanUrls: 対象アドレスがなければ空配列", () => {
+  assertEquals(lanUrls(8000, [{ family: "IPv4", address: "127.0.0.1" }]), []);
 });
 
 Deno.test("openBrowserCommand: OS ごとに正しいコマンドを選ぶ", () => {
