@@ -12,7 +12,7 @@ import {
   useState,
 } from "https://esm.sh/preact@10.28.3/hooks";
 import htm from "https://esm.sh/htm@3.1.1";
-import { formatInt, safeHref } from "./format.js";
+import { formatInt, formatPenaltyMultiplier, safeHref } from "./format.js";
 import { rawMetricsRows } from "./raw_metrics.js";
 import { applyFilters, LABEL_CHIPS, labelCounts, labelsOf } from "./list_filter.js";
 import { bandSegments, categoryBreakdown, shortBarRatio, summarize } from "./line_meta.js";
@@ -480,7 +480,7 @@ function MetricsTable({ work }) {
 function PenaltyMultiplier({ penalty, side }) {
   return html`
     <div class=${`penalty-mult ${side}`}>${penalty
-      ? `×${penalty.multiplier.toFixed(2)}`
+      ? `×${formatPenaltyMultiplier(penalty.multiplier)}`
       : "—"}</div>
   `;
 }

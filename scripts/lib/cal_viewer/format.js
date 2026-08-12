@@ -66,3 +66,9 @@ export function safeHref(url) {
   }
   return url.trim();
 }
+
+// penalty multiplier の表示用 (dossier_format.ts と同期)。grade ペナルティの連続値を
+// 小数第3位に丸めて末尾ゼロを削る。
+export function formatPenaltyMultiplier(multiplier) {
+  return String(Math.round(multiplier * 1000) / 1000);
+}

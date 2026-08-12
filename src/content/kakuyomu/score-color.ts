@@ -1,5 +1,6 @@
 import type { ScoreResult } from "../../domain/types.ts";
 import { formatOpeningContext } from "../../domain/analyzer/opening_format.ts";
+import { formatPenaltyMultiplier } from "../../domain/analyzer/dossier_format.ts";
 
 const COLOR_RED_BOUNDARY = 35;
 const COLOR_GREEN_BOUNDARY = 65;
@@ -61,7 +62,7 @@ export function createTooltip(result: ScoreResult): HTMLSpanElement {
   for (const p of result.penalties) {
     const line = document.createElement("span");
     line.className = "nqf-tooltip-line";
-    line.textContent = `⚠ ${p.label} x${p.multiplier}`;
+    line.textContent = `⚠ ${p.label} x${formatPenaltyMultiplier(p.multiplier)}`;
     tooltip.appendChild(line);
   }
 

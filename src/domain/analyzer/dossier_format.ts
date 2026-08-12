@@ -14,6 +14,12 @@ export function formatInt(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+// penalty multiplier の表示用。grade ペナルティ (連続値) は 0.9111111111111111 のような
+// 浮動小数の生値を持つため、小数第3位に丸めて末尾ゼロを削る (0.911 / 0.85 / 0.9)。
+export function formatPenaltyMultiplier(multiplier: number): string {
+  return String(Math.round(multiplier * 1000) / 1000);
+}
+
 export function percentInt(numerator: number, denominator: number): string {
   if (denominator === 0) return "-";
   return `${Math.round((numerator / denominator) * 100)}%`;

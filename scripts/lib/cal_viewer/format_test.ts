@@ -98,3 +98,10 @@ Deno.test("safeHref: http/https/相対URLは許可、危険スキームは同じ
     assertEquals(jsAllowed, denoAllowed, `accept/reject差: ${url}`);
   }
 });
+
+Deno.test("formatPenaltyMultiplier: Deno側とブラウザ側が同じ出力を返す", () => {
+  for (const v of [0.9111111111111111, 0.85, 0.55, 0.8999999999999999, 1]) {
+    assertEquals(jsFormat.formatPenaltyMultiplier(v), denoFormat.formatPenaltyMultiplier(v));
+  }
+  assertEquals(jsFormat.formatPenaltyMultiplier(0.9111111111111111), "0.911");
+});

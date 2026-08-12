@@ -5,6 +5,7 @@ import {
   averagePerLineLabel,
   compositionSegments,
   formatInt,
+  formatPenaltyMultiplier,
   formatRawValue,
   isNarrativeCount,
   percentInt,
@@ -151,4 +152,13 @@ Deno.test("compositionSegments: 6区分の [slug,count] を構成順に返す", 
     ["blank", 2],
     ["sep", 1],
   ]);
+});
+
+Deno.test("formatPenaltyMultiplier: 小数第3位までに丸め、末尾ゼロは削る", () => {
+  // grade ペナルティ (連続 multiplier) の生値 0.9111111111111111 のような表示を防ぐ
+  assertEquals(formatPenaltyMultiplier(0.9111111111111111), "0.911");
+  assertEquals(formatPenaltyMultiplier(0.85), "0.85");
+  assertEquals(formatPenaltyMultiplier(0.55), "0.55");
+  assertEquals(formatPenaltyMultiplier(0.8999999999999999), "0.9");
+  assertEquals(formatPenaltyMultiplier(1), "1");
 });

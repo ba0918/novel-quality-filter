@@ -11,6 +11,7 @@ import {
   averagePerLineLabel,
   compositionSegments,
   formatInt,
+  formatPenaltyMultiplier,
   formatRawValue,
   isNarrativeCount,
   percentInt,
@@ -253,7 +254,7 @@ function createPenaltySection(penalties: PenaltyResult[]): HTMLDivElement {
 
     const multiplier = document.createElement("span");
     multiplier.className = "nqf-penalty-multiplier";
-    multiplier.textContent = `x${p.multiplier}`;
+    multiplier.textContent = `x${formatPenaltyMultiplier(p.multiplier)}`;
     row.appendChild(multiplier);
 
     section.appendChild(row);
