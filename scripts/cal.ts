@@ -1,5 +1,6 @@
 // 較正ループツールの統一入口（純ルーター）。第1引数のサブコマンドを本体（scripts/lib/cal_*）へ
-// 委譲するだけで、ロジックは持たない。起動: deno task cal <register|label|tag|exclude|evaluate|list|serve> ...
+// 委譲するだけで、ロジックは持たない。
+// 起動: deno task cal <register|label|tag|exclude|evaluate|list|serve|harvest> ...
 //
 // detail サブコマンドは廃止した。1作品の詳細は list が焼く cal.json からブラウザ側（serve が
 // 配信する cal_viewer/app.js）で描画する。
@@ -8,6 +9,7 @@ import { runRegister } from "./lib/cal_register.ts";
 import { runExclude, runLabel, runTag } from "./lib/cal_labels.ts";
 import { runEvaluate, runList } from "./lib/cal_list.ts";
 import { runServe } from "./lib/cal_serve.ts";
+import { runHarvest } from "./lib/cal_harvest.ts";
 
 export type Handler = (args: string[]) => Promise<number>;
 
@@ -19,6 +21,7 @@ export const HANDLERS: Record<string, Handler> = {
   evaluate: runEvaluate,
   list: runList,
   serve: runServe,
+  harvest: runHarvest,
 };
 
 export async function route(
